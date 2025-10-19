@@ -47,7 +47,7 @@ function App({ employeeID }: AppProps) {
       // Fetch all data in parallel for better performance
       const [hotelsData, companionsData, roomTypesData, transportData, employeeName, maximumNoOfCompanionsValue] = await Promise.all([
         getHotelsFromServer(),
-        getCompanionsFromServer(),
+        getCompanionsFromServer(employeeID),
         getRoomTypesFromServer(),
         getTransportOptionsFromServer(),
         getEmployeeNameFromServer(employeeID),

@@ -37,9 +37,10 @@ export async function getHotelsFromServer() {
     return {};
   }
 }
-export async function getCompanionsFromServer() {
+
+export async function getCompanionsFromServer(employeeID: number) {
   try {
-    const response = await fetch('http://localhost:3000/api/companions');
+    const response = await fetch('http://localhost:3000/api/companions/' + employeeID);
     const result = await response.json();
     
     if (result.success) {

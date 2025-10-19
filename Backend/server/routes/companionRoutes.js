@@ -3,8 +3,9 @@ const router = express.Router();
 const companionService = require('../services/companionService');
 
 
-router.get('/companions', (req, res) => {
-  const companions = companionService.getCompanions();
+router.get('/companions/:employeeId', (req, res) => {
+  const { employeeId } = req.params;
+  const companions = companionService.getCompanions(employeeId);
 
   if (companions.length === 0) {
     return res.status(404).json({ success: false, message: 'companion not found' });
