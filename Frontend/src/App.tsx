@@ -1,0 +1,687 @@
+import { useState, useEffect, useRef } from 'react';
+
+interface Hotel {
+  id: string;
+  en: string;
+  ar: string;
+}
+
+interface Companion {
+  rel: string;
+  name: string;
+}
+
+interface RoomType {
+  key: string;
+  ar: string;
+  factor: number;
+}
+
+interface ColumnState {
+  selectedCity: string;
+  selectedHotel: Hotel | null;
+  travelAllowance: string;
+  arrivalDate: string;
+  roomCounts: Record<string, number>;
+  extraBedCounts: Record<string, number>;
+  maxExtraBeds: Record<string, number>;
+}
+
+const HOTELS: Record<string, Hotel[]> = {
+  "القاهرة": [
+    {id:"c_fs_nile", en:"Four Seasons Hotel Cairo at Nile Plaza", ar:"فندق فورسيزونز نايل بلازا"},
+    {id:"c_ramses", en:"Ramses Hilton Cairo", ar:"رمسيس هيلتون"},
+    {id:"c_fairmont", en:"Fairmont Nile City", ar:"فيرمونت نايل سيتي"},
+    {id:"c_mena", en:"Marriott Mena House", ar:"ماريوت مينا هاوس"},
+    {id:"c_conrad", en:"Conrad Cairo", ar:"كونراد القاهرة"},
+  ],
+  "الإسكندرية": [
+    {id:"a_fs", en:"Four Seasons Alexandria at San Stefano", ar:"فورسيزونز الإسكندرية"},
+    {id:"a_hilton", en:"Hilton Alexandria Corniche", ar:"هيلتون الإسكندرية كورنيش"},
+    {id:"a_steigen", en:"Steigenberger Cecil", ar:"شتايجنبرجر سيسيل"},
+  ],
+  "شرم الشيخ": [
+    {id:"s_rixos", en:"Rixos Premium Seagate", ar:"ريكسوس بريميوم سيجيت"},
+    {id:"s_baron", en:"Baron Resort Sharm El Sheikh", ar:"بارون شرم"},
+    {id:"s_savoy", en:"Savoy Sharm El Sheikh", ar:"سافوي شرم"},
+  ],
+  "الغردقة": [
+    {id:"h_steigen", en:"Steigenberger Al Dau Beach", ar:"شتايجنبرجر الداو"},
+    {id:"h_jaz", en:"Jaz Aquamarine", ar:"جاز أكوامارين"},
+    {id:"h_pick", en:"Pickalbatros Sea World", ar:"بيكالبتروس سي وورلد"},
+  ],
+  "الأقصر": [
+    {id:"l_sofitel", en:"Sofitel Winter Palace Luxor", ar:"سوفيتيل ونتر بالاس الأقصر"},
+    {id:"l_hilton", en:"Hilton Luxor Resort & Spa", ar:"هيلتون الأقصر"},
+  ],
+  "أسوان": [
+    {id:"as_old", en:"Sofitel Legend Old Cataract Aswan", ar:"سوفيتيل أولد كتراكت أسوان"},
+    {id:"as_moven", en:"Mövenpick Resort Aswan", ar:"موفنبيك أسوان"},
+  ],
+  "سهل حشيش": [
+    {id:"sh_oberoi", en:"The Oberoi Sahl Hasheesh", ar:"أوبروي سهل حشيش"},
+    {id:"sb_kemp", en:"Kempinski Soma Bay", ar:"كيمبنسكي سوما باي"},
+  ],
+  "منتجعات البحر الأحمر": [
+    {id:"r_baron", en:"Baron Palace Resort", ar:"بارون بالاس"},
+    {id:"r_grand", en:"The Grand Resort", ar:"الجراند ريزورت"},
+  ]
+};
+
+const COMPANIONS: Companion[] = [
+  { rel: "زوجة", name: "رانا على مسعد إبراهيم" },
+  { rel: "ابن", name: "مالك جمال الدين محمود" },
+  { rel: "ابنة", name: "هنا جمال الدين محمود" },
+  { rel: "أب", name: "محمود أحمد السيد" },
+  { rel: "أم", name: "السيدة محمد فهيم" },
+  { rel: "ابن", name: "احمد جمال الدين محمود" },
+  { rel: "ابنة", name: "مليكه جمال الدين محمود" }
+];
+
+const ROOM_TYPES: RoomType[] = [
+  { key: "single", ar: "فردي", factor: 1.0 },
+  { key: "double", ar: "مزدوج", factor: 1.4 },
+  { key: "trible", ar: "ثلاثي", factor: 1.7 },
+  { key: "family_room", ar: "غرفة عائلية", factor: 2.0 },
+  { key: "family_suite", ar: "جناح عائلي", factor: 2.6 },
+  { key: "joiner_suite", ar: "جناح ملحق", factor: 2.8 }
+];
+
+const TRANSPORT_OPTIONS = ['لايوجد','300','400','500','600','700'];
+
+function App() {
+  const [selectedCompanions, setSelectedCompanions] = useState<string[]>([]);
+  const [showHotelPopup, setShowHotelPopup] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [currentColumn, setCurrentColumn] = useState<number | null>(null);
+  const [calendarColumn, setCalendarColumn] = useState<number | null>(null);
+  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
+  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
+  const [tooltip, setTooltip] = useState<{show: boolean, x: number, y: number, content: string}>({
+    show: false, x: 0, y: 0, content: ''
+  });
+
+  const [columns, setColumns] = useState<Record<number, ColumnState>>({
+    1: { selectedCity: '', selectedHotel: null, travelAllowance: 'لايوجد', arrivalDate: '', roomCounts: {}, extraBedCounts: {}, maxExtraBeds: {} },
+    2: { selectedCity: '', selectedHotel: null, travelAllowance: 'لايوجد', arrivalDate: '', roomCounts: {}, extraBedCounts: {}, maxExtraBeds: {} },
+    3: { selectedCity: '', selectedHotel: null, travelAllowance: 'لايوجد', arrivalDate: '', roomCounts: {}, extraBedCounts: {}, maxExtraBeds: {} }
+  });
+
+  const handleCompanionChange = (value: string, checked: boolean) => {
+    if (checked) {
+      if (selectedCompanions.length >= 6) {
+        alert('الحد الأقصى للمرافقين هو 6.');
+        return;
+      }
+      setSelectedCompanions([...selectedCompanions, value]);
+    } else {
+      setSelectedCompanions(selectedCompanions.filter(c => c !== value));
+    }
+  };
+
+  const handleCityChange = (col: number, city: string) => {
+    const transportIdx = Math.floor(Math.random() * TRANSPORT_OPTIONS.length);
+    setColumns(prev => ({
+      ...prev,
+      [col]: {
+        ...prev[col],
+        selectedCity: city,
+        travelAllowance: city ? TRANSPORT_OPTIONS[transportIdx] : 'لايوجد'
+      }
+    }));
+  };
+
+  const openHotelPopup = (col: number) => {
+    const city = columns[col].selectedCity;
+    if (!city) {
+      alert('اختر المدينة أولاً');
+      return;
+    }
+    setCurrentColumn(col);
+    setShowHotelPopup(true);
+  };
+
+  const selectHotel = (hotel: Hotel) => {
+    if (currentColumn === null) return;
+
+    const maxBeds: Record<string, number> = {};
+    ROOM_TYPES.forEach(rt => {
+      maxBeds[rt.key] = Math.floor(Math.random() * 3);
+    });
+
+    setColumns(prev => ({
+      ...prev,
+      [currentColumn]: {
+        ...prev[currentColumn],
+        selectedHotel: hotel,
+        maxExtraBeds: maxBeds
+      }
+    }));
+    setShowHotelPopup(false);
+  };
+
+  const openCalendar = (col: number) => {
+    setCalendarColumn(col);
+    const now = new Date();
+    setCalendarYear(now.getFullYear());
+    setCalendarMonth(now.getMonth());
+    setShowCalendar(true);
+  };
+
+  const selectDate = (dateObj: Date) => {
+    if (calendarColumn === null) return;
+    const dateStr = dateObj.toISOString().slice(0, 10);
+    setColumns(prev => ({
+      ...prev,
+      [calendarColumn]: {
+        ...prev[calendarColumn],
+        arrivalDate: dateStr
+      }
+    }));
+    setShowCalendar(false);
+    setTooltip({ show: false, x: 0, y: 0, content: '' });
+  };
+
+  const updateRoomCount = (col: number, roomKey: string, value: number) => {
+    const val = Math.max(0, value);
+    setColumns(prev => ({
+      ...prev,
+      [col]: {
+        ...prev[col],
+        roomCounts: { ...prev[col].roomCounts, [roomKey]: val }
+      }
+    }));
+  };
+
+  const updateExtraBedCount = (col: number, roomKey: string, value: number) => {
+    const maxAllowed = (columns[col].maxExtraBeds[roomKey] || 0) * (columns[col].roomCounts[roomKey] || 0);
+    const val = Math.max(0, Math.min(value, maxAllowed));
+    setColumns(prev => ({
+      ...prev,
+      [col]: {
+        ...prev[col],
+        extraBedCounts: { ...prev[col].extraBedCounts, [roomKey]: val }
+      }
+    }));
+  };
+
+  const priceFor = (hotelId: string, dateObj: Date, roomTypeKey: string): number => {
+    const hotelBase: Record<string, number> = {
+      c_fs_nile: 1600, c_ramses: 1200, c_fairmont: 1400, c_mena: 1300, c_conrad: 1350,
+      a_fs: 1100, a_hilton: 1000, a_steigen: 950,
+      s_rixos: 2000, s_baron: 1800, s_savoy: 1700,
+      h_steigen: 1500, h_jaz: 1450, h_pick: 1300,
+      l_sofitel: 1200, l_hilton: 1100,
+      as_old: 1250, as_moven: 1150,
+      sh_oberoi: 2200, sb_kemp: 2100,
+      r_baron: 1600, r_grand: 1400
+    };
+    const base = hotelBase[hotelId] || 1000;
+
+    const roomFactor: Record<string, number> = {
+      single: 1.0,
+      double: 1.4,
+      trible: 1.7,
+      family_room: 2.0,
+      family_suite: 2.6,
+      joiner_suite: 2.8
+    };
+
+    const day = dateObj.getDay();
+    const weekend = (day === 5 || day === 6) ? 1.2 : 1.0;
+    const fluctuation = (dateObj.getDate() % 7) * 40;
+
+    return Math.round(base * (roomFactor[roomTypeKey] || 1) * weekend + fluctuation);
+  };
+
+  const calculateTotal = (col: number): { total: number, employee: number } => {
+    const colData = columns[col];
+    if (!colData.selectedHotel || !colData.arrivalDate) {
+      return { total: 0, employee: 0 };
+    }
+
+    const dateObj = new Date(colData.arrivalDate);
+    let total = 0;
+
+    ROOM_TYPES.forEach(rt => {
+      const count = colData.roomCounts[rt.key] || 0;
+      if (count > 0) {
+        total += priceFor(colData.selectedHotel!.id, dateObj, rt.key) * count;
+      }
+    });
+
+    return { total, employee: total * 0.6 };
+  };
+
+  const monthName = (y: number, m: number) => {
+    const ar = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+    return `${ar[m]} ${y}`;
+  };
+
+  const weekdayFull = (idx: number) => {
+    const ar = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+    return ar[idx];
+  };
+
+  const renderCalendar = () => {
+    const first = new Date(calendarYear, calendarMonth, 1);
+    const start = first.getDay();
+    const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+    const headers = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+
+    const days: (number | null)[] = [];
+    for (let i = 0; i < start; i++) {
+      days.push(null);
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      days.push(d);
+    }
+
+    return (
+      <>
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {headers.map((h, i) => (
+            <div key={i} className="text-center font-semibold p-2">{h}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-2">
+          {days.map((d, i) => {
+            if (d === null) {
+              return <div key={i} className="border rounded p-2 bg-gray-50"></div>;
+            }
+            const dateObj = new Date(calendarYear, calendarMonth, d);
+            let hotelId = calendarColumn !== null && columns[calendarColumn].selectedHotel
+              ? columns[calendarColumn].selectedHotel!.id
+              : Object.values(HOTELS)[0][0].id;
+            const singlePrice = priceFor(hotelId, dateObj, "single");
+
+            return (
+              <div
+                key={i}
+                className="border rounded p-2 bg-white relative"
+                style={{ minHeight: '72px', padding: '8px' }}
+                onMouseMove={(e) => handleTooltipShow(e, dateObj)}
+                onMouseLeave={() => setTooltip({ show: false, x: 0, y: 0, content: '' })}
+              >
+                <div className="font-semibold">{d}</div>
+                <div className="text-xs text-gray-600 mt-1">بدءًا من {singlePrice} جنيه</div>
+                <div className="mt-2">
+                  <button
+                    className="w-full text-sm p-1 border rounded"
+                    onClick={() => selectDate(dateObj)}
+                  >
+                    اختيار
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </>
+    );
+  };
+
+  const handleTooltipShow = (e: React.MouseEvent, dateObj: Date) => {
+    const yyyy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const dd = String(dateObj.getDate()).padStart(2, "0");
+    const localDateStr = `${yyyy}-${mm}-${dd}`;
+
+    let hotelId = calendarColumn !== null && columns[calendarColumn].selectedHotel
+      ? columns[calendarColumn].selectedHotel!.id
+      : Object.values(HOTELS)[0][0].id;
+
+    let typesToShow = ROOM_TYPES;
+    if (calendarColumn !== null) {
+      const hasRooms = ROOM_TYPES.filter(rt => (columns[calendarColumn].roomCounts[rt.key] || 0) > 0);
+      if (hasRooms.length > 0) typesToShow = hasRooms;
+    }
+
+    let html = `<div style="font-weight:700;margin-bottom:6px">${weekdayFull(dateObj.getDay())} — ${localDateStr}</div>`;
+    html += `<table style="width:100%;font-size:13px;margin-bottom:6px"><thead><tr>
+      <th style="padding:2px 8px">نوع الغرفة</th>
+      <th style="padding:2px 8px">السعر</th>
+    </tr></thead><tbody>`;
+
+    typesToShow.forEach(rt => {
+      const price = priceFor(hotelId, dateObj, rt.key);
+      html += `<tr>
+        <td style="padding:2px 8px">${rt.ar}</td>
+        <td style="padding:2px 8px;text-align:left">EGP ${price}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table>`;
+
+    const extraBedPrices: Record<string, number> = {
+      c_fs_nile: 500, c_ramses: 400, c_fairmont: 450, c_mena: 420, c_conrad: 430,
+      a_fs: 410, a_hilton: 390, a_steigen: 380, s_rixos: 600, s_baron: 550, s_savoy: 530,
+      h_steigen: 470, h_jaz: 460, h_pick: 440, l_sofitel: 410, l_hilton: 400,
+      as_old: 420, as_moven: 410, sh_oberoi: 700, sb_kemp: 650, r_baron: 500, r_grand: 480
+    };
+    const extraBedPrice = extraBedPrices[hotelId] || 400;
+    html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">سعر السرير الإضافي: EGP ${extraBedPrice}</div>`;
+
+    setTooltip({ show: true, x: e.clientX, y: e.clientY, content: html });
+  };
+
+  const renderColumn = (col: number) => {
+    const colData = columns[col];
+    const { total, employee } = calculateTotal(col);
+
+    return (
+      <section className="bg-white p-6 rounded-2xl shadow-lg">
+        <h2 className="text-xl font-bold mb-3">
+          {col === 1 ? 'الإختيار الأول: إختر المدينة والفندق' :
+           col === 2 ? 'الإختيار الثاني: إختر المدينة والفندق' :
+           'الإختيار الثالث: إختر المدينة والفندق'}
+        </h2>
+
+        <select
+          className="w-full border rounded p-3 mb-4 text-lg"
+          value={colData.selectedCity}
+          onChange={(e) => handleCityChange(col, e.target.value)}
+        >
+          <option value="">-- اختر المدينة --</option>
+          {Object.keys(HOTELS).map(city => (
+            <option key={city} value={city}>{city}</option>
+          ))}
+        </select>
+
+        <div className="flex items-center gap-3 mb-3">
+          <button
+            className="bg-indigo-600 text-white px-6 py-2 rounded-lg"
+            onClick={() => openHotelPopup(col)}
+          >
+            اختيار الفندق
+          </button>
+          <span style={{ color: '#16a34a', fontWeight: '700', fontSize: '14px' }}>بدل انتقال</span>
+          <input
+            type="text"
+            readOnly
+            value={colData.travelAllowance}
+            placeholder="لايوجد"
+            style={{
+              width: '84px',
+              padding: '6px 8px',
+              borderRadius: '8px',
+              background: '#ecfdf5',
+              color: '#065f46',
+              border: '1px solid #bbf7d0',
+              textAlign: 'center',
+              fontWeight: '600',
+              cursor: 'not-allowed'
+            }}
+          />
+        </div>
+
+        {colData.selectedHotel && (
+          <>
+            <img
+              src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60"
+              alt={colData.selectedHotel.ar}
+              style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }}
+              className="mb-2"
+            />
+            <div className="mb-2 text-lg font-semibold text-blue-700">{colData.selectedHotel.ar}</div>
+          </>
+        )}
+        {!colData.selectedHotel && (
+          <div className="mb-2 text-lg font-semibold text-blue-700">لم يتم اختيار فندق</div>
+        )}
+
+        <label className="block font-semibold mb-1">أنواع الغرف والسرير الإضافي</label>
+        <div>
+          {ROOM_TYPES.map(rt => {
+            const maxBeds = colData.maxExtraBeds[rt.key] || 0;
+            const roomCount = colData.roomCounts[rt.key] || 0;
+            const reqBeds = colData.extraBedCounts[rt.key] || 0;
+
+            return (
+              <div key={rt.key} className="flex items-center gap-2 mb-2" style={{ flexWrap: 'nowrap' }}>
+                <span style={{ width: '110px' }}>{rt.ar}</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={roomCount}
+                  onChange={(e) => updateRoomCount(col, rt.key, parseInt(e.target.value) || 0)}
+                  style={{ width: '40px', textAlign: 'center', background: '#fff', border: '1px solid #bbb', marginRight: '6px' }}
+                  title="عدد الغرف"
+                />
+                <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>مسموح سرر إضافية</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="2"
+                  value={maxBeds}
+                  readOnly
+                  style={{ width: '32px', textAlign: 'center', background: '#eee', border: '1px solid #bbb', marginRight: '6px' }}
+                  title="أقصى عدد أسرة إضافية"
+                />
+                <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>عدد السرر الإضافية</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={reqBeds}
+                  onChange={(e) => updateExtraBedCount(col, rt.key, parseInt(e.target.value) || 0)}
+                  style={{ width: '32px', textAlign: 'center', background: '#fff', border: '1px solid #bbb', marginRight: '6px' }}
+                  title="عدد الأسرة المطلوبة"
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        <button
+          className="bg-indigo-600 text-white px-10 py-2 rounded-lg mt-3"
+          onClick={() => openCalendar(col)}
+        >
+          اختيار التاريخ
+        </button>
+
+        <label className="block font-semibold mb-1 mt-2">تاريخ الوصول</label>
+        <input
+          readOnly
+          value={colData.arrivalDate}
+          className="border p-1 rounded w-full bg-gray-50 text-lg"
+          placeholder="—"
+        />
+
+        {total > 0 && (
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px', borderRadius: '8px' }} className="mt-4">
+            <div className="font-semibold">
+              إجمالي تكلفة الرحلة: EGP {total}<br />
+              إجمالي تكلفة الموظف: (60%) EGP {employee}
+            </div>
+          </div>
+        )}
+      </section>
+    );
+  };
+
+  return (
+    <div className="bg-gray-100 min-h-screen" dir="rtl" lang="ar" style={{ fontSize: '16px' }}>
+      <header className="bg-white shadow p-4 mb-4">
+        <div className="max-w-7xl mx-auto flex items-start justify-between relative">
+          <div className="absolute left-1/2 transform -translate-x-1/2">
+            <img src="Logo.png" width="300" height="200" alt="Logo" className="object-contain mx-auto" />
+          </div>
+
+          <div className="text-right ml-auto">
+            <div style={{ display: 'inline-block', textAlign: 'center' }}>
+              <div className="text-1.5xl font-extrabold pb-1"
+                   style={{ color: '#0F4C9B', borderBottom: '4px solid #0F4C9B', fontFamily: "'GE Hili', sans-serif" }}>
+                إدارة العلاقات العامة
+              </div>
+              <div className="text-1.5xl font-extrabold mt-3"
+                   style={{ color: '#0F4C9B', fontFamily: "'GE Hili', sans-serif" }}>
+                رحلات قصيرة
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg">
+              English
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="w-full px-4 pb-12">
+        <div className="mt-6 mb-2 flex justify-center text-3xl font-bold gap-[300px]">
+          <span>اسم الموظف: جمال الدين محمود أحمد السيد</span>
+          <span>الرقم الوظيفى: 100325</span>
+        </div>
+
+        <div className="mt-4 mb-8">
+          <section className="bg-white p-6 rounded-2xl shadow-lg">
+            <label className="block font-semibold mb-2">المرافقون — الحد الأقصى هو 6</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {COMPANIONS.map((c, i) => (
+                <label key={i} className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedCompanions.includes(`${c.rel}|${c.name}`)}
+                    onChange={(e) => handleCompanionChange(`${c.rel}|${c.name}`, e.target.checked)}
+                    style={{ width: '20px', height: '20px' }}
+                  />
+                  <span>{c.rel} — {c.name}</span>
+                </label>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-none">
+          {renderColumn(1)}
+          {renderColumn(2)}
+          {renderColumn(3)}
+        </div>
+
+        <div className="flex justify-center mt-8 mb-1">
+          <button className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
+            إرسال الطلب ورحلة سعيدة
+          </button>
+        </div>
+      </main>
+
+      {showHotelPopup && currentColumn !== null && columns[currentColumn].selectedCity && (
+        <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{ background: 'rgba(0,0,0,0.45)' }}>
+          <div className="bg-white rounded-2xl p-4 w-full max-w-2xl shadow-lg">
+            <div className="flex justify-between mb-3">
+              <div className="font-bold text-lg">اختر الفندق</div>
+              <button
+                className="px-4 py-2 bg-red-600 text-white rounded"
+                onClick={() => setShowHotelPopup(false)}
+              >
+                إغلاق
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              {HOTELS[columns[currentColumn].selectedCity].map(h => (
+                <button
+                  key={h.id}
+                  className="block w-full text-right p-3 border rounded mb-2 hover:bg-blue-50"
+                  onClick={() => selectHotel(h)}
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60"
+                    alt={h.ar}
+                    style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }}
+                    className="mb-2"
+                  />
+                  <strong>{h.ar}</strong><br />
+                  <span className="text-sm text-gray-600">{h.en}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCalendar && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-4 w-full max-w-4xl shadow-lg" style={{ maxHeight: '700px', overflowY: 'auto' }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-lg font-bold">{monthName(calendarYear, calendarMonth)}</div>
+              <div className="flex gap-1">
+                <button
+                  className="px-3 py-2 border rounded"
+                  onClick={() => {
+                    let m = calendarMonth - 1;
+                    let y = calendarYear;
+                    if (m < 0) { m = 11; y -= 1; }
+                    setCalendarMonth(m);
+                    setCalendarYear(y);
+                  }}
+                >
+                  ‹ الشهر السابق
+                </button>
+                <button
+                  className="px-3 py-2 border rounded"
+                  onClick={() => {
+                    let m = calendarMonth + 1;
+                    let y = calendarYear;
+                    if (m > 11) { m = 0; y += 1; }
+                    setCalendarMonth(m);
+                    setCalendarYear(y);
+                  }}
+                >
+                  الشهر التالي ›
+                </button>
+                <button
+                  className="px-4 py-2 bg-red-600 text-white rounded"
+                  onClick={() => {
+                    setShowCalendar(false);
+                    setTooltip({ show: false, x: 0, y: 0, content: '' });
+                  }}
+                >
+                  إغلاق
+                </button>
+              </div>
+            </div>
+            <div style={{ overflowY: 'auto', maxHeight: '500px' }}>
+              {renderCalendar()}
+            </div>
+            <div className="mt-3 text-sm text-gray-600">انقر على التاريخ لاختياره.</div>
+          </div>
+        </div>
+      )}
+
+      {tooltip.show && (
+        <div
+          style={{
+            position: 'fixed',
+            zIndex: 9999,
+            background: 'rgba(15,15,20,0.96)',
+            color: 'white',
+            padding: '10px',
+            borderRadius: '8px',
+            maxWidth: '440px',
+            fontSize: '12px',
+            lineHeight: '1.25',
+            boxShadow: '0 8px 28px rgba(0,0,0,0.25)',
+            border: '2px solid red',
+            left: `${tooltip.x + 12}px`,
+            top: `${tooltip.y + 12}px`,
+            pointerEvents: 'none'
+          }}
+          dangerouslySetInnerHTML={{ __html: tooltip.content }}
+        />
+      )}
+
+      <footer className="bg-white shadow p-4 mt-8">
+        <div className="max-w-6xl mx-auto flex items-center justify-center gap-4">
+          <img src="First.jpeg" alt="First logo" className="w-16 h-16 object-contain" />
+          <div>
+            <div className="text-lg font-bold">First Information &amp; Technology Solutions</div>
+            <div className="text-sm text-gray-600">الشركة الأولى لنظم المعلومات والحلول التقنية</div>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
