@@ -1,21 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
+import {
+  getCompanionsFromServer,
+  getHotelsFromServer,
+  getRoomTypesFromServer,
+  getTransportOptionsFromServer,
+  Hotel,
+  Companion,
+  RoomType
+} from './services/hotelService';
 
-interface Hotel {
-  id: string;
-  en: string;
-  ar: string;
-}
 
-interface Companion {
-  rel: string;
-  name: string;
-}
 
-interface RoomType {
-  key: string;
-  ar: string;
-  factor: number;
-}
+
 
 interface ColumnState {
   selectedCity: string;
@@ -27,72 +23,47 @@ interface ColumnState {
   maxExtraBeds: Record<string, number>;
 }
 
-const HOTELS: Record<string, Hotel[]> = {
-  "القاهرة": [
-    {id:"c_fs_nile", en:"Four Seasons Hotel Cairo at Nile Plaza", ar:"فندق فورسيزونز نايل بلازا"},
-    {id:"c_ramses", en:"Ramses Hilton Cairo", ar:"رمسيس هيلتون"},
-    {id:"c_fairmont", en:"Fairmont Nile City", ar:"فيرمونت نايل سيتي"},
-    {id:"c_mena", en:"Marriott Mena House", ar:"ماريوت مينا هاوس"},
-    {id:"c_conrad", en:"Conrad Cairo", ar:"كونراد القاهرة"},
-  ],
-  "الإسكندرية": [
-    {id:"a_fs", en:"Four Seasons Alexandria at San Stefano", ar:"فورسيزونز الإسكندرية"},
-    {id:"a_hilton", en:"Hilton Alexandria Corniche", ar:"هيلتون الإسكندرية كورنيش"},
-    {id:"a_steigen", en:"Steigenberger Cecil", ar:"شتايجنبرجر سيسيل"},
-  ],
-  "شرم الشيخ": [
-    {id:"s_rixos", en:"Rixos Premium Seagate", ar:"ريكسوس بريميوم سيجيت"},
-    {id:"s_baron", en:"Baron Resort Sharm El Sheikh", ar:"بارون شرم"},
-    {id:"s_savoy", en:"Savoy Sharm El Sheikh", ar:"سافوي شرم"},
-  ],
-  "الغردقة": [
-    {id:"h_steigen", en:"Steigenberger Al Dau Beach", ar:"شتايجنبرجر الداو"},
-    {id:"h_jaz", en:"Jaz Aquamarine", ar:"جاز أكوامارين"},
-    {id:"h_pick", en:"Pickalbatros Sea World", ar:"بيكالبتروس سي وورلد"},
-  ],
-  "الأقصر": [
-    {id:"l_sofitel", en:"Sofitel Winter Palace Luxor", ar:"سوفيتيل ونتر بالاس الأقصر"},
-    {id:"l_hilton", en:"Hilton Luxor Resort & Spa", ar:"هيلتون الأقصر"},
-  ],
-  "أسوان": [
-    {id:"as_old", en:"Sofitel Legend Old Cataract Aswan", ar:"سوفيتيل أولد كتراكت أسوان"},
-    {id:"as_moven", en:"Mövenpick Resort Aswan", ar:"موفنبيك أسوان"},
-  ],
-  "سهل حشيش": [
-    {id:"sh_oberoi", en:"The Oberoi Sahl Hasheesh", ar:"أوبروي سهل حشيش"},
-    {id:"sb_kemp", en:"Kempinski Soma Bay", ar:"كيمبنسكي سوما باي"},
-  ],
-  "منتجعات البحر الأحمر": [
-    {id:"r_baron", en:"Baron Palace Resort", ar:"بارون بالاس"},
-    {id:"r_grand", en:"The Grand Resort", ar:"الجراند ريزورت"},
-  ]
-};
-
-const COMPANIONS: Companion[] = [
-  { rel: "زوجة", name: "رانا على مسعد إبراهيم" },
-  { rel: "ابن", name: "مالك جمال الدين محمود" },
-  { rel: "ابنة", name: "هنا جمال الدين محمود" },
-  { rel: "أب", name: "محمود أحمد السيد" },
-  { rel: "أم", name: "السيدة محمد فهيم" },
-  { rel: "ابن", name: "احمد جمال الدين محمود" },
-  { rel: "ابنة", name: "مليكه جمال الدين محمود" }
-];
-
-const ROOM_TYPES: RoomType[] = [
-  { key: "single", ar: "فردي", factor: 1.0 },
-  { key: "double", ar: "مزدوج", factor: 1.4 },
-  { key: "trible", ar: "ثلاثي", factor: 1.7 },
-  { key: "family_room", ar: "غرفة عائلية", factor: 2.0 },
-  { key: "family_suite", ar: "جناح عائلي", factor: 2.6 },
-  { key: "joiner_suite", ar: "جناح ملحق", factor: 2.8 }
-];
-
-const TRANSPORT_OPTIONS = ['لايوجد','300','400','500','600','700'];
-
 function App() {
+  const [ROOM_TYPES, setROOM_TYPES] = useState<RoomType[]>([]);
+  const [TRANSPORT_OPTIONS, setTRANSPORT_OPTIONS] = useState<string[]>([]);
+  const [HOTELS, setHOTELS] = useState<Record<string, Hotel[]>>({});
   const [selectedCompanions, setSelectedCompanions] = useState<string[]>([]);
   const [showHotelPopup, setShowHotelPopup] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [COMPANIONS, setCOMPANIONS] = useState<Companion[]>([]);
+
+  
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      // Fetch all data in parallel for better performance
+      const [hotelsData, companionsData, roomTypesData, transportData] = await Promise.all([
+        getHotelsFromServer(),
+        getCompanionsFromServer(),
+        getRoomTypesFromServer(),
+        getTransportOptionsFromServer()
+      ]);
+    
+      setHOTELS(hotelsData);
+      console.log('Fetched hotels:', hotelsData);
+      
+      if (Array.isArray(companionsData)) {
+        setCOMPANIONS(companionsData as Companion[]);
+      } else {
+        setCOMPANIONS((companionsData as any)?.companions ?? []);
+      }
+      console.log('Fetched companions:', companionsData);
+      
+      setROOM_TYPES(roomTypesData);
+      console.log('Fetched room types:', roomTypesData);
+      
+      setTRANSPORT_OPTIONS(transportData);
+      console.log('Fetched transport options:', transportData);
+    };
+
+    fetchInitialData();
+  }, []);
+
+  
   const [currentColumn, setCurrentColumn] = useState<number | null>(null);
   const [calendarColumn, setCalendarColumn] = useState<number | null>(null);
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
