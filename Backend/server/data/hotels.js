@@ -39,26 +39,26 @@ const HOTELS = {
   ]
 };
 
-const HOTEL_BASE_PRICES = {
-  c_fs_nile: 1600, c_ramses: 1200, c_fairmont: 1400, c_mena: 1300, c_conrad: 1350,
-  a_fs: 1100, a_hilton: 1000, a_steigen: 950,
-  s_rixos: 2000, s_baron: 1800, s_savoy: 1700,
-  h_steigen: 1500, h_jaz: 1450, h_pick: 1300,
-  l_sofitel: 1200, l_hilton: 1100,
-  as_old: 1250, as_moven: 1150,
-  sh_oberoi: 2200, sb_kemp: 2100,
-  r_baron: 1600, r_grand: 1400
-};
+// const HOTEL_BASE_PRICES = {
+//   c_fs_nile: 1600, c_ramses: 1200, c_fairmont: 1400, c_mena: 1300, c_conrad: 1350,
+//   a_fs: 1100, a_hilton: 1000, a_steigen: 950,
+//   s_rixos: 2000, s_baron: 1800, s_savoy: 1700,
+//   h_steigen: 1500, h_jaz: 1450, h_pick: 1300,
+//   l_sofitel: 1200, l_hilton: 1100,
+//   as_old: 1250, as_moven: 1150,
+//   sh_oberoi: 2200, sb_kemp: 2100,
+//   r_baron: 1600, r_grand: 1400
+// };
 
-const EXTRA_BED_PRICES = {
-  c_fs_nile: 500, c_ramses: 400, c_fairmont: 450, c_mena: 420, c_conrad: 430,
-  a_fs: 410, a_hilton: 390, a_steigen: 380, s_rixos: 600, s_baron: 550, s_savoy: 530,
-  h_steigen: 470, h_jaz: 460, h_pick: 440, l_sofitel: 410, l_hilton: 400,
-  as_old: 420, as_moven: 410, sh_oberoi: 700, sb_kemp: 650, r_baron: 500, r_grand: 480
-};
+// const EXTRA_BED_PRICES = {
+//   c_fs_nile: 500, c_ramses: 400, c_fairmont: 450, c_mena: 420, c_conrad: 430,
+//   a_fs: 410, a_hilton: 390, a_steigen: 380, s_rixos: 600, s_baron: 550, s_savoy: 530,
+//   h_steigen: 470, h_jaz: 460, h_pick: 440, l_sofitel: 410, l_hilton: 400,
+//   as_old: 420, as_moven: 410, sh_oberoi: 700, sb_kemp: 650, r_baron: 500, r_grand: 480
+// };
 
 module.exports = {
   HOTELS,
-  HOTEL_BASE_PRICES,
-  EXTRA_BED_PRICES
+  // HOTEL_BASE_PRICES,
+  // EXTRA_BED_PRICES
 };

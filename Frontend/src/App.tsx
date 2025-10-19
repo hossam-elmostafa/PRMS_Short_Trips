@@ -6,8 +6,10 @@ import {
   getTransportOptionsFromServer,
   Hotel,
   Companion,
-  RoomType
-} from './services/hotelService';
+  RoomType,
+  getEmployeeNameFromServer,
+  getMaximumNoOfCompanionsFromServer
+} from './services/Services';
 
 
 
@@ -23,7 +25,11 @@ interface ColumnState {
   maxExtraBeds: Record<string, number>;
 }
 
-function App() {
+interface AppProps {
+  employeeID: number;
+}
+
+function App({ employeeID }: AppProps) {
   const [ROOM_TYPES, setROOM_TYPES] = useState<RoomType[]>([]);
   const [TRANSPORT_OPTIONS, setTRANSPORT_OPTIONS] = useState<string[]>([]);
   const [HOTELS, setHOTELS] = useState<Record<string, Hotel[]>>({});
@@ -31,16 +37,21 @@ function App() {
   const [showHotelPopup, setShowHotelPopup] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [COMPANIONS, setCOMPANIONS] = useState<Companion[]>([]);
+  const [employeeName, setEmployeeName] = useState<string>('');
+  const [maximumNoOfCompanions, setMaximumNoOfCompanions] = useState<number>(0);
 
   
   useEffect(() => {
+    console.log('im loading now')
     const fetchInitialData = async () => {
       // Fetch all data in parallel for better performance
-      const [hotelsData, companionsData, roomTypesData, transportData] = await Promise.all([
+      const [hotelsData, companionsData, roomTypesData, transportData, employeeName, maximumNoOfCompanionsValue] = await Promise.all([
         getHotelsFromServer(),
         getCompanionsFromServer(),
         getRoomTypesFromServer(),
-        getTransportOptionsFromServer()
+        getTransportOptionsFromServer(),
+        getEmployeeNameFromServer(employeeID),
+        getMaximumNoOfCompanionsFromServer()
       ]);
     
       setHOTELS(hotelsData);
@@ -58,6 +69,8 @@ function App() {
       
       setTRANSPORT_OPTIONS(transportData);
       console.log('Fetched transport options:', transportData);
+      setEmployeeName(employeeName)
+      setMaximumNoOfCompanions(maximumNoOfCompanionsValue)
     };
 
     fetchInitialData();
@@ -80,8 +93,8 @@ function App() {
 
   const handleCompanionChange = (value: string, checked: boolean) => {
     if (checked) {
-      if (selectedCompanions.length >= 6) {
-        alert('الحد الأقصى للمرافقين هو 6.');
+      if (selectedCompanions.length >= maximumNoOfCompanions) {
+        alert(`الحد الأقصى للمرافقين هو ${maximumNoOfCompanions}`);
         return;
       }
       setSelectedCompanions([...selectedCompanions, value]);
@@ -501,13 +514,13 @@ function App() {
 
       <main className="w-full px-4 pb-12">
         <div className="mt-6 mb-2 flex justify-center text-3xl font-bold gap-[300px]">
-          <span>اسم الموظف: جمال الدين محمود أحمد السيد</span>
-          <span>الرقم الوظيفى: 100325</span>
+          <span>اسم الموظف: {employeeName}</span>
+          <span>الرقم الوظيفى: {employeeID.toString()}</span>
         </div>
 
         <div className="mt-4 mb-8">
           <section className="bg-white p-6 rounded-2xl shadow-lg">
-            <label className="block font-semibold mb-2">المرافقون — الحد الأقصى هو 6</label>
+            <label className="block font-semibold mb-2">المرافقون — الحد الأقصى هو {maximumNoOfCompanions}</label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {COMPANIONS.map((c, i) => (
                 <label key={i} className="flex items-center gap-3">

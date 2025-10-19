@@ -7,11 +7,11 @@ router.get('/transport-options', (req, res) => {
   res.json({ success: true, data: options });
 });
 
-router.get('/transport-allowance/:city', (req, res) => {
-  const { city } = req.params;
-  const allowance = transportService.getTransportAllowanceForCity(city);
+// router.get('/transport-allowance/:city', (req, res) => {
+//   const { city } = req.params;
+//   const allowance = transportService.getTransportAllowanceForCity(city);
 
-  res.json({ success: true, data: { allowance } });
-});
+//   res.json({ success: true, data: { allowance } });
+// });
 
 module.exports = router;

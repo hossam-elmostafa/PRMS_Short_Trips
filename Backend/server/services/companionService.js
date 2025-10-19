@@ -1,10 +1,14 @@
 const { COMPANIONS } = require('../data/companions');
 
-function getAllCompanions() {
-  return COMPANIONS
+function getCompanions(){
+  return COMPANIONS;
 }
 
+function getMaximumNoOfCompanions(){
+  return 6;
+}
 
 module.exports = {
-  getAllCompanions
+  getCompanions,
+  getMaximumNoOfCompanions
 };

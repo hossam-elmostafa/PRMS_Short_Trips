@@ -1,3 +1,23 @@
+export interface Hotel {
+  id: string;
+  en: string;
+  ar: string;
+}
+
+export interface Companion {
+  rel: string;
+  name: string;
+}
+
+export interface RoomType {
+  key: string;
+  ar: string;
+  factor: number;
+}
+
+
+
+
 export async function getHotelsFromServer() {
   try {
     const response = await fetch('http://localhost:3000/api/hotels');
@@ -38,22 +58,6 @@ export async function getCompanionsFromServer() {
   }
 }
 
-export interface Hotel {
-  id: string;
-  en: string;
-  ar: string;
-}
-
-export interface Companion {
-  rel: string;
-  name: string;
-}
-
-export interface RoomType {
-  key: string;
-  ar: string;
-  factor: number;
-}
 
 export async function getRoomTypesFromServer() {
   try {
@@ -85,6 +89,42 @@ export async function getTransportOptionsFromServer() {
     return result.data;
   } catch (error) {
     console.error('Error fetching transport options:', error);
+    throw error; // Re-throw the error to handle it in the component
+  }
+}
+
+
+
+export async function getEmployeeNameFromServer(employeeID: number) {
+  try {
+    const response = await fetch('http://localhost:3000/api/employee/' + employeeID);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to fetch Employee Name ');
+    }
+    return result.data;
+  } catch (error) {
+    console.error('Error fetching Employee Name :', error);
+    throw error; // Re-throw the error to handle it in the component
+  }
+}
+
+export async function getMaximumNoOfCompanionsFromServer() {
+  try {
+    const response = await fetch('http://localhost:3000/api/maximum-no-of-companions');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to fetch maximum-no-of-companions  ');
+    }
+    return result.data;
+  } catch (error) {
+    console.error('Error fetching maximum-no-of-companions :', error);
     throw error; // Re-throw the error to handle it in the component
   }
 }
