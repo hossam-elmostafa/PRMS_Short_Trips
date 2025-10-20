@@ -1,6 +1,134 @@
 const { COMPANIONS } = require('../data/companions');
 const prisma = require('../lib/prisma');
 
+async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
+    try {
+        const langBit = lang === 'en' ? 1 : 0;
+        let cityInput = String(city).trim();
+
+        const normalizeArabic = (s) => {
+            return String(s || '')
+                .replace(/[\u0640]/g, '') // Tatweel
+                .replace(/[\u0622\u0623\u0625]/g, '\u0627') // all alef variants -> alef
+                .replace(/[\u0649]/g, '\u064A') // alif maqsura -> ya
+                .replace(/[\u0629]/g, '\u0647') // taa marbuta -> ha (best-effort)
+                .replace(/\s+/g, ' ')
+                .trim();
+        };
+
+        // Normalize city: accept either code (e.g., "ALEX") or localized name (e.g., "الإسكندرية")
+        // If input looks like a Latin code, use it; otherwise resolve via P_GET_STRIP_CITIES
+        let cityCode = cityInput;
+        const looksLikeCode = /^[A-Z]{2,6}$/.test(cityInput);
+        if (!looksLikeCode) {
+            try {
+                const [citiesAr, citiesEn] = await Promise.all([
+                    getCitiesFromDB('ar'),
+                    getCitiesFromDB('en')
+                ]);
+                const inputNorm = normalizeArabic(cityInput);
+                const all = [...(citiesAr || []), ...(citiesEn || [])];
+                let match = all.find(c => String(c.name || '').trim() === cityInput);
+                if (!match) {
+                    match = all.find(c => normalizeArabic(c.name || '') === inputNorm);
+                }
+                if (!match) {
+                    match = all.find(c => (c.name || '').includes(cityInput));
+                }
+                if (match && match.code) {
+                    cityCode = String(match.code).trim().toUpperCase();
+                }
+                try { console.log('City resolution:', { input: cityInput, resolvedCode: cityCode }); } catch (_) {}
+            } catch (_) {
+                // ignore and fallback to original input
+            }
+        }
+
+        // Execute proc directly; map flexible column names
+        const esc = (s) => String(s).replace(/'/g, "''");
+        const cityCodeEsc = esc(cityCode);
+        const cityNameEsc = esc(cityInput);
+
+        // Fetch Arabic and English names, then merge on HOTEL_CODE to deliver both ar/en
+        const queryFor = async (bit, city) => prisma.$queryRawUnsafe(`
+            DECLARE @Results TABLE (
+                HOTEL_CODE NVARCHAR(100),
+                HOTEL_NAME NVARCHAR(400),
+                HOTEL_PIC VARBINARY(MAX),
+                HOTEL_ROOM_TYPES NVARCHAR(MAX)
+            );
+
+            INSERT INTO @Results
+            EXEC P_GET_STRIP_HOTEL ${bit}, N'${city}';
+
+            SELECT HOTEL_CODE, HOTEL_NAME FROM @Results;
+        `);
+
+        // First try with resolved code; then, if needed, retry with original city name
+        let rowsAr = await queryFor(0, cityCodeEsc);
+        let rowsEn = await queryFor(1, cityCodeEsc);
+
+        if ((!rowsAr || rowsAr.length === 0) && (!rowsEn || rowsEn.length === 0)) {
+            rowsAr = await queryFor(0, cityNameEsc);
+            rowsEn = await queryFor(1, cityNameEsc);
+        }
+
+        const arByCode = new Map();
+        const enByCode = new Map();
+        (rowsAr || []).forEach(r => {
+            const code = String(r.HOTEL_CODE || '').trim();
+            if (code) arByCode.set(code, String(r.HOTEL_NAME || '').trim());
+        });
+        (rowsEn || []).forEach(r => {
+            const code = String(r.HOTEL_CODE || '').trim();
+            if (code) enByCode.set(code, String(r.HOTEL_NAME || '').trim());
+        });
+
+        const allCodes = Array.from(new Set([
+            ...Array.from(arByCode.keys()),
+            ...Array.from(enByCode.keys())
+        ]));
+
+        const mapped = allCodes.map((code, index) => {
+            const arName = arByCode.get(code) || '';
+            const enName = enByCode.get(code) || arName || '';
+            const id = code || `${cityCode}-${index + 1}`;
+            return { id, ar: arName, en: enName };
+        });
+
+        // Temporary log to verify counts and names during debugging
+        try { console.log('Hotels fetched for city', cityCode, 'count:', mapped.length, mapped.map(h => h.ar)); } catch (_) {}
+        return mapped;
+    } catch (error) {
+        console.error('Error calling stored procedure P_GET_STRIP_HOTEL:', error);
+        console.error('Parameters used - city:', city, 'lang:', lang);
+        return [];
+    }
+}
+
+async function getCitiesFromDB(lang = 'ar') {
+    try {
+        const langBit = lang === 'en' ? 1 : 0;
+        const rows = await prisma.$queryRawUnsafe(`
+            DECLARE @Results TABLE (
+                CITIES_CODE VARCHAR(50),
+                CITIES_NAME NVARCHAR(200)
+            );
+
+            INSERT INTO @Results
+            EXEC P_GET_STRIP_CITIES ${langBit};
+
+            SELECT CITIES_CODE, CITIES_NAME FROM @Results;
+        `);
+
+        return (rows || []).map(r => ({ code: r.CITIES_CODE, name: r.CITIES_NAME }));
+    } catch (error) {
+        console.error('Error calling stored procedure P_GET_STRIP_CITIES:', error);
+        console.error('Parameters used - lang:', lang);
+        return [];
+    }
+}
+
 async function getCompanionsfromDB(employeeId, lang = 'en') {
     try {
         // Convert lang to bit: 'en' = 1, others = 0
@@ -114,6 +242,7 @@ async function getMaximumNoOfCompanionsfromDB(employeeId) {
             const row = rows[0];
             // Try common column names; otherwise take first scalar value
             const candidates = [
+                row.POLICY_STRIP_MAXCOMPAN,
                 row.MAX_COMPANIONS,
                 row.MaxCompanions,
                 row.MAX_NO_OF_COMPANIONS,
@@ -135,5 +264,7 @@ module.exports = {
     getCompanionsfromDB,
     getTransportAllowancefromDB,
     getEmployeeNamefromDB,
-    getMaximumNoOfCompanionsfromDB
+    getMaximumNoOfCompanionsfromDB,
+    getHotelsByCityFromDB,
+    getCitiesFromDB
 };

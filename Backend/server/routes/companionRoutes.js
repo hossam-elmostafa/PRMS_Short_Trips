@@ -39,9 +39,9 @@ router.get('/employee/:employeeId', async (req, res) => {
   }
 });
 
-router.get('/maximum-no-of-companions', async (req, res) => {
+router.get('/maximum-no-of-companions/:employeeId', async (req, res) => {
   try {
-    const { employeeId } = req.query;
+    const { employeeId } = req.params;
     const maxNoOfCompanions = await companionService.getMaximumNoOfCompanions(employeeId);
     res.json({ success: true, data: maxNoOfCompanions });
   } catch (error) {

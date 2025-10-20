@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   getCompanionsFromServer,
   getHotelsFromServer,
+  getHotelsByCityFromServer,
   getRoomTypesFromServer,
   getTransportOptionsFromServer,
   Hotel,
@@ -51,7 +52,7 @@ function App({ employeeID }: AppProps) {
         getRoomTypesFromServer(),
         getTransportOptionsFromServer(employeeID),
         getEmployeeNameFromServer(employeeID),
-        getMaximumNoOfCompanionsFromServer()
+        getMaximumNoOfCompanionsFromServer(employeeID)
       ]);
     
       setHOTELS(hotelsData);
@@ -64,13 +65,13 @@ function App({ employeeID }: AppProps) {
       }
       console.log('Fetched companions:', companionsData);
       
-      setROOM_TYPES(roomTypesData);
+      setROOM_TYPES(Array.isArray(roomTypesData) ? roomTypesData : []);
       console.log('Fetched room types:', roomTypesData);
       
       setTRANSPORT_OPTIONS(transportData);
       console.log('Fetched transport options:', transportData);
       setEmployeeName(employeeName)
-      setMaximumNoOfCompanions(maximumNoOfCompanionsValue)
+      setMaximumNoOfCompanions(Number(maximumNoOfCompanionsValue))
     };
 
     fetchInitialData();
@@ -105,22 +106,43 @@ function App({ employeeID }: AppProps) {
   };
 
   const handleCityChange = (col: number, city: string) => {
-    const transportIdx = Math.floor(Math.random() * TRANSPORT_OPTIONS.length);
+    const hasOptions = Array.isArray(TRANSPORT_OPTIONS) && TRANSPORT_OPTIONS.length > 0;
+    const travel = city
+      ? (hasOptions ? TRANSPORT_OPTIONS[Math.floor(Math.random() * TRANSPORT_OPTIONS.length)] : 'لايوجد')
+      : 'لايوجد';
     setColumns(prev => ({
       ...prev,
       [col]: {
         ...prev[col],
         selectedCity: city,
-        travelAllowance: city ? TRANSPORT_OPTIONS[transportIdx] : 'لايوجد'
+        travelAllowance: travel ?? 'لايوجد'
       }
     }));
+
+    if (city) {
+      (async () => {
+        try {
+          const hotels = await getHotelsByCityFromServer(city, 'ar');
+          setHOTELS(prev => ({ ...prev, [city]: hotels }));
+        } catch (e) {
+          console.error('Failed to load hotels for city', city, e);
+        }
+      })();
+    }
   };
 
-  const openHotelPopup = (col: number) => {
+  const openHotelPopup = async (col: number) => {
     const city = columns[col].selectedCity;
     if (!city) {
       alert('اختر المدينة أولاً');
       return;
+    }
+    try {
+      // Ensure latest hotels for the selected city are loaded before opening
+      const hotels = await getHotelsByCityFromServer(city, 'ar');
+      setHOTELS(prev => ({ ...prev, [city]: hotels }));
+    } catch (e) {
+      console.error('Failed to refresh hotels for city before opening popup', city, e);
     }
     setCurrentColumn(col);
     setShowHotelPopup(true);
@@ -384,7 +406,7 @@ function App({ employeeID }: AppProps) {
           <input
             type="text"
             readOnly
-            value={colData.travelAllowance}
+            value={colData.travelAllowance ?? ''}
             placeholder="لايوجد"
             style={{
               width: '84px',
@@ -524,7 +546,7 @@ function App({ employeeID }: AppProps) {
             <label className="block font-semibold mb-2">المرافقون — الحد الأقصى هو {maximumNoOfCompanions}</label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {COMPANIONS.map((c, i) => (
-                <label key={i} className="flex items-center gap-3">
+                <div key={i} className="flex items-center gap-3">
                   <input
                     type="checkbox"
                     checked={selectedCompanions.includes(`${c.rel}|${c.name}`)}
@@ -532,7 +554,7 @@ function App({ employeeID }: AppProps) {
                     style={{ width: '20px', height: '20px' }}
                   />
                   <span>{c.rel} — {c.name}</span>
-                </label>
+                </div>
               ))}
             </div>
           </section>

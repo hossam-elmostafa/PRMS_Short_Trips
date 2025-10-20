@@ -1,5 +1,5 @@
 const ROOM_TYPES = [
-  { key: "single", ar: "فرديون", factor: 1.0 },
+  { key: "single", ar: "فردي", factor: 1.0 },
   { key: "double", ar: "مزدوج", factor: 1.4 },
   { key: "trible", ar: "ثلاثي", factor: 1.7 },
   { key: "family_room", ar: "غرفة عائلية", factor: 2.0 },

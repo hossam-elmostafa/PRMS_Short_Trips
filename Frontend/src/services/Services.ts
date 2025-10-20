@@ -9,6 +9,11 @@ export interface Companion {
   name: string;
 }
 
+export interface City {
+  code: string;
+  name: string;
+}
+
 export interface RoomType {
   key: string;
   ar: string;
@@ -39,6 +44,40 @@ export async function getHotelsFromServer() {
   }
 }
 
+export async function getHotelsByCityFromServer(city: string, lang: 'ar' | 'en' = 'ar') {
+  try {
+    const response = await fetch(`http://localhost:3000/api/hotels/${encodeURIComponent(city)}?lang=${lang}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to fetch hotels by city');
+    }
+    return result.data as Hotel[];
+  } catch (error) {
+    console.error('Error fetching hotels by city:', error);
+    throw error;
+  }
+}
+
+export async function getCitiesFromServer(lang: 'ar' | 'en' = 'ar') {
+  try {
+    const response = await fetch(`http://localhost:3000/api/cities?lang=${lang}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to fetch cities');
+    }
+    return result.data as City[];
+  } catch (error) {
+    console.error('Error fetching cities:', error);
+    throw error;
+  }
+}
+
 export async function getCompanionsFromServer(employeeID: number) {
   try {
     const response = await fetch('http://localhost:3000/api/companions/' + employeeID);
@@ -46,7 +85,7 @@ export async function getCompanionsFromServer(employeeID: number) {
     
     if (result.success) {
       // Transform the data into the format expected by the app
-      var COMPANIONS: Companion[] = result.data;
+      const COMPANIONS: Companion[] = result.data;
       console.log('Companions fetched from server:', COMPANIONS);
       
     return COMPANIONS;
@@ -71,7 +110,8 @@ export async function getRoomTypesFromServer() {
     if (!result.success) {
       throw new Error(result.message || 'Failed to fetch room types');
     }
-    return result.data;
+    // Expect an array of room types from API
+    return Array.isArray(result.data) ? result.data as RoomType[] : [];
   } catch (error) {
     console.error('Error fetching room types:', error);
     throw error; // Re-throw the error to handle it in the component
@@ -114,9 +154,9 @@ export async function getEmployeeNameFromServer(employeeID: number) {
   }
 }
 
-export async function getMaximumNoOfCompanionsFromServer() {
+export async function getMaximumNoOfCompanionsFromServer(employeeID: number) {
   try {
-    const response = await fetch('http://localhost:3000/api/maximum-no-of-companions');
+    const response = await fetch('http://localhost:3000/api/maximum-no-of-companions/' + employeeID);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
