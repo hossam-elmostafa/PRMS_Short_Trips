@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   getCompanionsFromServer,
   getHotelsFromServer,
@@ -49,7 +49,7 @@ function App({ employeeID }: AppProps) {
         getHotelsFromServer(),
         getCompanionsFromServer(employeeID),
         getRoomTypesFromServer(),
-        getTransportOptionsFromServer(),
+        getTransportOptionsFromServer(employeeID),
         getEmployeeNameFromServer(employeeID),
         getMaximumNoOfCompanionsFromServer()
       ]);
@@ -60,7 +60,7 @@ function App({ employeeID }: AppProps) {
       if (Array.isArray(companionsData)) {
         setCOMPANIONS(companionsData as Companion[]);
       } else {
-        setCOMPANIONS((companionsData as any)?.companions ?? []);
+        setCOMPANIONS((companionsData as { companions?: Companion[] })?.companions ?? []);
       }
       console.log('Fetched companions:', companionsData);
       
@@ -74,7 +74,8 @@ function App({ employeeID }: AppProps) {
     };
 
     fetchInitialData();
-  }, []);
+    
+  }, [employeeID]);
 
   
   const [currentColumn, setCurrentColumn] = useState<number | null>(null);
@@ -274,7 +275,7 @@ function App({ employeeID }: AppProps) {
               return <div key={i} className="border rounded p-2 bg-gray-50"></div>;
             }
             const dateObj = new Date(calendarYear, calendarMonth, d);
-            let hotelId = calendarColumn !== null && columns[calendarColumn].selectedHotel
+            const hotelId = calendarColumn !== null && columns[calendarColumn].selectedHotel
               ? columns[calendarColumn].selectedHotel!.id
               : Object.values(HOTELS)[0][0].id;
             const singlePrice = priceFor(hotelId, dateObj, "single");
@@ -311,7 +312,7 @@ function App({ employeeID }: AppProps) {
     const dd = String(dateObj.getDate()).padStart(2, "0");
     const localDateStr = `${yyyy}-${mm}-${dd}`;
 
-    let hotelId = calendarColumn !== null && columns[calendarColumn].selectedHotel
+    const hotelId = calendarColumn !== null && columns[calendarColumn].selectedHotel
       ? columns[calendarColumn].selectedHotel!.id
       : Object.values(HOTELS)[0][0].id;
 
@@ -417,9 +418,9 @@ function App({ employeeID }: AppProps) {
         <label className="block font-semibold mb-1">أنواع الغرف والسرير الإضافي</label>
         <div>
           {ROOM_TYPES.map(rt => {
-            const maxBeds = colData.maxExtraBeds[rt.key] || 0;
-            const roomCount = colData.roomCounts[rt.key] || 0;
-            const reqBeds = colData.extraBedCounts[rt.key] || 0;
+            const maxBeds = colData.maxExtraBeds[rt.key] ?? 0;
+            const roomCount = colData.roomCounts[rt.key] ?? 0;
+            const reqBeds = colData.extraBedCounts[rt.key] ?? 0;
 
             return (
               <div key={rt.key} className="flex items-center gap-2 mb-2" style={{ flexWrap: 'nowrap' }}>

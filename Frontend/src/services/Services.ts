@@ -21,15 +21,16 @@ export interface RoomType {
 export async function getHotelsFromServer() {
   try {
     const response = await fetch('http://localhost:3000/api/hotels');
-    const result = await response.json();
+    const hotelResult = await response.json();
+    console.log('Hotels fetched from server:', hotelResult);
     
-    if (result.success) {
+    if (hotelResult.success) {
       // Transform the data into the format expected by the app
-      const hotels: Record<string, Hotel[]> = result.data;
+      const hotels: Record<string, Hotel[]> = hotelResult.data;
       
     return hotels;
     } else {
-      console.error('Failed to fetch hotels:', result.message);
+      console.error('Failed to fetch hotels:', hotelResult.message);
       return {};
     }
   } catch (error) {
@@ -77,9 +78,9 @@ export async function getRoomTypesFromServer() {
   }
 }
 
-export async function getTransportOptionsFromServer() {
+export async function getTransportOptionsFromServer(employeeID: number) {
   try {
-    const response = await fetch('http://localhost:3000/api/transport-options');
+    const response = await fetch('http://localhost:3000/api/transport-options/' + employeeID);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }

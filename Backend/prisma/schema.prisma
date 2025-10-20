@@ -1,0 +1,1609 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model CMN_ACTV {
+  ACTV_CODE        String            @id(map: "PK_CMN_ACTV") @db.VarChar(50)
+  ACTV_DESCRIPION  String?           @db.VarChar(255)
+  ACTV_ADESCRIPION String?           @db.VarChar(100)
+  ACTIVE_REC       String?           @default("Y", map: "DF__CMN_ACTV__ACTIVE__4891720A") @db.VarChar(1)
+  APPTABLEINDEX    Int               @default(autoincrement())
+  MMS_COMPANYACTV  MMS_COMPANYACTV[]
+}
+
+model CMN_AFE {
+  AFE_CODE           String       @id(map: "PK_CMN_AFE") @db.VarChar(50)
+  AFE_Desc           String       @db.VarChar(100)
+  AFE_Type           String?      @db.VarChar(100)
+  AFE_Parent         String?      @db.VarChar(50)
+  AFE_TotBudgAmt     Float?
+  AFE_TotActAmt      Float?
+  AFE_Currency       String?      @db.VarChar(50)
+  AFE_Note           String?      @db.VarChar(1000)
+  AFE_Active         String       @default("Y", map: "DF_CMN_AFE_AFE_Active") @db.VarChar(1)
+  AFE_CompCode       String?      @db.VarChar(50)
+  AFE_WorkLoc        String?      @db.VarChar(50)
+  AFE_Depart         String?      @db.VarChar(50)
+  AFE_StartDate      DateTime?    @db.DateTime
+  AFE_EstEndDate     DateTime?    @db.DateTime
+  AFE_CreateDate     DateTime?    @db.DateTime
+  AFE_CreateBy       String?      @db.VarChar(100)
+  AFE_LastUpdateDate DateTime?    @db.DateTime
+  AFE_UpdateBy       String?      @db.VarChar(100)
+  CMN_AFEWBS         CMN_AFEWBS[]
+}
+
+model CMN_AFEWBS {
+  AFEWBS_AFE               String  @db.VarChar(50)
+  AutoFieldNum             Int     @default(autoincrement())
+  AFEWBS_Code              String  @db.VarChar(50)
+  AFEWBS_Desc              String  @db.VarChar(100)
+  AFEWBS_RecoveryIndicator String? @db.VarChar(1)
+  AFEWBS_Cost              Float?
+  AFEWBS_TaskScope         String? @db.VarChar(1000)
+  AFEWBS_Notes             String? @db.VarChar(500)
+  CMN_AFE                  CMN_AFE @relation(fields: [AFEWBS_AFE], references: [AFE_CODE], onDelete: Cascade, map: "FK_CMN_AFEWBS_CMN_AFE")
+
+  @@id([AFEWBS_AFE, AFEWBS_Code], map: "PK_CMN_AFEWBS")
+}
+
+model CMN_BANK {
+  BANK_CODE         String           @id(map: "PK_CMN_BANK") @db.VarChar(50)
+  BANK_NAME         String?          @db.VarChar(100)
+  BANK_ADDRESS      String?          @db.VarChar(250)
+  BANK_ARADDRESS    String?          @db.VarChar(250)
+  BANK_TELEPHONE    String?          @db.VarChar(250)
+  BANK_FAX          String?          @db.VarChar(250)
+  BANK_EMAIL        String?          @db.VarChar(1000)
+  BANK_WEBSITE      String?          @db.VarChar(250)
+  BANK_CONTACTPER   String?          @db.VarChar(100)
+  BANK_ARCONTACTPER String?          @db.VarChar(100)
+  BANK_POBOX        String?          @db.VarChar(30)
+  BANK_CLASS        String?          @db.VarChar(1)
+  BANK_REGDATE      DateTime?        @db.DateTime
+  CMN_BANKBRANCH    CMN_BANKBRANCH[]
+}
+
+model CMN_BANKBRANCH {
+  BANKBRANCH_CODE         String   @db.VarChar(50)
+  BANKBRANCH_BANK         String   @db.VarChar(50)
+  BANKBRANCH_NAME         String?  @db.VarChar(100)
+  BANKBRANCH_ADDRESS      String?  @db.VarChar(250)
+  BANKBRANCH_ARADDRESS    String?  @db.VarChar(250)
+  BANKBRANCH_TELEPHONE    String?  @db.VarChar(250)
+  BANKBRANCH_FAX          String?  @db.VarChar(250)
+  BANKBRANCH_EMAIL        String?  @db.VarChar(1000)
+  BANKBRANCH_CONTACTPER   String?  @db.VarChar(100)
+  BANKBRANCH_ARCONTACTPER String?  @db.VarChar(100)
+  BANKBRANCH_POBOX        String?  @db.VarChar(30)
+  AutoFieldNum            Int      @default(autoincrement())
+  CMN_BANK                CMN_BANK @relation(fields: [BANKBRANCH_BANK], references: [BANK_CODE], onDelete: Cascade, map: "FK_CMN_BANKBRANCH_CMN_BANK")
+
+  @@id([BANKBRANCH_CODE, BANKBRANCH_BANK], map: "PK_BANKBRANCH")
+}
+
+model CMN_BdgtPlan {
+  BdgtPlan_Code               String                @id(map: "PK_CMN_BdgtPlan") @db.VarChar(50)
+  BdgtPlan_TotalEstAmount     Int?
+  BdgtPlan_EstAmountLocalCurr Int?
+  BdgtPlan_Variance           Int?
+  BdgtPlan_FiscalYear         Int
+  BdgtPlan_Currency           String                @db.VarChar(50)
+  BdgtPlan_TotalActAmount     Int?
+  BdgtPlan_ActAmountLocalCurr Int?
+  BdgtPlan_CurrencyRate       Int?
+  BdgtPlan_Justifi            String?               @db.VarChar(1000)
+  BdgtPlan_Company            String?               @db.VarChar(50)
+  BdgtPlan_StartDate          DateTime?             @db.DateTime
+  BdgtPlan_WorkLoc            String?               @db.VarChar(50)
+  BdgtPlan_CreatedDate        DateTime?             @db.DateTime
+  BdgtPlan_Depart             String?               @db.VarChar(50)
+  BdgtPlan_CreatedBy          String?               @db.VarChar(100)
+  BdgtPlan_Notes              String?               @db.VarChar(1000)
+  BdgtPlan_Status             String?               @db.VarChar(50)
+  BdgtPlan_LastUpdatedDate    DateTime?             @db.DateTime
+  BdgtPlan_UpdateBy           String?               @db.VarChar(100)
+  BdgtPlan_Active             String                @db.VarChar(1)
+  CMN_BdgtPlanAprvl           CMN_BdgtPlanAprvl[]   @ignore
+  CMN_BdgtPlanBudget          CMN_BdgtPlanBudget[]  @ignore
+  CMN_BdgtPlanDoc             CMN_BdgtPlanDoc[]     @ignore
+  CMN_BdgtPlanInv             CMN_BdgtPlanInv[]     @ignore
+  CMN_BdgtPlanItemDtl         CMN_BdgtPlanItemDtl[] @ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model CMN_BdgtPlanAprvl {
+  AutoFieldNum             Int          @default(autoincrement())
+  BdgtPlanAprvl_Title      String       @db.VarChar(50)
+  BdgtPlanAprvl_BdgtPlan   String       @db.VarChar(50)
+  BdgtPlanAprvl_Emp        String       @db.VarChar(50)
+  BdgtPlanAprvl_ApprovDate DateTime     @db.DateTime
+  BdgtPlanAprvl_Note       String?      @db.VarChar(500)
+  CMN_BdgtPlan             CMN_BdgtPlan @relation(fields: [BdgtPlanAprvl_BdgtPlan], references: [BdgtPlan_Code], onDelete: Cascade, map: "FK_CMN_BdgtPlanAprvl_CMN_BdgtPlan")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model CMN_BdgtPlanBudget {
+  AutoFieldNum                     Int          @default(autoincrement())
+  BdgtPlanBudget_BdgtPlan          String       @db.VarChar(50)
+  BdgtPlanBudget_BudgetCode        String       @db.VarChar(50)
+  BdgtPlanBudget_BudgetDescription String?      @db.VarChar(500)
+  BdgtPlanBudget_BudgetType        String       @db.VarChar(20)
+  BdgtPlanBudget_Period            String       @db.VarChar(20)
+  BdgtPlanBudget_Q1                Int
+  BdgtPlanBudget_Q2                Int?
+  BdgtPlanBudget_Q3                Int?
+  BdgtPlanBudget_Q4                Int?
+  BdgtPlanBudget_Note              String?      @db.VarChar(500)
+  CMN_BdgtPlan                     CMN_BdgtPlan @relation(fields: [BdgtPlanBudget_BdgtPlan], references: [BdgtPlan_Code], onDelete: Cascade, map: "FK_CMN_BdgtPlanBudget_CMN_BdgtPlan")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model CMN_BdgtPlanDoc {
+  AutoFieldNum          Int          @default(autoincrement())
+  BdgtPlanDoc_BdgtPlan  String       @db.VarChar(50)
+  BdgtPlanDoc_Code      Int
+  BdgtPlanDoc_Desc      String       @db.VarChar(500)
+  BdgtPlanDoc_File      String       @db.VarChar(500)
+  BdgtPlanDoc_Type      DateTime?    @db.DateTime
+  BdgtPlanDoc_AutoPrint Int?
+  BdgtPlanDoc_Note      String?      @db.VarChar(500)
+  CMN_BdgtPlan          CMN_BdgtPlan @relation(fields: [BdgtPlanDoc_BdgtPlan], references: [BdgtPlan_Code], onDelete: Cascade, map: "FK_CMN_BdgtPlanDoc_CMN_BdgtPlan")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model CMN_BdgtPlanInv {
+  AutoFieldNum            Int           @default(autoincrement())
+  BdgtPlanInv_BdgtPlan    String?       @db.VarChar(50)
+  BdgtPlanInv_InvCode     String?       @db.VarChar(50)
+  BdgtPlanInv_Desc        String?       @db.VarChar(50)
+  BdgtPlanInv_Date        DateTime?     @db.DateTime
+  BdgtPlanInv_InvAmount   Float?
+  BdgtPlanInv_BdgtCode    String?       @db.VarChar(50)
+  BdgtPlanInv_CC          String?       @db.VarChar(50)
+  BdgtPlanInv_AFE         String?       @db.VarChar(50)
+  BdgtPlanInv_Vendor      String?       @db.VarChar(50)
+  BdgtPlanInv_InvVal      Float?
+  BdgtPlanInv_Curr        String?       @db.VarChar(50)
+  BdgtPlanInv_PayDate     DateTime?     @db.DateTime
+  BdgtPlanInv_PayCurr     String?       @db.VarChar(50)
+  BdgtPlanInv_ActtPayVal  Float?
+  BdgtPlanInv_ActtPayDate DateTime?     @db.DateTime
+  CMN_BdgtPlan            CMN_BdgtPlan? @relation(fields: [BdgtPlanInv_BdgtPlan], references: [BdgtPlan_Code], onDelete: Cascade, map: "FK_CMN_BdgtPlanInv_CMN_BdgtPlan")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model CMN_BdgtPlanItemDtl {
+  AutoFieldNum               Int          @default(autoincrement())
+  BdgtPlanItemDtl_BdgtPlan   String       @db.VarChar(50)
+  BdgtPlanItemDtl_BudgetCode String?      @db.VarChar(50)
+  BdgtPlanItemDtl_BudgetDesc String?      @db.VarChar(500)
+  BdgtPlanItemDtl_BudgetItem String       @db.VarChar(50)
+  BdgtPlanItemDtl_ItemDesc   String       @db.VarChar(500)
+  BdgtPlanItemDtl_Q1         Int
+  BdgtPlanItemDtl_Q2         Int?
+  BdgtPlanItemDtl_Q3         Int?
+  BdgtPlanItemDtl_Q4         Int?
+  BdgtPlanItemDtl_Notes      String?      @db.VarChar(500)
+  CMN_BdgtPlan               CMN_BdgtPlan @relation(fields: [BdgtPlanItemDtl_BdgtPlan], references: [BdgtPlan_Code], onDelete: Cascade, map: "FK_CMN_BdgtPlanItemDtl_CMN_BdgtPlan")
+
+  @@ignore
+}
+
+model CMN_BDJTCODE {
+  BDJTCODE_Code           String             @id(map: "PK_CMN_BDJTCODE") @db.VarChar(50)
+  BDJTCODE_Desc           String             @db.VarChar(100)
+  BDJTCODE_AccNo          String?            @db.VarChar(100)
+  BDJTCODE_Curr           String?            @db.VarChar(50)
+  BDJTCODE_CompCode       String?            @db.VarChar(50)
+  BDJTCODE_WorkLoc        String?            @db.VarChar(50)
+  BDJTCODE_Depart         String?            @db.VarChar(50)
+  BDJTCODE_Status         String?            @db.VarChar(50)
+  BDJTCODE_Active         String             @default("Y", map: "DF_CMN_BDJTCODE_BDJTCODE_Active") @db.VarChar(1)
+  BDJTCODE_StartDate      DateTime?          @db.DateTime
+  BDJTCODE_Notes          String?            @db.VarChar(1000)
+  BDJTCODE_CreateDate     DateTime?          @db.DateTime
+  BDJTCODE_CreateBy       String?            @db.VarChar(100)
+  BDJTCODE_LastUpdateDate DateTime?          @db.DateTime
+  BDJTCODE_UpdateBy       String?            @db.VarChar(100)
+  CMN_BDJTCODEItem        CMN_BDJTCODEItem[]
+}
+
+model CMN_BDJTCODEItem {
+  BDJTCODEItem_BDJTCODE String       @db.VarChar(50)
+  AutoFieldNum          Int          @default(autoincrement())
+  BDJTCODEItem_Code     String       @db.VarChar(50)
+  BDJTCODEItem_Desc     String       @db.VarChar(500)
+  BDJTCODEItem_Note     String?      @db.VarChar(500)
+  CMN_BDJTCODE          CMN_BDJTCODE @relation(fields: [BDJTCODEItem_BDJTCODE], references: [BDJTCODE_Code], onDelete: Cascade, map: "FK_CMN_BDJTCODEItem_CMN_BDJTCODE")
+
+  @@id([BDJTCODEItem_BDJTCODE, BDJTCODEItem_Code], map: "PK_CMN_BDJTCODEItem")
+}
+
+model CMN_CancelRes {
+  CancelRes_Code   String  @id(map: "PK_CMN_CancelRes") @db.VarChar(50)
+  CancelRes_Desc   String? @db.VarChar(100)
+  CancelRes_Active String? @default("Y", map: "DF_CMN_CancelRes_CancelRes_Active") @db.VarChar(1)
+}
+
+model CMN_CC {
+  CC_Code           String    @id(map: "PK_CMN_CC") @db.VarChar(50)
+  CC_Desc           String    @db.VarChar(100)
+  CC_Type           String?   @db.VarChar(100)
+  CC_Parent         String?   @db.VarChar(50)
+  CC_Currency       String?   @db.VarChar(50)
+  CC_Note           String?   @db.VarChar(1000)
+  CC_Active         String    @default("Y", map: "DF_CMN_CC_CC_Active") @db.VarChar(1)
+  CC_CompCode       String?   @db.VarChar(50)
+  CC_WorkLoc        String?   @db.VarChar(50)
+  CC_Depart         String?   @db.VarChar(50)
+  CC_User           String?   @db.VarChar(50)
+  CC_StartDate      DateTime? @db.DateTime
+  CC_CreateDate     DateTime? @db.DateTime
+  CC_CreateBy       String?   @db.VarChar(100)
+  CC_LastUpdateDate DateTime? @db.DateTime
+  CC_UpdateBy       String?   @db.VarChar(100)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model CMN_CITIES {
+  CITIES_COUNTRY String?        @db.VarChar(50)
+  CITIES_CODE    String         @db.VarChar(50)
+  CITIES_NAME    String?        @db.VarChar(50)
+  CITIES_TNAME   String?        @db.VarChar(50)
+  AutoFieldNum   Int            @default(autoincrement())
+  CMN_COUNTRIES  CMN_COUNTRIES? @relation(fields: [CITIES_COUNTRY], references: [COUNTRIES_CODE], onDelete: Cascade, map: "FK_CMN_CITIES_CMN_COUNTRIES")
+
+  @@ignore
+}
+
+model CMN_COMPPRF {
+  COMPPRF_FULNAM         String               @db.VarChar(60)
+  COMPPRF_SHRTNAM        String?              @db.VarChar(50)
+  COMPPRF_TRNSNAMFULNAM  String?              @db.VarChar(60)
+  COMPPRF_TRNSNAMSHRTNAM String?              @db.VarChar(15)
+  COMPPRF_CNTRY          String?              @db.VarChar(50)
+  COMPPRF_STT            String?              @db.VarChar(30)
+  COMPPRF_CTY            String?              @db.VarChar(20)
+  COMPPRF_LOC            String?              @db.VarChar(40)
+  COMPPRF_STRT           String?              @db.VarChar(60)
+  COMPPRF_TELNO          String?              @db.VarChar(100)
+  COMPPRF_FAXNO          String?              @db.VarChar(100)
+  COMPPRF_PNTBOX         String?              @db.VarChar(40)
+  COMPPRF_EMAILADR       String?              @db.VarChar(100)
+  COMPPRF_WEBSIT         String?              @db.VarChar(100)
+  COMPPRF_COMPLGO        Bytes?               @db.Image
+  COMPPRF_OFCLDOCLNG     String?              @db.VarChar(50)
+  COMPPRF_CURYR          Int?                 @default(0, map: "DF__CMN_COMPP__COMPP__4B6DDEB5")
+  COMPPRF_CURMNTH        Int?                 @default(0, map: "DF__CMN_COMPP__COMPP__4C6202EE")
+  COMPPRF_BLDNGNO        Int?                 @default(0, map: "DF__CMN_COMPP__COMPP__4D562727")
+  COMPPRF_COD            String               @id(map: "PK_CMN_COMPPRF") @db.VarChar(50)
+  COMPPRF_ACTV           Int?                 @db.SmallInt
+  COMPPRF_DETAILS        String?              @db.VarChar(100)
+  COMPPRF_DSTRCT         String?              @db.VarChar(100)
+  COMPPRF_TCNTRY         String?              @db.VarChar(50)
+  COMPPRF_TSTT           String?              @db.VarChar(30)
+  COMPPRF_TCTY           String?              @db.VarChar(20)
+  COMPPRF_TDETAILS       String?              @db.VarChar(100)
+  COMPPRF_TDSTRCT        String?              @db.VarChar(100)
+  COMPPRF_MOBLS          String?              @db.VarChar(100)
+  COMPPRF_POBOX          String?              @db.VarChar(100)
+  CMN_COUNTRIES          CMN_COUNTRIES?       @relation(fields: [COMPPRF_CNTRY], references: [COUNTRIES_CODE], onDelete: NoAction, onUpdate: NoAction, map: "FK_WEB_CMN_CompPrf_CMN_COUNTRIES_COUNTRIES_CODE_CompPrf_Cntry")
+  CMN_COMPPRFLoc         CMN_COMPPRFLoc[]
+  CMN_COMPPRFSUBSDRS     CMN_COMPPRFSUBSDRS[]
+}
+
+model CMN_COMPPRFCNTCT {
+  COMPPRFCNTCT_LNK  String       @db.VarChar(10)
+  COMPPRFCNTCT_CODE String       @db.VarChar(50)
+  AutoFieldNum      Int          @default(autoincrement())
+  CMN_EMPLOYEE      CMN_EMPLOYEE @relation(fields: [COMPPRFCNTCT_CODE], references: [EMPLOYEE_CODE], onUpdate: NoAction, map: "FK_WEB_CMN_CompPrfCntct_CMN_EMPLOYEE_EMPLOYEE_CODE_CompPrfCntct_Code")
+
+  @@id([COMPPRFCNTCT_LNK, COMPPRFCNTCT_CODE], map: "PK_CMN_CompPrfCntct")
+}
+
+model CMN_COMPPRFLoc {
+  COMPPRFLoc_LNK String      @db.VarChar(50)
+  COMPPRFLoc_Loc String      @db.VarChar(10)
+  AutoFieldNum   Int         @default(autoincrement())
+  CMN_COMPPRF    CMN_COMPPRF @relation(fields: [COMPPRFLoc_LNK], references: [COMPPRF_COD], onDelete: Cascade, map: "FK_CMN_COMPPRFLoc_CMN_COMPPRF1")
+
+  @@id([COMPPRFLoc_LNK, COMPPRFLoc_Loc], map: "PK_CMN_COMPPRFLoc")
+}
+
+model CMN_COMPPRFSUBSDRS {
+  COMPPRFSUBSDRS_CODE  String      @db.VarChar(50)
+  COMPPRFSUBSDRS_CMNTS String?     @db.VarChar(100)
+  COMPPRFSUBSDRS_ACTV  String?     @default("Y", map: "DF__CMN_COMPP__COMPP__521ADC44") @db.VarChar(1)
+  COMPPRFSUBSDRS_LNK   String      @db.VarChar(10)
+  AutoFieldNum         Int         @default(autoincrement())
+  CMN_COMPPRF          CMN_COMPPRF @relation(fields: [COMPPRFSUBSDRS_CODE], references: [COMPPRF_COD], onDelete: Cascade, map: "FK_WEB_CMN_COMPPRFSubsdrs_CMN_COMPPRF_CompPrf_Cod_COMPPRFSubsdrs_Code")
+
+  @@id([COMPPRFSUBSDRS_CODE, COMPPRFSUBSDRS_LNK], map: "PK_CMN_COMPPRFSubsdrs")
+}
+
+model CMN_Contract {
+  Contract_CODE           String                @id(map: "PK_CMN_Contract") @db.VarChar(50)
+  Contract_Subject        String                @db.VarChar(500)
+  Contract_Depart         String?               @db.VarChar(50)
+  Contract_Value          Float?
+  Contract_Currency       String?               @db.VarChar(50)
+  Contract_Type           String?               @db.VarChar(20)
+  Contract_Scope          String?               @db.VarChar(1000)
+  Contract_StartDate      DateTime?             @db.DateTime
+  Contract_EndDate        DateTime?             @db.DateTime
+  Contract_Status         String?               @db.VarChar(50)
+  Contract_Active         String                @default("Y", map: "DF_CMN_Contract_Contract_Active") @db.VarChar(1)
+  Contract_CompCode       String?               @db.VarChar(50)
+  Contract_WorkLoc        String?               @db.VarChar(50)
+  Contract_ContractorCode String?               @db.VarChar(50)
+  Contract_ContractorName String?               @db.VarChar(100)
+  Contract_Renewable      String?               @db.VarChar(1)
+  Contract_Notes          String?               @db.VarChar(1000)
+  Contract_CreateDate     DateTime?             @db.DateTime
+  Contract_CreateBy       String?               @db.VarChar(100)
+  Contract_LastUpdateDate DateTime?             @db.DateTime
+  Contract_UpdateBy       String?               @db.VarChar(100)
+  CMN_ContractDoc         CMN_ContractDoc[]
+  CMN_ContractItem        CMN_ContractItem[]
+  CMN_ContractPayTerm     CMN_ContractPayTerm[]
+  CMN_ContractTerms       CMN_ContractTerms[]
+}
+
+model CMN_ContractDoc {
+  ContractDoc_Contract  String       @db.VarChar(50)
+  AutoFieldNum          Int          @default(autoincrement())
+  ContractDoc_Code      String       @db.VarChar(10)
+  ContractDoc_Desc      String       @db.VarChar(500)
+  ContractDoc_Files     String       @db.VarChar(500)
+  ContractDoc_DocType   String?      @db.VarChar(50)
+  ContractDoc_AutoPrint Int?
+  ContractDoc_Notes     String?      @db.VarChar(500)
+  CMN_Contract          CMN_Contract @relation(fields: [ContractDoc_Contract], references: [Contract_CODE], onDelete: Cascade, map: "FK_CMN_ContractDoc_CMN_Contract")
+
+  @@id([ContractDoc_Contract, ContractDoc_Code], map: "PK_CMN_ContractDoc")
+}
+
+model CMN_ContractItem {
+  ContractItem_Contract  String       @db.VarChar(50)
+  AutoFieldNum           Int          @default(autoincrement())
+  ContractItem_ItemCode  String       @db.VarChar(50)
+  ContractItem_Desc      String       @db.VarChar(100)
+  ContractItem_ItemPrice Float?
+  ContractItem_Notes     String?      @db.VarChar(500)
+  CMN_Contract           CMN_Contract @relation(fields: [ContractItem_Contract], references: [Contract_CODE], onDelete: Cascade, map: "FK_CMN_ContractItem_CMN_Contract")
+
+  @@id([ContractItem_Contract, ContractItem_ItemCode], map: "PK_CMN_ContractItem")
+}
+
+model CMN_ContractPayTerm {
+  ContractPayTerm_Contract  String       @db.VarChar(50)
+  AutoFieldNum              Int          @default(autoincrement())
+  ContractPayTerm_PayCode   String       @db.VarChar(50)
+  ContractPayTerm_Desc      String       @db.VarChar(500)
+  ContractPayTerm_PayPer    Float?
+  ContractPayTerm_PayAmt    Float?
+  ContractPayTerm_InAdvance String?      @db.VarChar(1)
+  ContractPayTerm_PayMethod String?      @db.VarChar(50)
+  ContractPayTerm_Notes     String?      @db.VarChar(500)
+  CMN_Contract              CMN_Contract @relation(fields: [ContractPayTerm_Contract], references: [Contract_CODE], onDelete: Cascade, map: "FK_CMN_ContractPayTerm_CMN_Contract")
+
+  @@id([ContractPayTerm_PayCode, ContractPayTerm_Contract], map: "PK_CMN_ContractPayTerm")
+}
+
+model CMN_ContractTerms {
+  ContractTerms_Contract  String       @db.VarChar(50)
+  AutoFieldNum            Int          @default(autoincrement())
+  ContractTerms_TermsCode String       @db.VarChar(50)
+  ContractTerms_Name      String       @db.VarChar(100)
+  ContractTerms_Desc      String?      @db.VarChar(500)
+  ContractTerms_Notes     String?      @db.VarChar(500)
+  CMN_Contract            CMN_Contract @relation(fields: [ContractTerms_Contract], references: [Contract_CODE], onDelete: Cascade, map: "FK_CMN_ContractTerms_CMN_Contract")
+
+  @@id([ContractTerms_Contract, ContractTerms_TermsCode], map: "PK_CMN_ContractTerms")
+}
+
+model CMN_COUNTRIES {
+  COUNTRIES_ID          Int?
+  COUNTRIES_CODE        String        @id(map: "PK_CMN_COUNTRIES") @db.VarChar(50)
+  APPTABLEINDEX         Int           @default(autoincrement())
+  ACTIVE_REC            String?       @db.VarChar(1)
+  COUNTRIES_ISO         String?       @db.VarChar(50)
+  COUNTRIES_DIALCODE    String?       @db.VarChar(50)
+  COUNTRIES_CURRENCY    String?       @db.VarChar(50)
+  COUNTRIES_TNAME       String?       @db.VarChar(50)
+  COUNTRIES_NATIONALITY String?       @db.VarChar(50)
+  CMN_CITIES            CMN_CITIES[]  @ignore
+  CMN_COMPPRF           CMN_COMPPRF[]
+  CMN_VENDOR            CMN_VENDOR[]
+
+  @@index([COUNTRIES_CODE], map: "COUNTRIES_CODE")
+  @@index([COUNTRIES_DIALCODE], map: "COUNTRIES_DIALCODE")
+  @@index([COUNTRIES_ID], map: "COUNTRIES_ID")
+}
+
+model CMN_CURENCY {
+  CURENCY_CODE            String         @id(map: "PK_CMN_CURENCY") @db.VarChar(20)
+  CURENCY_DESCRIPTIO      String?        @db.VarChar(50)
+  CURENCY_CHANGERATE      Float?
+  CURENCY_RATEDATE        DateTime?      @db.DateTime
+  APPTABLEINDEX           Int            @default(autoincrement())
+  CURENCY_LOCALCURRENCY   String?        @db.VarChar(1)
+  CURENCY_DEFAULTCURRENCY String?        @db.VarChar(1)
+  CURENCY_RATEDATE_HIJRI  String?        @db.VarChar(20)
+  ACTIVE_REC              String?        @db.VarChar(1)
+  CURENCY_SUBCODE         String?        @db.VarChar(10)
+  CURENCY_SYMBOL          String?        @db.VarChar(5)
+  CMN_EMPLOYEE            CMN_EMPLOYEE[]
+  CMN_TRADES              CMN_TRADES[]
+  MMS_CURHIST             MMS_CURHIST[]
+
+  @@index([CURENCY_CODE], map: "CURENCY_CODE")
+  @@index([CURENCY_SUBCODE], map: "CURENCY_SUBCODE")
+}
+
+model CMN_DEPART {
+  DEPART_CODE      String          @id(map: "PK_CMN_DEPART") @db.VarChar(50)
+  DEPART_NAME      String?         @db.VarChar(50)
+  DEPART_DESCR     String?         @db.VarChar(255)
+  DEPART_MAINCS    String?         @db.VarChar(50)
+  DEPART_LOC       String?         @db.VarChar(50)
+  DEPART_WSACCNT   String?         @db.VarChar(50)
+  DEPART_PARENT    String?         @db.VarChar(50)
+  APPTABLEINDEX    Int             @default(autoincrement())
+  DEPART_GRANDPA   String?         @db.VarChar(50)
+  DEPART_EXCLUDEME Boolean?
+  DEPART_TOPLEVEL  Boolean?
+  DEPART_COMMENT   String?         @db.VarChar(255)
+  ACTIVE_REC       String?         @default("Y", map: "DF__CMN_DEPAR__ACTIV__69F265D5") @db.VarChar(1)
+  DEPART_MAINCODE  String?         @db.VarChar(50)
+  DEPART_EMAIL     String?         @db.VarChar(1000)
+  DEPART_WorkLoc   String?         @db.VarChar(50)
+  DEPART_TNAME     String?         @db.VarChar(100)
+  DEPART_MANAGER   String?         @db.VarChar(100)
+  DEPART_TOTJOB    String?         @db.VarChar(100)
+  DEPART_FILLJOB   String?         @db.VarChar(100)
+  CMN_DEPART       CMN_DEPART?     @relation("CMN_DEPARTToCMN_DEPART", fields: [DEPART_PARENT], references: [DEPART_CODE], onDelete: NoAction, onUpdate: NoAction, map: "FK_CMN_DEPART_DEPART_Parent")
+  other_CMN_DEPART CMN_DEPART[]    @relation("CMN_DEPARTToCMN_DEPART")
+  CMN_DEPARTFIN    CMN_DEPARTFIN[]
+  CMN_DEPARTJOB    CMN_DEPARTJOB[]
+  CMN_EMPLOYEE     CMN_EMPLOYEE[]
+  CMN_TRADES       CMN_TRADES[]
+  CMN_VENDOR       CMN_VENDOR[]
+}
+
+model CMN_DEPARTFIN {
+  DEPARTFIN_DEPART     String     @db.VarChar(50)
+  DEPARTFIN_Code       String     @db.VarChar(50)
+  DEPARTFIN_CC         String?    @db.VarChar(50)
+  DEPARTFIN_GLAcc      String?    @db.VarChar(100)
+  DEPARTFIN_BudgetCode String?    @db.VarChar(100)
+  DEPARTFIN_BudgetAmt  Int?       @default(0, map: "DF__CMN_DEPAR__DEPAR__4A44B052")
+  DEPARTFIN_BudgetDesc String?    @db.VarChar(500)
+  AutoFieldNum         Int        @default(autoincrement())
+  CMN_DEPART           CMN_DEPART @relation(fields: [DEPARTFIN_DEPART], references: [DEPART_CODE], onDelete: Cascade, map: "FK_CMN_DEPARTFIN_CMN_DEPART")
+
+  @@id([DEPARTFIN_DEPART, DEPARTFIN_Code], map: "PK_CMN_DEPARTFIN")
+}
+
+model CMN_DEPARTJOB {
+  DEPARTJOB_DEPART   String     @db.VarChar(50)
+  DEPARTJOB_Job      String     @db.VarChar(50)
+  DEPARTJOB_JobTitle String?    @db.VarChar(100)
+  DEPARTJOB_Filled   String?    @db.VarChar(1)
+  DEPARTJOB_Notes    String?    @db.VarChar(500)
+  AutoFieldNum       Int        @default(autoincrement())
+  CMN_DEPART         CMN_DEPART @relation(fields: [DEPARTJOB_DEPART], references: [DEPART_CODE], onDelete: Cascade, map: "FK_CMN_DEPARTJOB_CMN_DEPART")
+
+  @@id([DEPARTJOB_DEPART, DEPARTJOB_Job], map: "PK_CMN_DEPARTJOB")
+}
+
+model CMN_DOCCLS {
+  DOCCLS_NAME    String? @db.VarChar(100)
+  DOCCLS_COMMENT String? @db.VarChar(200)
+  ACTIVE_REC     String? @default("Y", map: "DF__CMN_DOCCL__ACTIV__6CCED280") @db.VarChar(1)
+  DOCCLS_CODE    String  @id(map: "PK_CMN_DOCCLS") @db.VarChar(50)
+}
+
+model CMN_EMAILS {
+  EMAILS_ID                  String  @id(map: "PK_CMN_EMAILS") @db.VarChar(50)
+  EMAILS_APPCODE             Int?
+  EMAILS_DESC                String? @db.VarChar(200)
+  EMAILS_SUBJECT             String? @db.VarChar(100)
+  EMAILS_BODY                String? @db.VarChar(Max)
+  EMAILS_TO                  String? @db.VarChar(Max)
+  EMAILS_CC                  String? @db.VarChar(Max)
+  EMAILS_BCC                 String? @db.VarChar(Max)
+  EMAILS_QUERY               String? @db.VarChar(Max)
+  EMAILS_CONDQUERY           String? @db.VarChar(Max)
+  EMAILS_SCHEDULE            String? @db.VarChar(1)
+  ACTIVE_REC                 String? @default("Y", map: "DF__CMN_EMAIL__ACTIV__6FAB3F2B") @db.VarChar(1)
+  EMAILS_HTMLCAPTIONS        String? @db.VarChar(Max)
+  EMAILS_FORMAT              String? @db.VarChar(10)
+  EMAILS_REPORTFILENAME      String? @db.VarChar(256)
+  EMAILS_AltBodyForMissingTo String? @db.VarChar(Max)
+
+  @@index([EMAILS_ID], map: "EMAILS_ID")
+}
+
+model CMN_EmpClass {
+  EmpClass_Code   String  @id(map: "PK_CMN_EmpClass") @db.VarChar(50)
+  EmpClass_Name   String  @db.VarChar(100)
+  EmpClass_Desc   String? @db.VarChar(500)
+  EmpClass_Active String? @default("Y", map: "DF_CMN_EmpClass_EmpClass_Active") @db.VarChar(1)
+}
+
+model CMN_EMPDOC {
+  EMPDOC_Code      String       @db.VarChar(50)
+  EMPDOC_Desc      String?      @db.VarChar(500)
+  EMPDOC_EMP       String       @db.VarChar(50)
+  EMPDOC_File      String       @db.VarChar(500)
+  EMPDOC_Type      String?      @db.VarChar(50)
+  EMPDOC_Note      String?      @db.VarChar(500)
+  EMPDOC_AutoPrint String?      @db.VarChar(1)
+  AutoFieldNum     Int          @default(autoincrement())
+  CMN_EMPLOYEE     CMN_EMPLOYEE @relation(fields: [EMPDOC_EMP], references: [EMPLOYEE_CODE], onDelete: Cascade, map: "FK_CMN_EMPDOC_CMN_EMPLOYEE")
+
+  @@id([EMPDOC_Code, EMPDOC_EMP], map: "PK_CMN_EMPDOC")
+}
+
+model CMN_EMPFAMILY {
+  EMPFAMILY_EMP           String       @db.VarChar(50)
+  EMPFAMILY_RelativeID    String       @db.VarChar(50)
+  EMPFAMILY_Name          String       @db.VarChar(100)
+  EMPFAMILY_Tname         String?      @db.VarChar(100)
+  EMPFAMILY_RelType       String?      @db.VarChar(2)
+  EMPFAMILY_BirthDate     DateTime?    @db.DateTime
+  EMPFAMILY_Gender        String?      @db.VarChar(1)
+  EMPFAMILY_Mstatus       String?      @db.VarChar(1)
+  EMPFAMILY_MarriageDate  DateTime?    @db.DateTime
+  EMPFAMILY_Active        String?      @default("Y", map: "DF_CMN_EMPFAMILY_EMPFAMILY_Active") @db.VarChar(1)
+  EMPFAMILY_Nationality   String?      @db.VarChar(50)
+  EMPFAMILY_IDNo          String?      @db.VarChar(100)
+  EMPFAMILY_PassNo        String?      @db.VarChar(100)
+  EMPFAMILY_DeathDate     DateTime?    @db.DateTime
+  EMPFAMILY_Qualification String?      @db.VarChar(500)
+  EMPFAMILY_Working       String?      @db.VarChar(1)
+  EMPFAMILY_DeserveTrip   String?      @default("Y", map: "DF_CMN_EMPFAMILY_EMPFAMILY_DeserveTrip") @db.VarChar(1)
+  EMPFAMILY_Notes         String?      @db.VarChar(500)
+  AutoFieldNum            Int          @default(autoincrement())
+  CMN_EMPLOYEE            CMN_EMPLOYEE @relation(fields: [EMPFAMILY_EMP], references: [EMPLOYEE_CODE], onDelete: Cascade, map: "FK_CMN_EMPFAMILY_CMN_EMPLOYEE")
+
+  @@id([EMPFAMILY_EMP, EMPFAMILY_Name], map: "PK_CMN_EMPFAMILY")
+}
+
+model CMN_EmpGrade {
+  EmpGrade_Code   String  @id(map: "PK_CMN_EmpGrade") @db.VarChar(50)
+  EmpGrade_Name   String  @db.VarChar(100)
+  EmpGrade_Desc   String? @db.VarChar(50)
+  EmpGrade_Active String? @default("Y", map: "DF_CMN_EmpGrade_EmpGrade_Active") @db.VarChar(1)
+}
+
+model CMN_EMPLOYEE {
+  EMPLOYEE_CODE                String             @id(map: "PK_CMN_EMPLOYEE") @db.VarChar(50)
+  EMPLOYEE_NAME                String?            @db.VarChar(100)
+  EMPLOYEE_TNAME               String?            @db.VarChar(100)
+  EMPLOYEE_TRADES              String?            @db.VarChar(50)
+  EMPLOYEE_COSTPERH            Float?             @default(0, map: "DF__CMN_EMPLO__EMPLO__44C0E126")
+  EMPLOYEE_CURRENCYS           String?            @db.VarChar(20)
+  EMPLOYEE_AUTHORITYB          Float?             @default(0, map: "DF__CMN_EMPLO__EMPLO__45B5055F")
+  EMPLOYEE_AVAILABLE           String?            @db.VarChar(1)
+  EMPLOYEE_WSHOP               String?            @db.VarChar(50)
+  APPTABLEINDEX                Int                @default(autoincrement())
+  EMPLOYEE_EXCLUDEME           Boolean?
+  ACTIVE_REC                   String?            @db.VarChar(1)
+  EMPLOYEE_IMAGE               Bytes?             @db.Image
+  EMPLOYEE_LEFTDATE            DateTime?          @db.DateTime
+  EMPLOYEE_LOGINNAME           String?            @db.VarChar(50)
+  EMPLOYEE_JOINDATE            DateTime?          @db.DateTime
+  EMPLOYEE_CERTIFICATE         String?            @db.VarChar(50)
+  EMPLOYEE_CONSULT             String?            @db.VarChar(1)
+  EMPLOYEE_INSURENCENO         String?            @db.VarChar(50)
+  EMPLOYEE_COMMENT             String?            @db.VarChar(250)
+  EMPLOYEE_EMAIL               String?            @db.VarChar(50)
+  EMPLOYEE_FAX                 String?            @db.VarChar(50)
+  EMPLOYEE_MOBILE              String?            @db.VarChar(50)
+  EMPLOYEE_POBOX               String?            @db.VarChar(50)
+  EMPLOYEE_TEL                 String?            @db.VarChar(100)
+  EMPLOYEE_DEPARTMENT          String?            @db.VarChar(50)
+  EMPLOYEE_Company             String?            @db.VarChar(100)
+  EMPLOYEE_BirthDate           DateTime?          @db.DateTime
+  EMPLOYEE_Nationality         String?            @db.VarChar(100)
+  EMPLOYEE_Address             String?            @db.VarChar(250)
+  EMPLOYEE_IDNo                String?            @db.VarChar(50)
+  EMPLOYEE_PassportNo          String?            @db.VarChar(50)
+  EMPLOYEE_QulfcnYear          Int?
+  EMPLOYEE_CreateDate          DateTime?          @db.DateTime
+  EMPLOYEE_LastUpdateDate      DateTime?          @db.DateTime
+  EMPLOYEE_PassportVisaExpDate DateTime?          @db.DateTime
+  EMPLOYEE_PassportExpDate     DateTime?          @db.DateTime
+  EMPLOYEE_PassportIssueDate   DateTime?          @db.DateTime
+  EMPLOYEE_CreateBy            String?            @db.VarChar(100)
+  EMPLOYEE_UpdateBy            String?            @db.VarChar(100)
+  EMPLOYEE_EmgContNo           String?            @db.VarChar(100)
+  EMPLOYEE_EmgContRel          String?            @db.VarChar(100)
+  EMPLOYEE_HomeTel             String?            @db.VarChar(100)
+  EMPLOYEE_BankAccNo           String?            @db.VarChar(100)
+  EMPLOYEE_Bank                String?            @db.VarChar(100)
+  EMPLOYEE_EmgContName         String?            @db.VarChar(100)
+  EMPLOYEE_QulfcnPlace         String?            @db.VarChar(500)
+  EMPLOYEE_Notes               String?            @db.VarChar(1000)
+  EMPLOYEE_PNAME               String?            @db.VarChar(100)
+  EMPLOYEE_Class               String?            @db.VarChar(50)
+  EMPLOYEE_Grade               String?            @db.VarChar(50)
+  EMPLOYEE_Comp                String?            @db.VarChar(50)
+  EMPLOYEE_WorkLoc             String?            @db.VarChar(50)
+  EMPLOYEE_JobCode             String?            @db.VarChar(50)
+  EMPLOYEE_DirectManger        String?            @db.VarChar(50)
+  EMPLOYEE_JOINSector          DateTime?          @db.DateTime
+  EMPLOYEE_InsuranceDate       DateTime?          @db.DateTime
+  EMPLOYEE_ExpJOINDATE         String?            @db.VarChar(20)
+  EMPLOYEE_Gender              String?            @db.VarChar(1)
+  EMPLOYEE_ExpJOINSector       String?            @db.VarChar(20)
+  EMPLOYEE_MSTATUS             String?            @db.VarChar(1)
+  EMPLOYEE_ExpInsurance        String?            @db.VarChar(20)
+  EMPLOYEE_Religion            String?            @db.VarChar(1)
+  EMPLOYEE_LoanDate            DateTime?          @db.DateTime
+  EMPLOYEE_LoanEndDate         DateTime?          @db.DateTime
+  EMPLOYEE_HRStatus            String?            @db.VarChar(50)
+  EMPLOYEE_LoanComp            String?            @db.VarChar(50)
+  EMPLOYEE_LoanType            String?            @db.VarChar(50)
+  EMPLOYEE_LEFTRES             String?            @db.VarChar(500)
+  EMPLOYEE_PlaceBirth          String?            @db.VarChar(100)
+  EMPLOYEE_IDIssueDate         DateTime?          @db.DateTime
+  EMPLOYEE_IDExpDate           DateTime?          @db.DateTime
+  EMPLOYEE_UnivName            String?            @db.VarChar(100)
+  EMPLOYEE_RecCar              String?            @db.VarChar(1)
+  EMPLOYEE_JobCat              String?            @db.VarChar(1)
+  CMN_COMPPRFCNTCT             CMN_COMPPRFCNTCT[]
+  CMN_EMPDOC                   CMN_EMPDOC[]
+  CMN_EMPFAMILY                CMN_EMPFAMILY[]
+  CMN_CURENCY                  CMN_CURENCY?       @relation(fields: [EMPLOYEE_CURRENCYS], references: [CURENCY_CODE], onDelete: NoAction, onUpdate: NoAction, map: "FK_CMN_EMPLOYEE_EMPLOYEE_CURRENCYS")
+  CMN_TRADES                   CMN_TRADES?        @relation(fields: [EMPLOYEE_TRADES], references: [TRADES_CODE], onDelete: NoAction, map: "FK_CMN_EMPLOYEE_EMPLOYEE_TRADES")
+  CMN_DEPART                   CMN_DEPART?        @relation(fields: [EMPLOYEE_WSHOP], references: [DEPART_CODE], onDelete: NoAction, onUpdate: NoAction, map: "FK_CMN_EMPLOYEE_EMPLOYEE_WSHOP")
+  CMN_EMPSKILS                 CMN_EMPSKILS[]
+}
+
+model CMN_EMPSKILS {
+  EMPSKILS_CODE String       @db.VarChar(50)
+  EMPSKILS_EMP  String       @db.VarChar(50)
+  EMPSKILS_DESC String?      @db.VarChar(500)
+  AutoFieldNum  Int          @default(autoincrement())
+  CMN_EMPLOYEE  CMN_EMPLOYEE @relation(fields: [EMPSKILS_EMP], references: [EMPLOYEE_CODE], onDelete: Cascade, map: "FK_CMN_EMPSKILS_CMN_EMPLOYEE")
+
+  @@id([EMPSKILS_CODE, EMPSKILS_EMP], map: "PK_CMN_EMPSKILS")
+}
+
+model CMN_GLAcc {
+  GLAcc_CODE           String         @id(map: "PK_CMN_GLAcc") @db.VarChar(50)
+  GLAcc_Name           String         @db.VarChar(100)
+  GLAcc_Desc           String?        @db.VarChar(500)
+  GLAcc_Type           String?        @db.VarChar(100)
+  GLAcc_AccSubType     String?        @db.VarChar(100)
+  GLAcc_Currency       String?        @db.VarChar(50)
+  GLAcc_ParentAccount  String?        @db.VarChar(50)
+  GLAcc_Notes          String?        @db.VarChar(1000)
+  GLAcc_Active         String         @default("Y", map: "DF_CMN_GLAcc_GLAcc_Active") @db.VarChar(1)
+  GLAcc_CompCode       String?        @db.VarChar(50)
+  GLAcc_StartDate      DateTime?      @db.DateTime
+  GLAcc_ReconcilMethod String?        @db.VarChar(100)
+  GLAcc_DefaultDim     DateTime?      @db.DateTime
+  GLAcc_CreateDate     DateTime?      @db.DateTime
+  GLAcc_CreateBy       String?        @db.VarChar(100)
+  GLAcc_LastUpdateDate DateTime?      @db.DateTime
+  GLAcc_UpdateBy       String?        @db.VarChar(100)
+  CMN_GLAccFin         CMN_GLAccFin[]
+}
+
+model CMN_GLAccFin {
+  GLAccFin_Acc          String    @db.VarChar(50)
+  AutoFieldNum          Int       @default(autoincrement())
+  GLAccFin_Code         String    @db.VarChar(50)
+  GLAccFin_FiscalYear   Int
+  GLAccFin_BudgetCode   String    @db.VarChar(50)
+  GLAccFin_BudgetDesc   String?   @db.VarChar(100)
+  GLAccFin_Period       String?   @db.VarChar(10)
+  GLAccFin_BudgetAmount Float?
+  GLAccFin_Active       String?   @default("Y", map: "DF__CMN_GLAcc__GLAcc__63CF782B") @db.VarChar(1)
+  CMN_GLAcc             CMN_GLAcc @relation(fields: [GLAccFin_Acc], references: [GLAcc_CODE], onDelete: Cascade, map: "FK_CMN_GLAccFin_CMN_GLAcc")
+
+  @@id([GLAccFin_Acc, GLAccFin_Code], map: "PK_CMN_GLAccFin")
+}
+
+model CMN_HRStatus {
+  HRStatus_Code      String  @id(map: "PK_CMN_HRStatus") @db.VarChar(50)
+  HRStatus_Name      String  @db.VarChar(100)
+  HRStatus_Desc      String? @db.VarChar(500)
+  HRStatus_InService String? @db.VarChar(1)
+  HRStatus_Active    String? @db.VarChar(1)
+}
+
+model CMN_Job {
+  Job_Code           String  @id(map: "PK_CMN_JOB") @db.VarChar(50)
+  Job_Title          String? @db.VarChar(100)
+  Job_Cat            String? @db.VarChar(1)
+  Job_Depart         String? @db.VarChar(100)
+  Job_WorkLoc        String? @db.VarChar(100)
+  Job_Qualifications String? @db.VarChar(500)
+  Job_ExpLevel       String? @db.VarChar(100)
+  Job_Active         String? @db.VarChar(1)
+}
+
+model CMN_PendRes {
+  PendRes_Code   String  @id(map: "PK_CMN_PendRes") @db.VarChar(50)
+  PendRes_Desc   String? @db.VarChar(100)
+  PendRes_Active String? @db.VarChar(1)
+}
+
+model CMN_PetyCach {
+  PetyCach_Code             String             @id(map: "PK_CMN_PetyCach") @db.VarChar(50)
+  PetyCach_Desc             String             @db.VarChar(100)
+  PetyCach_Tdesc            String?            @db.VarChar(100)
+  PetyCach_Date             DateTime?          @db.DateTime
+  PetyCach_ReceivedEmp      String             @db.VarChar(50)
+  PetyCach_Depart           String?            @db.VarChar(50)
+  PetyCach_Notes            String?            @db.VarChar(1000)
+  PetyCach_Active           String             @db.VarChar(1)
+  PetyCach_PettyCashAmount  Float?
+  PetyCach_TotalItemsAmount Float?
+  PetyCach_Variance         Float?
+  PetyCach_Currency         DateTime?          @db.DateTime
+  PetyCach_InAdvance        String?            @db.VarChar(1)
+  PetyCach_CreateDate       DateTime?          @db.DateTime
+  PetyCach_CreateBy         String?            @db.VarChar(100)
+  PetyCach_LastUpdateDate   DateTime?          @db.DateTime
+  PetyCach_UpdateBy         String?            @db.VarChar(100)
+  CMN_PetyCachDoc           CMN_PetyCachDoc[]
+  CMN_PetyCachItem          CMN_PetyCachItem[]
+}
+
+model CMN_PetyCachDoc {
+  PetyCachDoc_PetyCach  String       @db.VarChar(50)
+  AutoFieldNum          Int          @default(autoincrement())
+  PetyCachDoc_Code      String       @db.VarChar(10)
+  PetyCachDoc_Desc      String       @db.VarChar(500)
+  PetyCachDoc_Files     String       @db.VarChar(500)
+  PetyCachDoc_DocType   String?      @db.VarChar(50)
+  PetyCachDoc_AutoPrint Int?
+  PetyCachDoc_Notes     String?      @db.VarChar(500)
+  CMN_PetyCach          CMN_PetyCach @relation(fields: [PetyCachDoc_PetyCach], references: [PetyCach_Code], onDelete: Cascade, map: "FK_CMN_PetyCachDoc_CMN_PetyCach")
+
+  @@id([PetyCachDoc_PetyCach, PetyCachDoc_Code], map: "PK_CMN_PetyCachDoc")
+}
+
+model CMN_PetyCachItem {
+  PetyCachItem_PetyCach String       @db.VarChar(50)
+  AutoFieldNum          Int          @default(autoincrement())
+  PetyCachItem_Code     String       @db.VarChar(10)
+  PetyCachItem_ItemCode String       @db.VarChar(50)
+  PetyCachItem_ItemDesc String       @db.VarChar(100)
+  PetyCachItem_Date     DateTime?    @db.DateTime
+  PetyCachItem_Amount   Float?
+  PetyCachItem_Notes    String?      @db.VarChar(500)
+  CMN_PetyCach          CMN_PetyCach @relation(fields: [PetyCachItem_PetyCach], references: [PetyCach_Code], onDelete: Cascade, map: "FK_CMN_PetyCachItem_CMN_PetyCach")
+
+  @@id([PetyCachItem_PetyCach, PetyCachItem_Code], map: "PK_CMN_PetyCachItem")
+}
+
+model CMN_RejectRes {
+  RejectRes_Code   String  @id(map: "PK_CMN_RejectRes") @db.VarChar(50)
+  RejectRes_Desc   String? @db.VarChar(100)
+  RejectRes_Active String? @db.VarChar(1)
+}
+
+model CMN_SEGCODE {
+  SEGCODE_APPCODE   Int
+  SEGCODE_TABLENAME String     @db.VarChar(50)
+  SEGCODE_NO        Int
+  SEGCODE_TYPE      String?    @db.VarChar(50)
+  SEGCODE_FIELDNAME String?    @db.VarChar(50)
+  SEGCODE_LEN       Int?
+  SEGCODE_SEP       String?    @db.VarChar(50)
+  AutoFieldNum      Int        @default(autoincrement())
+  CMN_SEGTXN        CMN_SEGTXN @relation(fields: [SEGCODE_APPCODE, SEGCODE_TABLENAME], references: [SEGTXN_APPCODE, SEGTXN_CODE], onDelete: Cascade, map: "FK_CMN_SEGCODE_SEGCODE_APPCODE_SEGCODE_TABLENAME")
+
+  @@id([SEGCODE_APPCODE, SEGCODE_TABLENAME, SEGCODE_NO], map: "PK_CMN_SEGCODE")
+  @@index([SEGCODE_APPCODE], map: "SEGCODE_APPCODE")
+}
+
+model CMN_SEGSERIALS {
+  SEGSERIALS_APPCODE  Int
+  SEGSERIALS_TABLE    String     @db.VarChar(50)
+  SEGSERIALS_FIELDVAL String     @db.VarChar(50)
+  SEGSERIALS_VALUE    Int?
+  AutoFieldNum        Int        @default(autoincrement())
+  CMN_SEGTXN          CMN_SEGTXN @relation(fields: [SEGSERIALS_APPCODE, SEGSERIALS_TABLE], references: [SEGTXN_APPCODE, SEGTXN_CODE], onDelete: Cascade, map: "FK_CMN_SEGSERIALS_SEGSERIALS_APPCODE_SEGSERIALS_TABLE")
+
+  @@id([SEGSERIALS_APPCODE, SEGSERIALS_TABLE, SEGSERIALS_FIELDVAL], map: "PK_CMN_SEGSERIALS")
+  @@unique([SEGSERIALS_APPCODE, SEGSERIALS_TABLE, SEGSERIALS_FIELDVAL], map: "SEGSERIALS_APPCODE_TABLE_FIELD")
+}
+
+model CMN_SEGTXN {
+  SEGTXN_APPCODE  Int
+  SEGTXN_CODE     String           @db.VarChar(50)
+  SEGTXN_DESC     String?          @db.VarChar(100)
+  SEGTXN_AUTOCODE String?          @db.VarChar(1)
+  CMN_SEGCODE     CMN_SEGCODE[]
+  CMN_SEGSERIALS  CMN_SEGSERIALS[]
+
+  @@id([SEGTXN_APPCODE, SEGTXN_CODE], map: "PK_CMN_SEGTXN")
+  @@index([SEGTXN_APPCODE], map: "SEGTXN_APPCODE")
+  @@index([SEGTXN_AUTOCODE], map: "SEGTXN_AUTOCODE")
+  @@index([SEGTXN_CODE], map: "SEGTXN_CODE")
+}
+
+model CMN_SEGTYPE {
+  SEGTYPE_ID   String  @id(map: "PK_CMN_SEGTYPE") @db.VarChar(50)
+  SEGTYPE_DESC String? @db.VarChar(100)
+
+  @@index([SEGTYPE_ID], map: "SEGTYPE_ID")
+}
+
+model CMN_TRADES {
+  TRADES_CODE       String         @id(map: "PK_CMN_TRADES") @db.VarChar(50)
+  TRADES_COSTPERH   Float?         @default(0, map: "DF__CMN_TRADE__TRADE__3FFC2C09")
+  TRADES_CURRENCYS  String?        @db.VarChar(20)
+  TRADES_DEPART     String?        @db.VarChar(50)
+  TRADES_DESCRIPTIO String?        @db.VarChar(255)
+  TRADES_AVHRSWEEK  Float?         @default(0, map: "DF__CMN_TRADE__TRADE__40F05042")
+  TRADES_NUMEMPLOY  Float?         @default(0, map: "DF__CMN_TRADE__TRADE__41E4747B")
+  APPTABLEINDEX     Int            @default(autoincrement())
+  ACTIVE_REC        String?        @db.VarChar(1)
+  CMN_EMPLOYEE      CMN_EMPLOYEE[]
+  CMN_CURENCY       CMN_CURENCY?   @relation(fields: [TRADES_CURRENCYS], references: [CURENCY_CODE], onDelete: NoAction, onUpdate: NoAction, map: "FK_CMN_TRADES_TRADES_CURRENCYS")
+  CMN_DEPART        CMN_DEPART?    @relation(fields: [TRADES_DEPART], references: [DEPART_CODE], onDelete: NoAction, onUpdate: NoAction, map: "FK_WEB_CMN_TRADES_CMN_DEPART_DEPART_CODE_TRADES_DEPART")
+}
+
+model CMN_USERDEFCRITRIA {
+  USERDEFCRITRIA_APPLICATIONCODE Int
+  USERDEFCRITRIA_TABLENAME       String  @db.VarChar(50)
+  USERDEFCRITRIA_SUBTABLENAME    String  @db.VarChar(50)
+  USERDEFCRITRIA_PROCESSNAME     String  @db.VarChar(50)
+  USERDEFCRITRIA_SEGMENTNO       Int
+  USERDEFCRITRIA_ENGMSG          String? @db.VarChar(255)
+  USERDEFCRITRIA_ARABICMSG       String? @db.VarChar(255)
+  USERDEFCRITRIA_MESSAGETYPE     String? @db.VarChar(10)
+  USERDEFCRITRIA_ACTIVE          String? @db.VarChar(1)
+  AUTOFIELDNUM                   Int     @default(autoincrement())
+  Firstsysdb                     Int     @default(0, map: "DF__CMN_USERD__First__7A28CD9E")
+  USERDEFCRITRIA_SQLCRITERIA     String? @db.VarChar(Max)
+  USERDEFCRITRIA_READABLECR      String? @db.VarChar(Max)
+
+  @@id([USERDEFCRITRIA_APPLICATIONCODE, USERDEFCRITRIA_TABLENAME, USERDEFCRITRIA_SUBTABLENAME, USERDEFCRITRIA_PROCESSNAME, USERDEFCRITRIA_SEGMENTNO, Firstsysdb], map: "PK_CMN_USERDEFCRITRIA")
+  @@index([USERDEFCRITRIA_APPLICATIONCODE], map: "USERDEFCRITRIA_APPLICATIONCODE")
+}
+
+model CMN_VENDOR {
+  VENDOR_CODE                String              @id(map: "PK_CMN_VENDOR") @db.VarChar(50)
+  VENDOR_ARNAME              String?             @db.VarChar(64)
+  VENDOR_NAME                String?             @db.VarChar(64)
+  VENDOR_DESCRIPTIO          String?             @db.VarChar(255)
+  VENDOR_FOREIGNLOC          String?             @db.VarChar(1)
+  VENDOR_ACCOUNT             String?             @db.VarChar(50)
+  VENDOR_CITY                String?             @db.VarChar(50)
+  VENDOR_COUNTRY             String?             @db.VarChar(50)
+  VENDOR_TELEX               String?             @db.VarChar(1000)
+  VENDOR_WEBSITE             String?             @db.VarChar(100)
+  VENDOR_CONTACTPER          String?             @db.VarChar(50)
+  VENDOR_ESTBLSHYR           Int?
+  VENDOR_CNTRCTNO            String?             @db.VarChar(100)
+  VENDOR_CAT                 String?             @db.VarChar(2)
+  VENDOR_CASUAL              String?             @db.VarChar(1)
+  VENDOR_AREA                String?             @db.VarChar(100)
+  VENDOR_ARCONTACTPER        String?             @db.VarChar(50)
+  VENDOR_CHAIRMAN            String?             @db.VarChar(100)
+  VENDOR_POBOX               String?             @db.VarChar(30)
+  VENDOR_TYP                 String?             @db.VarChar(2)
+  VENDOR_REGEGPC             String?             @db.VarChar(50)
+  VENDOR_DISTRICT            String?             @db.VarChar(50)
+  VENDOR_REGCHMBRCMRC        String?             @db.VarChar(50)
+  VENDOR_FINNO               String?             @db.VarChar(100)
+  VENDOR_GMNAME              String?             @db.VarChar(100)
+  VENDOR_VENDOREVAL          Float?              @default(0, map: "DF__CMN_VENDO__VENDO__33614AFA")
+  APPTABLEINDEX              Int                 @default(autoincrement())
+  VENDOR_TAXID               String?             @db.VarChar(50)
+  VENDOR_STATUS              String?             @default("O", map: "DF__CMN_VENDO__VENDO__34556F33") @db.VarChar(2)
+  VENDOR_DEPART              String?             @db.VarChar(50)
+  VENDOR_COMMENT             String?             @db.VarChar(250)
+  VENDOR_BANK                String?             @db.VarChar(50)
+  VENDOR_REGDATE             DateTime?           @db.DateTime
+  VENDOR_LSTGENEVAL          Int?
+  VENDOR_OVRALPOEVAL         Int?
+  VENDOR_BLCKRLESEDAT        DateTime?           @db.DateTime
+  VENDOR_LSTGENEVALRSULT     String?             @db.VarChar(100)
+  VENDOR_LSTGENEVALDATE      DateTime?           @db.DateTime
+  VENDOR_LSTRENWLDAT         DateTime?           @db.DateTime
+  VENDOR_LSTPOEVALRSULT      String?             @db.VarChar(100)
+  VENDOR_LSTPOEVALDATE       DateTime?           @db.DateTime
+  VENDOR_LSTPOEVAL           Int?
+  VENDOR_BLCKDAT             DateTime?           @db.DateTime
+  FLAG                       String?             @db.VarChar(100)
+  VENDOR_COMPGEOOP           String?             @db.VarChar(100)
+  VENDOR_COMREGCERTREF       String?             @db.VarChar(100)
+  VENDOR_ARTCLASSCREF        String?             @db.VarChar(100)
+  VENDOR_CONTACTJOBTITLE     String?             @db.VarChar(100)
+  VENDOR_INCOMTAXCERREF      String?             @db.VarChar(100)
+  VENDOR_ADDRESS             String?             @db.VarChar(1000)
+  VENDOR_ARADDRESS           String?             @db.VarChar(1000)
+  VENDOR_FAX                 String?             @db.VarChar(100)
+  VENDOR_TELEPHONE           String?             @db.VarChar(100)
+  VENDOR_Abbrvn              String?             @db.VarChar(50)
+  VENDOR_Tabbrvn             String?             @db.VarChar(50)
+  VENDOR_PayMethod           String?             @db.VarChar(100)
+  VENDOR_TaxPer              Int?
+  VENDOR_Notes               String?             @db.VarChar(1000)
+  VENDOR_Active              String?             @default("Y", map: "DF_CMN_VENDOR_VENDOR_Active") @db.VarChar(1)
+  VENDOR_EMAIL               String?             @db.VarChar(500)
+  VENDOR_REGCHMBRCMRCExpDate DateTime?           @db.DateTime
+  VENDOR_TaxCard             String?             @db.VarChar(100)
+  VENDOR_REGComp             String?             @db.VarChar(1)
+  VENDOR_REGCompDate         DateTime?           @db.DateTime
+  VENDOR_REGEGPCDate         DateTime?           @db.DateTime
+  CMN_COUNTRIES              CMN_COUNTRIES?      @relation(fields: [VENDOR_COUNTRY], references: [COUNTRIES_CODE], onDelete: NoAction, map: "FK_CMN_VENDOR_VENDOR_COUNTRY")
+  CMN_DEPART                 CMN_DEPART?         @relation(fields: [VENDOR_DEPART], references: [DEPART_CODE], onDelete: NoAction, onUpdate: NoAction, map: "FK_WEB_CMN_VENDOR_CMN_DEPART_DEPART_CODE_VENDOR_DEPART")
+  CMN_VENDORACC              CMN_VENDORACC[]     @ignore
+  CMN_VENDORAUTH             CMN_VENDORAUTH[]    @ignore
+  CMN_VENDORBRANCH           CMN_VENDORBRANCH[]  @ignore
+  CMN_VENDORDOC              CMN_VENDORDOC[]     @ignore
+  CMN_VENDORRoomTyp          CMN_VENDORRoomTyp[] @ignore
+  CMN_VENDORUnitDtl          CMN_VENDORUnitDtl[] @ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model CMN_VENDORACC {
+  VENDORACC_BankName    String?     @db.VarChar(100)
+  VENDORACC_BankAddress String?     @db.VarChar(250)
+  VENDORACC_SWIFT       String?     @db.VarChar(100)
+  VENDORACC_IBANCode    String?     @db.VarChar(100)
+  VENDORACC_AccNo       String?     @db.VarChar(100)
+  VENDORACC_VENDOR      String?     @db.VarChar(50)
+  VENDORACC_Curr        String?     @db.VarChar(50)
+  VENDORACC_Note        String?     @db.VarChar(500)
+  AutoFieldNum          Int         @default(autoincrement())
+  CMN_VENDOR            CMN_VENDOR? @relation(fields: [VENDORACC_VENDOR], references: [VENDOR_CODE], onDelete: Cascade, map: "FK_CMN_VENDORACC_CMN_VENDOR")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model CMN_VENDORAUTH {
+  VENDORAUTH_RequestBy   String?     @db.VarChar(100)
+  VENDORAUTH_RequestDate DateTime?   @db.DateTime
+  VENDORAUTH_VENDOR      String?     @db.VarChar(50)
+  VENDORAUTH_RequestDept String?     @db.VarChar(50)
+  VENDORAUTH_ReviewBy    String?     @db.VarChar(100)
+  VENDORAUTH_ReviewDate  DateTime?   @db.DateTime
+  VENDORAUTH_ApproveBy   String?     @db.VarChar(100)
+  VENDORAUTH_ApproveDate DateTime?   @db.DateTime
+  AutoFieldNum           Int         @default(autoincrement())
+  CMN_VENDOR             CMN_VENDOR? @relation(fields: [VENDORAUTH_VENDOR], references: [VENDOR_CODE], onDelete: Cascade, map: "FK_CMN_VENDORAUTH_CMN_VENDOR")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model CMN_VENDORBRANCH {
+  VENDORBRANCH_VENDOR        String?     @db.VarChar(50)
+  VENDORBRANCH_Code          String?     @db.VarChar(50)
+  VENDORBRANCH_BranchName    String?     @db.VarChar(100)
+  VENDORBRANCH_City          String?     @db.VarChar(100)
+  VENDORBRANCH_Area          String?     @db.VarChar(100)
+  VENDORBRANCH_Address       String?     @db.VarChar(500)
+  VENDORBRANCH_TAddress      String?     @db.VarChar(500)
+  VENDORBRANCH_Telephone     String?     @db.VarChar(500)
+  VENDORBRANCH_ContactPerson String?     @db.VarChar(500)
+  VENDORBRANCH_Notes         String?     @db.VarChar(500)
+  VENDORBRANCH_Active        String?     @default("Y", map: "DF_CMN_VENDORBRANCH_VENDORBRANCH_Active") @db.VarChar(1)
+  AutoFieldNum               Int         @default(autoincrement())
+  CMN_VENDOR                 CMN_VENDOR? @relation(fields: [VENDORBRANCH_VENDOR], references: [VENDOR_CODE], onDelete: Cascade, map: "FK_CMN_VENDORBRANCH_CMN_VENDOR")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model CMN_VENDORDOC {
+  VENDORDOC_VENDOR    String?     @db.VarChar(50)
+  VENDORDOC_Code      String?     @db.VarChar(50)
+  VENDORDOC_Desc      String?     @db.VarChar(500)
+  VENDORDOC_File      String?     @db.VarChar(500)
+  VENDORDOC_Type      String?     @db.VarChar(50)
+  VENDORDOC_AutoPrint String?     @db.VarChar(1)
+  VENDORDOC_Note      String?     @db.VarChar(500)
+  AutoFieldNum        Int         @default(autoincrement())
+  CMN_VENDOR          CMN_VENDOR? @relation(fields: [VENDORDOC_VENDOR], references: [VENDOR_CODE], onDelete: Cascade, map: "FK_CMN_VENDORDOC_CMN_VENDOR")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model CMN_VENDORRoomTyp {
+  VENDORRoomTyp_VENDOR          String?     @db.VarChar(50)
+  VENDORRoomTyp_RoomType        String?     @db.VarChar(50)
+  VENDORRoomTyp_BedsCount       Int?        @default(0, map: "DF__CMN_VENDO__VENDO__752F0E57")
+  VENDORRoomTyp_RoomPrice       Float?      @default(0, map: "DF__CMN_VENDO__VENDO__76233290")
+  VENDORRoomTyp_RoomDiscPrice   Float?      @default(0, map: "DF__CMN_VENDO__VENDO__771756C9")
+  VENDORRoomTyp_Curr            String?     @db.VarChar(50)
+  VENDORRoomTyp_PriceInclude    String?     @db.VarChar(500)
+  VENDORRoomTyp_Note            String?     @db.VarChar(500)
+  VENDORRoomTyp_Active          Int?        @default(1, map: "DF__CMN_VENDO__VENDO__13B39577")
+  VENDORRoomTyp_ChildBedSupport Int?
+  CMN_VENDOR                    CMN_VENDOR? @relation(fields: [VENDORRoomTyp_VENDOR], references: [VENDOR_CODE], onDelete: Cascade, map: "FK_CMN_VENDORRoomTyp_CMN_VENDOR")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model CMN_VENDORUnitDtl {
+  VENDORUnitDtl_UnitType    String?     @db.VarChar(50)
+  VENDORUnitDtl_UnitNo      String?     @db.VarChar(50)
+  VENDORUnitDtl_UnitsSpecs  String?     @db.VarChar(500)
+  VENDORUnitDtl_VENDOR      String?     @db.VarChar(50)
+  VENDORUnitDtl_NoOfPersons Int?
+  VENDORUnitDtl_Address     String?     @db.VarChar(500)
+  VENDORUnitDtl_Location    String?     @db.VarChar(500)
+  VENDORUnitDtl_Active      String?     @default("Y", map: "DF_CMN_VENDORUnitDtl_VENDORUnitDtl_Active") @db.VarChar(1)
+  CMN_VENDOR                CMN_VENDOR? @relation(fields: [VENDORUnitDtl_VENDOR], references: [VENDOR_CODE], onDelete: Cascade, map: "FK_CMN_VENDORUnitDtl_CMN_VENDOR")
+
+  @@ignore
+}
+
+model CMN_WorkLoc {
+  WorkLoc_Code       String  @id(map: "PK_CMN_WorkLoc") @db.VarChar(50)
+  WorkLoc_Name       String  @db.VarChar(100)
+  WorkLoc_ShortName  String? @db.VarChar(50)
+  WorkLoc_TName      String? @db.VarChar(100)
+  WorkLoc_TShortName String? @db.VarChar(50)
+  WorkLoc_Type       String? @db.VarChar(1)
+  WorkLoc_Active     String? @default("Y", map: "DF_CMN_WorkLoc_WorkLoc_Active") @db.VarChar(1)
+  WorkLoc_Address    String? @db.VarChar(500)
+  WorkLoc_OnMap      String? @db.VarChar(500)
+  WorkLoc_LatLong    String? @db.VarChar(500)
+  WorkLoc_ContactNo  String? @db.VarChar(100)
+  WorkLoc_Email      String? @db.VarChar(500)
+  WorkLoc_Fax        String? @db.VarChar(100)
+  WorkLoc_Manager    String? @db.VarChar(100)
+  WorkLoc_Notes      String? @db.VarChar(1000)
+}
+
+model FIRST_DESKTOP_SETTING {
+  REG_KEY   String  @id(map: "PK__FIRST_DE__1E8132A85A132F68") @db.VarChar(255)
+  REG_VALUE String? @db.VarChar(Max)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model HOTEL_ROOM_PRICES {
+  HOTEL_CODE       String?   @db.VarChar(15)
+  ROOM_TYPE        String?   @db.VarChar(2)
+  PRICE_DATE       DateTime? @db.Date
+  ROOM_PRICE       Int?
+  EXTRA_BEDS_COUNT Int?
+  EXTRA_BED_PRICE  Int?
+
+  @@ignore
+}
+
+model MMS_COMPANY {
+  COMPANY_CODE          String             @id(map: "PK_MMS_COMPANY") @db.VarChar(50)
+  COMPANY_NAME          String?            @db.VarChar(50)
+  COMPANY_ACCOUNTS      String?            @db.VarChar(50)
+  COMPANY_TEL           String?            @db.VarChar(50)
+  COMPANY_FAX           String?            @db.VarChar(50)
+  COMPANY_CONTACTPERSON String?            @db.VarChar(50)
+  COMPANY_EMAIL         String?            @db.VarChar(50)
+  COMPANY_COMMENT       String?            @db.VarChar(4000)
+  ACTIVE_REC            String?            @default("Y", map: "DF__MMS_COMPA__ACTIV__7D053A49") @db.VarChar(1)
+  COMPANY_CITY          String?            @db.VarChar(50)
+  COMPANY_CNTRY         String?            @db.VarChar(50)
+  COMPANY_MOBILE        String?            @db.VarChar(50)
+  COMPANY_WEBSITE       String?            @db.VarChar(50)
+  COMPANY_POBOX         String?            @db.VarChar(50)
+  COMPANY_STATE         String?            @db.VarChar(50)
+  COMPANY_TCITY         String?            @db.VarChar(50)
+  COMPANY_TNAME         String?            @db.VarChar(50)
+  COMPANY_TSHORTNAME    String?            @db.VarChar(50)
+  COMPANY_TSTATE        String?            @db.VarChar(50)
+  COMPANY_ESHORTNAME    String?            @db.VarChar(50)
+  COMPANY_DSTRCT        String?            @db.VarChar(100)
+  COMPANY_DETAILS       String?            @db.VarChar(100)
+  COMPANY_TDETAILS      String?            @db.VarChar(100)
+  COMPANY_TDSTRCT       String?            @db.VarChar(100)
+  MMS_COMPANYACTV       MMS_COMPANYACTV[]
+  MMS_COMPANYCNTCT      MMS_COMPANYCNTCT[]
+}
+
+model MMS_COMPANYACTV {
+  COMPANYACTV_COMP String      @db.VarChar(50)
+  COMPANYACTV_CODE String      @db.VarChar(50)
+  AutoFieldNum     Int         @default(autoincrement())
+  CMN_ACTV         CMN_ACTV    @relation(fields: [COMPANYACTV_CODE], references: [ACTV_CODE], map: "FK_MMS_COMPANYACTV_COMPANYACTV_CODE")
+  MMS_COMPANY      MMS_COMPANY @relation(fields: [COMPANYACTV_COMP], references: [COMPANY_CODE], onDelete: Cascade, map: "FK_MMS_COMPANYACTV_COMPANYACTV_COMP")
+
+  @@id([COMPANYACTV_COMP, COMPANYACTV_CODE], map: "PK_MMS_COMPANYACTV")
+  @@index([COMPANYACTV_COMP], map: "COMPANYACTV_COMP")
+}
+
+model MMS_COMPANYCNTCT {
+  COMPANYCNTCT_TITLE    String?     @db.VarChar(200)
+  COMPANYCNTCT_TEL      String?     @db.VarChar(1000)
+  COMPANYCNTCT_POBOX    String?     @db.VarChar(1000)
+  COMPANYCNTCT_NAME     String      @db.VarChar(200)
+  COMPANYCNTCT_MOBILE   String?     @db.VarChar(1000)
+  COMPANYCNTCT_FAX      String?     @db.VarChar(1000)
+  COMPANYCNTCT_EMAIL    String?     @db.VarChar(1000)
+  COMPANYCNTCT_COMPCODE String      @db.VarChar(50)
+  AutoFieldNum          Int         @default(autoincrement())
+  MMS_COMPANY           MMS_COMPANY @relation(fields: [COMPANYCNTCT_COMPCODE], references: [COMPANY_CODE], onDelete: Cascade, map: "FK_MMS_COMPANYCNTCT_COMPANYCNTCT_COMPCODE")
+
+  @@id([COMPANYCNTCT_NAME, COMPANYCNTCT_COMPCODE], map: "PK_MMS_COMPANYCNTCT")
+}
+
+model MMS_CURHIST {
+  CURHIST_CODE     String      @db.VarChar(20)
+  CURHIST_RATEDATE DateTime    @default(now(), map: "DF__MMS_CURHI__CURHI__03B237D8") @db.DateTime
+  CURHIST_RATE     Float?
+  AutoFieldNum     Int         @default(autoincrement())
+  CMN_CURENCY      CMN_CURENCY @relation(fields: [CURHIST_CODE], references: [CURENCY_CODE], onDelete: Cascade, map: "FK_MMS_CURHIST_CURHIST_CODE")
+
+  @@id([CURHIST_CODE, CURHIST_RATEDATE], map: "PK_MMS_CURHIST")
+}
+
+model MMS_SCREENFILES {
+  AUTOFIELDNUM        Int     @id(map: "PK_MMS_SCREENFILES") @default(autoincrement())
+  SCREENFILES_TXNCODE String? @db.VarChar(50)
+  SCREENFILES_CODE    String? @db.VarChar(50)
+  SCREENFILES_DESC    String? @db.VarChar(50)
+  SCREENFILES_PATH    String? @db.VarChar(4000)
+  SCREENFILES_TYPE    String? @db.VarChar(50)
+  SCREENFILES_CLASS   String? @db.VarChar(50)
+  SCREENFILES_RUN     String? @db.VarChar(50)
+  SCREENFILES_NOTES   String? @db.VarChar(4000)
+  AUTOPRINT           String? @db.VarChar(1)
+}
+
+model MMS_UNITCF {
+  UNITCF_UNITCODE String    @db.VarChar(50)
+  UNITCF_FCODE    String    @db.VarChar(50)
+  UNITCF_CF       Float     @default(0, map: "DF__MMS_UNITC__UNITC__0876ECF5")
+  AutoFieldNum    Int       @default(autoincrement())
+  MMS_UNITS       MMS_UNITS @relation(fields: [UNITCF_UNITCODE], references: [UNITS_CODE], onDelete: Cascade, map: "FK_MMS_UNITCF_UNITCF_UNITCODE")
+
+  @@id([UNITCF_UNITCODE, UNITCF_FCODE], map: "PK_MMS_UNITCF")
+}
+
+model MMS_UNITS {
+  UNITS_CODE     String       @id(map: "PK_MMS_UNITS") @db.VarChar(50)
+  UNITS_NAME     String?      @db.VarChar(50)
+  UNITS_FRACTION String?      @db.VarChar(1)
+  UNITS_USEDFOR  String?      @db.VarChar(50)
+  UNITS_COMMENT  String?      @db.VarChar(250)
+  ACTIVE_REC     String?      @default("Y", map: "DF__MMS_UNITS__ACTIV__0B5359A0") @db.VarChar(1)
+  MMS_UNITCF     MMS_UNITCF[]
+}
+
+model POLYDB_LAYOUT {
+  REG_KEY   String  @id(map: "PK__POLYDB_L__1E8132A809FDE0D1") @db.VarChar(255)
+  REG_VALUE String? @db.VarChar(Max)
+}
+
+model PRIVILEGE_APP {
+  REG_KEY   String  @id(map: "PK__PRIVILEG__1E8132A8858BA878") @db.VarChar(255)
+  REG_VALUE String? @db.VarChar(Max)
+}
+
+model PRMS_HonorEmpType {
+  HonorEmpType_Code      String                  @id(map: "PK_PRMS_HonorEmpType") @db.VarChar(50)
+  HonorEmpType_Name      String                  @db.VarChar(100)
+  HonorEmpType_BudgetAmt Float?
+  HonorEmpType_Currency  String?                 @db.VarChar(50)
+  HonorEmpType_Notes     String?                 @db.VarChar(1000)
+  HonorEmpType_Active    String                  @default("Y", map: "DF_PRMS_HonorEmpType_HonorEmpType_Active") @db.VarChar(1)
+  PRMS_HonorEmpTypeItem  PRMS_HonorEmpTypeItem[]
+}
+
+model PRMS_HonorEmpTypeItem {
+  HonorEmpTypeItem_HonorEmpType String            @db.VarChar(50)
+  AutoFieldNum                  Int               @default(autoincrement())
+  HonorEmpTypeItem_Code         String            @db.VarChar(50)
+  HonorEmpTypeItem_Desc         String            @db.VarChar(100)
+  HonorEmpTypeItem_BudgetAmount Float?
+  HonorEmpTypeItem_Notes        String?           @db.VarChar(500)
+  PRMS_HonorEmpType             PRMS_HonorEmpType @relation(fields: [HonorEmpTypeItem_HonorEmpType], references: [HonorEmpType_Code], onDelete: Cascade, map: "FK_PRMS_HonorEmpTypeItem_PRMS_HonorEmpType")
+
+  @@id([HonorEmpTypeItem_HonorEmpType, HonorEmpTypeItem_Code], map: "PK_PRMS_HonorEmpTypeItem")
+}
+
+model PRMS_Hotel {
+  Hotel_Code              String                  @id(map: "PK_PRMS_HOTEL") @db.VarChar(50)
+  Hotel_Vendor            String                  @db.VarChar(100)
+  Hotel_PriceInclude      String                  @db.VarChar(50)
+  Hotel_Country           String                  @db.VarChar(50)
+  Hotel_City              String                  @db.VarChar(100)
+  Hotel_PayMethod         String?                 @db.VarChar(100)
+  Hotel_Name              String                  @db.VarChar(100)
+  Hotel_TName             String?                 @db.VarChar(100)
+  Hotel_District          String?                 @db.VarChar(100)
+  Hotel_TaxPer            String?                 @db.VarChar(100)
+  Hotel_ComReg            String?                 @db.VarChar(50)
+  Hotel_Area              String?                 @db.VarChar(100)
+  Hotel_Abbr              String?                 @db.VarChar(50)
+  Hotel_Address           String                  @db.VarChar(500)
+  Hotel_ComRegExpDate     DateTime?               @db.DateTime
+  Hotel_TAbbr             String?                 @db.VarChar(50)
+  Hotel_Taddress          String?                 @db.VarChar(500)
+  Hotel_TaxCard           String?                 @db.VarChar(100)
+  Hotel_TaxCardExpDate    DateTime?               @db.DateTime
+  Hotel_WebSite           String?                 @db.VarChar(100)
+  Hotel_RegCompany        String?                 @db.VarChar(1)
+  Hotel_Email             String?                 @db.VarChar(500)
+  Hotel_Rating            String                  @db.VarChar(50)
+  Hotel_RegEGPCDate       DateTime?               @db.DateTime
+  Hotel_Tel               String?                 @db.VarChar(500)
+  Hotel_ContractNo        String?                 @db.VarChar(100)
+  Hotel_Fax               String?                 @db.VarChar(500)
+  Hotel_RegEGPC           String?                 @db.VarChar(1)
+  Hotel_EGPCRegNo         String?                 @db.VarChar(100)
+  Hotel_ContactPersons    String?                 @db.VarChar(500)
+  Hotel_Notes             String?                 @db.VarChar(1000)
+  Hotel_Active            String                  @default("Y", map: "DF__PRMS_Hote__Hotel__5BF94C39") @db.VarChar(1)
+  Hotel_RegCompanyDate    DateTime?               @db.DateTime
+  Hotel_TContactPersons   String?                 @db.VarChar(500)
+  HOTEL_MaxChildAge       Int?
+  Hotel_ExtraBedPolicy    String?                 @db.VarChar(1)
+  Hotel_ExtraBedValue     Int?
+  Hotel_ExtraChargePolicy String?                 @db.VarChar(1)
+  HOTEL_PIC               Bytes?                  @db.Image
+  HOTEL_STRIP_YEAR        Int?
+  PRMS_HotelAcc           PRMS_HotelAcc[]         @ignore
+  PRMS_HotelAuth          PRMS_HotelAuth[]        @ignore
+  PRMS_HotelChildPolicy   PRMS_HotelChildPolicy[] @ignore
+  PRMS_HotelDoc           PRMS_HotelDoc[]         @ignore
+  PRMS_HotelRoom          PRMS_HotelRoom[]        @ignore
+  PRMS_HotelTerms         PRMS_HotelTerms[]       @ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model PRMS_HotelAcc {
+  AutoFieldNum         Int         @default(autoincrement())
+  HotelAcc_Hotel       String?     @db.VarChar(50)
+  HotelAcc_Note        String?     @db.VarChar(500)
+  HotelAcc_Curr        String?     @db.VarChar(50)
+  HotelAcc_No          String?     @db.VarChar(100)
+  HotelAcc_IBAN        String?     @db.VarChar(100)
+  HotelAcc_SWIFT       String?     @db.VarChar(100)
+  HotelAcc_BankAddress String?     @db.VarChar(250)
+  HotelAcc_BankName    String      @db.VarChar(100)
+  PRMS_Hotel           PRMS_Hotel? @relation(fields: [HotelAcc_Hotel], references: [Hotel_Code], onDelete: Cascade, map: "FK_PRMS_HotelAcc_PRMS_Hotel")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model PRMS_HotelAuth {
+  AutoFieldNum           Int         @default(autoincrement())
+  HotelAuth_Hotel        String?     @db.VarChar(50)
+  HotelAuth_ApprovedDate DateTime?   @db.DateTime
+  HotelAuth_ApprovedBy   String?     @db.VarChar(100)
+  HotelAuth_ReviewDate   DateTime?   @db.DateTime
+  HotelAuth_ReviewBy     String?     @db.VarChar(100)
+  HotelAuth_ReqDept      String?     @db.VarChar(50)
+  HotelAuth_ReqDate      DateTime?   @db.DateTime
+  HotelAuth_ReqBy        String      @db.VarChar(100)
+  PRMS_Hotel             PRMS_Hotel? @relation(fields: [HotelAuth_Hotel], references: [Hotel_Code], onDelete: Cascade, map: "FK_PRMS_HotelAuth_PRMS_Hotel")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model PRMS_HotelChildPolicy {
+  AutoFieldNum                           Int         @default(autoincrement())
+  HotelChildPolicy_Hotel                 String?     @db.VarChar(50)
+  HotelChildPolicy_RoomType              String      @db.VarChar(2)
+  HotelChildPolicy_NoOfExtraCharge       Int
+  HotelChildPolicy_1stChildAge           Int?
+  HotelChildPolicy_1stExtraChargeCostPer Int?
+  HotelChildPolicy_1stExtraChargePrice   Int?
+  HotelChildPolicy_2ndChildAge           Int?
+  HotelChildPolicy_2ndExtraChargeCostPer Int?
+  HotelChildPolicy_2ndExtraChargePrice   Int?
+  HotelChildPolicy_Note                  String?     @db.VarChar(500)
+  PRMS_Hotel                             PRMS_Hotel? @relation(fields: [HotelChildPolicy_Hotel], references: [Hotel_Code], onDelete: Cascade, map: "FK_PRMS_HotelChildPolicy_PRMS_Hotel")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model PRMS_HotelDoc {
+  AutoFieldNum       Int         @default(autoincrement())
+  HotelDoc_Hotel     String?     @db.VarChar(50)
+  HotelDoc_Note      String?     @db.VarChar(500)
+  HotelDoc_AutoPrint String?     @db.VarChar(1)
+  HotelDoc_Type      String?     @db.VarChar(50)
+  HotelDoc_File      String?     @db.VarChar(500)
+  HotelDoc_Desc      String      @db.VarChar(500)
+  HotelDoc_Code      String      @db.VarChar(50)
+  PRMS_Hotel         PRMS_Hotel? @relation(fields: [HotelDoc_Hotel], references: [Hotel_Code], onDelete: Cascade, map: "FK_PRMS_HotelDoc_PRMS_Hotel")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model PRMS_HotelRoom {
+  AutoFieldNum             Int         @default(autoincrement())
+  HotelRoom_Hotel          String?     @db.VarChar(50)
+  HotelRoom_RoomType       String?     @db.VarChar(2)
+  HotelRoom_BedsCount      Int
+  HotelRoom_Months         String?     @db.VarChar(50)
+  HotelRoom_RoomPrice      Int?
+  HotelRoom_RoomDiscPrice  Int?
+  HotelRoom_Curr           String?     @db.VarChar(50)
+  HotelRoom_Note           String?     @db.VarChar(500)
+  HotelRoom_Active         Int?
+  HotelRoom_ExtraBedsCount Int?        @default(0, map: "DF__PRMS_Hote__Hotel__106D1478")
+  HotelRoom_ExtraBedPrice  Int?        @default(0, map: "DF__PRMS_Hote__Hotel__116138B1")
+  PRMS_Hotel               PRMS_Hotel? @relation(fields: [HotelRoom_Hotel], references: [Hotel_Code], onDelete: Cascade, map: "FK_PRMS_HotelRoom_PRMS_Hotel")
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model PRMS_HotelTerms {
+  AutoFieldNum     Int         @default(autoincrement())
+  HotelTerms_Hotel String?     @db.VarChar(50)
+  HotelTerms_Note  String?     @db.VarChar(500)
+  HotelTerms_Desc  String      @db.VarChar(500)
+  HotelTerms_Code  String      @db.VarChar(50)
+  PRMS_Hotel       PRMS_Hotel? @relation(fields: [HotelTerms_Hotel], references: [Hotel_Code], onDelete: Cascade, map: "FK_PRMS_HotelTerms_PRMS_Hotel")
+
+  @@ignore
+}
+
+model PRMS_POLICY_STRIP {
+  POLICY_STRIP_For            String                   @id(map: "PK_PRMS_POLICY_STRIP") @db.VarChar(1)
+  POLICY_STRIP_Units          String?                  @db.VarChar(1)
+  POLICY_STRIP_MaxNights      Int?                     @default(0, map: "DF__PRMS_POLI__POLIC__391A2450")
+  POLICY_STRIP_MaxHotels      Int?                     @default(0, map: "DF__PRMS_POLI__POLIC__3A0E4889")
+  POLICY_STRIP_MaxCompan      Int?                     @default(0, map: "DF__PRMS_POLI__POLIC__3B026CC2")
+  POLICY_STRIP_ClosingDate    DateTime?                @db.DateTime
+  POLICY_STRIP_WH             Int?                     @default(0, map: "DF__PRMS_POLI__POLIC__3BF690FB")
+  POLICY_STRIP_CHILD          Int?                     @default(0, map: "DF__PRMS_POLI__POLIC__3CEAB534")
+  POLICY_STRIP_MParent        Int?                     @default(0, map: "DF__PRMS_POLI__POLIC__3DDED96D")
+  POLICY_STRIP_MMaxSonAge     Int?                     @default(0, map: "DF__PRMS_POLI__POLIC__3ED2FDA6")
+  POLICY_STRIP_MDaughterMarid Int?                     @default(0, map: "DF__PRMS_POLI__POLIC__3FC721DF")
+  POLICY_STRIP_SParent        Int?                     @default(0, map: "DF__PRMS_POLI__POLIC__40BB4618")
+  POLICY_STRIP_SBrothSister   Int?                     @default(0, map: "DF__PRMS_POLI__POLIC__41AF6A51")
+  POLICY_STRIP_SMaxBrotherAge Int?                     @default(0, map: "DF__PRMS_POLI__POLIC__42A38E8A")
+  POLICY_STRIP_SSisterMarid   Int?                     @default(0, map: "DF__PRMS_POLI__POLIC__4397B2C3")
+  POLICY_STRIP_HireMonths     Int?
+  POLICY_STRIP_StartDate      DateTime?                @db.DateTime
+  POLICY_STRIP_EndDate        DateTime?                @db.DateTime
+  POLICY_STRIP_ExEndDate      DateTime?                @db.DateTime
+  POLICY_STRIP_MSonMarid      Int?
+  POLICY_STRIP_ExReason       String?                  @db.VarChar(100)
+  POLICY_STRIP_TrasAlowns     Int?
+  POLICY_STRIP_SBrotherMarid  Int?
+  POLICY_STRIP_OpenDate       DateTime?                @db.DateTime
+  PRMS_POLICY_STRIP_CONT      PRMS_POLICY_STRIP_CONT[]
+}
+
+model PRMS_POLICY_STRIP_CONT {
+  POLICY_STRIP_CONT_For                   String?            @db.VarChar(1)
+  POLICY_STRIP_CONT_JobCat                String             @id(map: "PK_PRMS_POLICY_STRIP_CONT") @db.VarChar(1)
+  POLICY_STRIP_CONT_PayMethod             String?            @db.VarChar(1)
+  POLICY_STRIP_CONT_InstalmentCount       Int?               @default(0, map: "DF__PRMS_POLI__POLIC__56AA8737")
+  POLICY_STRIP_CONT_InstalmentDetail      String?            @db.VarChar(500)
+  POLICY_STRIP_CONT_CompPer               Int?               @default(0, map: "DF__PRMS_POLI__POLIC__579EAB70")
+  POLICY_STRIP_CONT_EmpPer                Int?               @default(0, map: "DF__PRMS_POLI__POLIC__5892CFA9")
+  POLICY_STRIP_CONT_InstalmentSalCount    Int?               @default(0, map: "DF__PRMS_POLI__POLIC__5986F3E2")
+  POLICY_STRIP_CONT_InstalmentPerfCount   Int?               @default(0, map: "DF__PRMS_POLI__POLIC__5A7B181B")
+  POLICY_STRIP_CONT_InstalmentPIPCount    Int?               @default(0, map: "DF__PRMS_POLI__POLIC__5B6F3C54")
+  POLICY_STRIP_CONT_InstalmentProfitCount Int?               @default(0, map: "DF__PRMS_POLI__POLIC__5C63608D")
+  POLICY_STRIP_CONT_InstalmentOtherCount  Int?               @default(0, map: "DF__PRMS_POLI__POLIC__5D5784C6")
+  POLICY_STRIP_CONT_Notes                 String?            @db.VarChar(500)
+  AutoFieldNum                            Int                @default(autoincrement())
+  PRMS_POLICY_STRIP                       PRMS_POLICY_STRIP? @relation(fields: [POLICY_STRIP_CONT_For], references: [POLICY_STRIP_For], onDelete: Cascade, map: "FK_PRMS_POLICY_STRIP_CONT_PRMS_POLICY_STRIP")
+}
+
+model PRMS_STRIP {
+  STRIP_CODE             String             @id(map: "PK_PRMS_STRIP") @default("1)/(2025", map: "DF_PRMS_STRIP_STRIP_CODE") @db.VarChar(50)
+  STRIP_EmpNo            String?            @db.VarChar(50)
+  STRIP_EmpName          String?            @db.VarChar(100)
+  STRIP_EmpDepart        String?            @db.VarChar(100)
+  STRIP_EmpJobTitle      String?            @db.VarChar(100)
+  STRIP_EmpWorkLoc       String?            @db.VarChar(100)
+  STRIP_EmpGrade         String?            @db.VarChar(50)
+  STRIP_EmpJobCat        String?            @db.VarChar(1)
+  STRIP_EmpMStatus       String?            @db.VarChar(1)
+  STRIP_Mobile           String?            @db.VarChar(100)
+  STRIP_Email            String?            @db.VarChar(500)
+  STRIP_ReqPandStatus    String?            @db.VarChar(50)
+  STRIP_CreateDate       DateTime?          @db.DateTime
+  STRIP_ReviewBy         String?            @db.VarChar(50)
+  STRIP_Notes            String?            @db.VarChar(1000)
+  STRIP_ApproveBy        String?            @db.VarChar(50)
+  STRIP_ApproveDate      DateTime?          @db.DateTime
+  STRIP_Acc              String?            @db.VarChar(100)
+  STRIP_Budget           String?            @db.VarChar(50)
+  STRIP_PayMethod        String?            @db.VarChar(1)
+  STRIP_InstalmentDetail String?            @db.VarChar(500)
+  STRIP_EmpPer           Int?
+  STRIP_CreateBy         String?            @db.VarChar(50)
+  STRIP_STATUS           String?            @default("N", map: "DF__PRMS_STRI__STRIP__159BDDE9") @db.VarChar(1)
+  STRIP_TransAlowns      Int?
+  PRMS_STripCompan       PRMS_STripCompan[]
+  PRMS_STripDoc          PRMS_STripDoc[]
+  PRMS_STripHotel        PRMS_STripHotel[]
+  PRMS_STripTrace        PRMS_STripTrace[]
+}
+
+model PRMS_STripCompan {
+  STripCompan_Line       Int?
+  STripCompan_TripCode   String     @db.VarChar(50)
+  STRIPCOMPAN_RELATIVEID String     @db.VarChar(50)
+  STripCompan_RelType    String?    @db.VarChar(2)
+  STripCompan_Name       String?    @db.VarChar(100)
+  AutoFieldNum           Int        @default(autoincrement())
+  PRMS_STRIP             PRMS_STRIP @relation(fields: [STripCompan_TripCode], references: [STRIP_CODE], onDelete: Cascade, map: "FK_PRMS_STripCompan_PRMS_STRIP")
+
+  @@id([STripCompan_TripCode, STRIPCOMPAN_RELATIVEID], map: "PK_PRMS_STripCompan")
+}
+
+model PRMS_STripDoc {
+  STripDoc_TripCode  String     @db.VarChar(50)
+  STripDoc_Code      String     @db.VarChar(50)
+  STripDoc_AutoPrint String?    @db.VarChar(1)
+  STripDoc_Type      String?    @db.VarChar(50)
+  STripDoc_File      String?    @db.VarChar(500)
+  STripDoc_Desc      String?    @db.VarChar(500)
+  STripDoc_Note      String?    @db.VarChar(500)
+  PRMS_STRIP         PRMS_STRIP @relation(fields: [STripDoc_TripCode], references: [STRIP_CODE], onDelete: Cascade, map: "FK_PRMS_STripDoc_PRMS_STRIP")
+
+  @@id([STripDoc_TripCode, STripDoc_Code], map: "PK_PRMS_STripDoc")
+}
+
+model PRMS_STripHotel {
+  AutoFieldNum                   Int        @default(autoincrement())
+  STripHotel_TripCode            String     @db.VarChar(50)
+  STripHotel_LineNo              Int?
+  STripHotel_Hotel               String     @db.VarChar(50)
+  STripHotel_ReqDate             DateTime   @db.DateTime
+  STripHotel_SRoomPrice          Float?     @default(0, map: "DF__PRMS_STri__STrip__64048255")
+  STripHotel_SRoomCount          Int?       @default(0, map: "DF__PRMS_STri__STrip__64F8A68E")
+  STripHotel_DRoomPrice          Float?     @default(0, map: "DF__PRMS_STri__STrip__65ECCAC7")
+  STripHotel_DRoomCount          Int?       @default(0, map: "DF__PRMS_STri__STrip__66E0EF00")
+  STripHotel_TRoomPrice          Float?     @default(0, map: "DF__PRMS_STri__STrip__67D51339")
+  STripHotel_TRoomCount          Int?       @default(0, map: "DF__PRMS_STri__STrip__68C93772")
+  STripHotel_JRoomPrice          Float?     @default(0, map: "DF__PRMS_STri__STrip__6BA5A41D")
+  STripHotel_JRoomCount          Int?       @default(0, map: "DF__PRMS_STri__STrip__6C99C856")
+  STripHotel_HotelConfirm        String?    @db.VarChar(1)
+  STripHotel_ActUsed             String?    @db.VarChar(1)
+  STripHotel_StartDate           DateTime?  @db.DateTime
+  STripHotel_InstSalaryCount     Int?
+  STripHotel_InstOtherVal        Float?
+  STripHotel_InstPerfectCount    Int?
+  STripHotel_InstPerfectVal      Float?
+  STripHotel_InstPIPCount        Int?
+  STripHotel_InstPIPVal          Float?
+  STripHotel_InstProfitsCount    Int?
+  STripHotel_InstProfitsVal      Float?
+  STripHotel_InstOtherCount      Int?
+  STripHotel_InstSalaryVal       Float?
+  STripHotel_InstTotCount        Int?
+  STripHotel_InstTotValue        Float?
+  STripHotel_TotRoomCost         Float?     @default(0, map: "DF__PRMS_STri__STrip__6D8DEC8F")
+  STripHotel_TotEmpCost          Float?
+  STripHotel_TransAlownsValue    Int?       @default(0, map: "DF__PRMS_STri__STrip__6A476B90")
+  STripHotel_SRoomBedCount       Int?       @default(0, map: "DF__PRMS_STri__STrip__6B3B8FC9")
+  STripHotel_DRoomBedCount       Int?       @default(0, map: "DF__PRMS_STri__STrip__6C2FB402")
+  STripHotel_TRoomBedCount       Int?       @default(0, map: "DF__PRMS_STri__STrip__6D23D83B")
+  STripHotel_FRRoomBedCount      Int?       @default(0, map: "DF__PRMS_STri__STrip__6E17FC74")
+  STripHotel_FSRoomBedCount      Int?       @default(0, map: "DF__PRMS_STri__STrip__6F0C20AD")
+  STripHotel_JRoomBedCount       Int?       @default(0, map: "DF__PRMS_STri__STrip__700044E6")
+  STripHotel_SRoomExBedCount     Int?       @default(0, map: "DF__PRMS_STri__STrip__70F4691F")
+  STripHotel_DRoomExBedCount     Int?       @default(0, map: "DF__PRMS_STri__STrip__71E88D58")
+  STripHotel_TRoomExBedCount     Int?       @default(0, map: "DF__PRMS_STri__STrip__72DCB191")
+  STripHotel_FRRoomExBedCount    Int?       @default(0, map: "DF__PRMS_STri__STrip__73D0D5CA")
+  STripHotel_FSRoomExBedCount    Int?       @default(0, map: "DF__PRMS_STri__STrip__74C4FA03")
+  STripHotel_JRoomExBedCount     Int?       @default(0, map: "DF__PRMS_STri__STrip__75B91E3C")
+  STripHotel_ExBedSRoomPrice     Int?       @default(0, map: "DF__PRMS_STri__STrip__76AD4275")
+  STripHotel_ExBedDRoomPrice     Int?       @default(0, map: "DF__PRMS_STri__STrip__77A166AE")
+  STripHotel_ExBedTRoomPrice     Int?       @default(0, map: "DF__PRMS_STri__STrip__78958AE7")
+  STripHotel_ExBedFRRoomPrice    Int?       @default(0, map: "DF__PRMS_STri__STrip__7989AF20")
+  STripHotel_ExBedFSRoomPrice    Int?       @default(0, map: "DF__PRMS_STri__STrip__7A7DD359")
+  STripHotel_ExBedJRoomPrice     Int?       @default(0, map: "DF__PRMS_STri__STrip__7B71F792")
+  STripHotel_ExChSRoomPrice      Int?       @default(0, map: "DF__PRMS_STri__STrip__7C661BCB")
+  STripHotel_ExChDRoomPrice      Int?       @default(0, map: "DF__PRMS_STri__STrip__7D5A4004")
+  STripHotel_ExChTRoomPrice      Int?       @default(0, map: "DF__PRMS_STri__STrip__7E4E643D")
+  STripHotel_ExChFRRoomPrice     Int?       @default(0, map: "DF__PRMS_STri__STrip__7F428876")
+  STripHotel_ExChFSRoomPrice     Int?       @default(0, map: "DF__PRMS_STri__STrip__0036ACAF")
+  STripHotel_ExChJRoomPrice      Int?       @default(0, map: "DF__PRMS_STri__STrip__012AD0E8")
+  STripHotel_ReqExBedSRoomCount  Int?       @default(0, map: "DF__PRMS_STri__STrip__021EF521")
+  STripHotel_ReqExBedDRoomCount  Int?       @default(0, map: "DF__PRMS_STri__STrip__0313195A")
+  STripHotel_ReqExBedTRoomCount  Int?       @default(0, map: "DF__PRMS_STri__STrip__04073D93")
+  STripHotel_ReqExBedFRRoomCount Int?       @default(0, map: "DF__PRMS_STri__STrip__04FB61CC")
+  STripHotel_ReqExBedFSRoomCount Int?       @default(0, map: "DF__PRMS_STri__STrip__05EF8605")
+  STripHotel_ReqExBedJRoomCount  Int?       @default(0, map: "DF__PRMS_STri__STrip__06E3AA3E")
+  STripHotel_FSRoomPrice         Int?       @default(0, map: "DF__PRMS_STri__STrip__08CBF2B0")
+  STripHotel_FRRoomPrice         Int?       @default(0, map: "DF__PRMS_STri__STrip__09C016E9")
+  STripHotel_FRRoomCount         Int?       @default(0, map: "DF__PRMS_STri__STrip__0AB43B22")
+  STripHotel_FSRoomCount         Int?       @default(0, map: "DF__PRMS_STri__STrip__0BA85F5B")
+  PRMS_STRIP                     PRMS_STRIP @relation(fields: [STripHotel_TripCode], references: [STRIP_CODE], onDelete: Cascade, map: "FK_PRMS_STripHotel_PRMS_STRIP")
+
+  @@id([STripHotel_TripCode, STripHotel_Hotel, STripHotel_ReqDate], map: "PK_PRMS_STripHotel")
+}
+
+model PRMS_STripTrace {
+  STripTrace_TripCode     String?     @db.VarChar(50)
+  STripTrace_STATUS       String?     @db.VarChar(1)
+  MAINLINK                Int         @id(map: "PK_PRMS_STripTrace") @default(autoincrement())
+  STripTrace_USERFULLNAME String?     @db.VarChar(100)
+  STripTrace_ACTIONDATE   DateTime?   @db.DateTime
+  STripTrace_Reason       String?     @db.VarChar(1000)
+  PRMS_STRIP              PRMS_STRIP? @relation(fields: [STripTrace_TripCode], references: [STRIP_CODE], onDelete: Cascade, map: "FK_PRMS_STripTrace_PRMS_STRIP")
+}
+
+model PRMS_TransAllowns {
+  AutoFieldNum         Int     @default(autoincrement())
+  TransAllowns_Country String  @db.VarChar(50)
+  TransAllowns_City    String  @db.VarChar(50)
+  TransAllowns_Desc    String? @db.VarChar(500)
+  TransAllowns_Value   Int
+  TransAllowns_Curr    String  @db.VarChar(20)
+  TransAllowns_Note    String? @db.VarChar(1000)
+
+  @@id([TransAllowns_Country, TransAllowns_City], map: "PK_PRMS_TransAllowns")
+}
+
+model REPORTS_PROFILE {
+  REG_KEY   String  @id(map: "PK__REPORTS___1E8132A8BB96F857") @db.VarChar(255)
+  REG_VALUE String? @db.VarChar(Max)
+}
+
+model USER_PROFILES {
+  REG_KEY   String  @id(map: "PK__USER_PRO__1E8132A805B1BFE6") @db.VarChar(255)
+  REG_VALUE String? @db.VarChar(Max)
+}
+
+model Version {
+  AppCode     Int
+  Major       Int
+  Minor       Int
+  Revision    Int
+  Comments    String?   @db.VarChar(Max)
+  VersionDate DateTime? @default(now(), map: "DF__Version__Version__2CE95795") @db.DateTime
+  Client      String?   @db.VarChar(20)
+  Firstsysdb  Int       @default(0, map: "DF__Version__Firstsy__2DDD7BCE")
+  WEB_Menu    String?   @db.VarChar(20)
+
+  @@id([AppCode, Major, Minor, Revision, Firstsysdb], map: "PK_Version_1")
+}
+
+model WEBFILTERS {
+  APP_CODE          Int
+  USER_CODE         Int
+  FORM_TAG          String  @db.VarChar(100)
+  FILTER_ORDER      Int?
+  FILTER_NAME       String  @db.VarChar(100)
+  FILTER_CRITERIA   String? @db.VarChar(Max)
+  READABLE_CRITERIA String? @db.VarChar(Max)
+  isDefaultFilter   Boolean @default(false, map: "DF__WEBFILTER__isDef__23B4F316")
+
+  @@id([APP_CODE, USER_CODE, FORM_TAG, FILTER_NAME], map: "PK__WEBFILTE__B5A3421327840D91")
+}
+
+model WIDGETWEATHER {
+  REG_KEY   String  @id(map: "PK__WIDGETWE__1E8132A818DFD1F3") @db.VarChar(255)
+  REG_VALUE String? @db.VarChar(Max)
+}

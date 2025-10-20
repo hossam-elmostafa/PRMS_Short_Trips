@@ -3,34 +3,51 @@ const router = express.Router();
 const companionService = require('../services/companionService');
 
 
-router.get('/companions/:employeeId', (req, res) => {
-  const { employeeId } = req.params;
-  const companions = companionService.getCompanions(employeeId);
+router.get('/companions/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { lang } = req.query; // Get language from query parameter
+    
+    const companions = await companionService.getCompanions(employeeId, lang);
 
-  if (companions.length === 0) {
-    return res.status(404).json({ success: false, message: 'companion not found' });
+    if (!companions || companions.length === 0) {
+      return res.status(404).json({ success: false, message: 'companion not found' });
+    }
+
+    res.json({ success: true, data: companions });
+  } catch (error) {
+    console.error('Error in companions route:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
-
-  res.json({ success: true, data: companions });
 });
 
-router.get('/employee/:employeeId', (req, res) => {
-  const { employeeId } = req.params;
+router.get('/employee/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { lang } = req.query; // optional language hint: 'ar' | 'en'
 
-  if (!employeeId) {
-    return res.status(404).json({ success: false, message: 'employee not found' });
+    if (!employeeId) {
+      return res.status(404).json({ success: false, message: 'employee not found' });
+    }
+
+    const name = await companionService.getEmployeeName(employeeId, (lang || 'ar'));
+    // Always respond 200 to avoid breaking frontend Promise.all; empty string if not found
+    res.json({ success: true, data: name || '' });
+  } catch (error) {
+    console.error('Error in employee name route:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
-  const employeeNames =['عبدالرحمن غنيم', 'محمد احمد', 'سارة علي' ];
-  console.log(employeeId);
-
-
-  res.json({ success: true, data: employeeNames[employeeId] });
 });
 
-router.get('/maximum-no-of-companions', (req, res) => {
-  const maxNoOfCompanions = companionService.getMaximumNoOfCompanions();
-
-  res.json({ success: true, data: maxNoOfCompanions });
+router.get('/maximum-no-of-companions', async (req, res) => {
+  try {
+    const { employeeId } = req.query;
+    const maxNoOfCompanions = await companionService.getMaximumNoOfCompanions(employeeId);
+    res.json({ success: true, data: maxNoOfCompanions });
+  } catch (error) {
+    console.error('Error in maximum-no-of-companions route:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
 });
 
 

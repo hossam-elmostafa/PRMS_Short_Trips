@@ -1,16 +1,18 @@
 const { TRANSPORT_OPTIONS, CITY_TRANSPORT_MAP } = require('../data/transportAllowances');
+const { getTransportAllowancefromDB } = require('../controllers/dbController');
 
-// function getTransportAllowanceForCity(city) {
-//   const options = CITY_TRANSPORT_MAP[city] || TRANSPORT_OPTIONS;
-//   const randomIndex = Math.floor(Math.random() * options.length);
-//   return options[randomIndex];
-// }
+async function getTransportAllowanceForEmployee(employeeId, lang = 'en', city = 'ALEX') {
+    console.log('Fetching transport allowance for employee:', employeeId, 'lang:', lang, 'city:', city);
+
+  return await getTransportAllowancefromDB(employeeId, lang, city);
+  
+}
 
 function getAllTransportOptions() {
   return TRANSPORT_OPTIONS;
 }
 
 module.exports = {
-  // getTransportAllowanceForCity,
+  getTransportAllowanceForEmployee,
   getAllTransportOptions
 };
