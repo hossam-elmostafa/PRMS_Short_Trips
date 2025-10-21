@@ -44,11 +44,8 @@ router.get('/transport-allowance/:employeeId', async (req, res) => {
       city || 'ALEX'
     );
 
-    if (!transportAllowance || transportAllowance.length === 0) {
-      return res.status(404).json({ success: false, message: 'Transport allowance not found' });
-    }
-
-    res.json({ success: true, data: transportAllowance });
+    // Always return 200 with a normalized allowance object
+    res.json({ success: true, data: transportAllowance || { value: 0, currency: '', label: 'لا يوجد' } });
   } catch (error) {
     console.error('Error in transport allowance route:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });

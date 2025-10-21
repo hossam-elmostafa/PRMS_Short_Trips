@@ -3,7 +3,7 @@ const { getCompanionsfromDB, getEmployeeNamefromDB, getMaximumNoOfCompanionsfrom
 
 // Relationship type mapping from English codes to Arabic terms
 const relationshipMapping = {
-  'WH': 'زوجه',      // Wife
+  'WH': 'زوجة',      // Wife
   'SN': 'ابن',        // Son
   'D': 'ابنة',        // Daughter
   'F': 'أب',          // Father

@@ -196,67 +196,340 @@ async function getEmployeeNamefromDB(employeeId, lang = 'ar') {
 
 async function getTransportAllowancefromDB(employeeId, lang = 'en', city = 'ALEX') {
     try {
-        // Convert lang to bit: 'en' = 1, others = 0
         const langBit = lang === 'en' ? 1 : 0;
         const empCode = String(employeeId).replace(/^:+/, '').trim();
-        const cityCode = String(city).trim();
-        
-        // Call stored procedure using table variable to capture results
-        const result = await prisma.$queryRawUnsafe(`
+        const esc = (s) => String(s || '').replace(/'/g, "''").trim();
+
+        // Try to resolve city code similar to hotels logic
+        let cityInput = esc(city);
+        let resolvedCity = cityInput;
+        try {
+            const [citiesAr, citiesEn] = await Promise.all([
+                getCitiesFromDB('ar'),
+                getCitiesFromDB('en')
+            ]);
+            const normalizeArabic = (text) => String(text || '')
+                .replace(/أ|إ|آ/g, 'ا')
+                .replace(/ى/g, 'ي')
+                .replace(/ة/g, 'ه')
+                .replace(/ـ/g, '')
+                .replace(/\s+/g, ' ').trim();
+            const inputNorm = normalizeArabic(cityInput);
+            const all = [...(citiesAr || []), ...(citiesEn || [])];
+            let match = all.find(c => String(c.code || '').toUpperCase() === cityInput.toUpperCase());
+            if (!match) match = all.find(c => normalizeArabic(c.name || '') === inputNorm);
+            if (!match) match = all.find(c => (c.name || '').includes(cityInput));
+            if (match && match.code) {
+                resolvedCity = esc(String(match.code).toUpperCase());
+            }
+        } catch (_) {
+            // ignore resolution errors; use input as-is
+        }
+
+        // Helper to execute the proc and read any returned value
+        const execForCity = async (cityParam) => prisma.$queryRawUnsafe(`
             DECLARE @Results TABLE (
-                TRANSPORT_OPTION VARCHAR(50)
-            )
-            
-            INSERT INTO @Results
-            EXEC P_GET_STRIP_TRANS_ALLOWANC ${langBit}, '${cityCode}', '${empCode}'
-            
-            SELECT * FROM @Results
+                VAL NVARCHAR(200)
+            );
+            INSERT INTO @Results (VAL)
+            EXEC P_GET_STRIP_TRANS_ALLOWANC ${langBit}, N'${cityParam}', N'${esc(empCode)}';
+            SELECT * FROM @Results;
         `);
-        
-        // Normalize payload: parse "<number> <currency>" or return label
-        const label = result && result[0] ? result[0].TRANSPORT_OPTION : 'لا يوجد';
-        const match = /^\s*(\d+)\s*([\p{L}A-Z]+)?\s*$/u.exec(label || '');
-        const normalized = match
-            ? { value: Number(match[1]), currency: match[2] || '', label }
-            : { value: 0, currency: '', label };
-        
-        return normalized;
-        
+
+        // First try resolved code, then fall back to original input
+        let rows = await execForCity(resolvedCity);
+        if ((!rows || rows.length === 0) && resolvedCity !== cityInput) {
+            rows = await execForCity(cityInput);
+        }
+
+        if (rows && rows.length > 0) {
+            const row = rows[0] || {};
+            // Read the first value regardless of column name
+            const firstValue = Object.values(row)[0];
+            let label = firstValue != null ? String(firstValue) : '';
+
+            // If row contained a known column, prefer it
+            if (row.TRANSPORT_OPTION != null) label = String(row.TRANSPORT_OPTION);
+            if (row.TRANS_ALLOWANCE != null) label = String(row.TRANS_ALLOWANCE);
+            if (row.VALUE != null) label = String(row.VALUE);
+
+            // Normalize: numeric or "<number> <currency>"
+            const numOnly = /^\s*([0-9]+)\s*$/u.exec(label);
+            if (numOnly) {
+                const n = Number(numOnly[1]);
+                return { value: n, currency: '', label: String(n) };
+            }
+            const numWithCurr = /^\s*([0-9]+)\s*([\p{L}A-Z]+)?\s*$/u.exec(label);
+            if (numWithCurr) {
+                const n = Number(numWithCurr[1]);
+                const curr = numWithCurr[2] || '';
+                return { value: n, currency: curr, label };
+            }
+            return { value: 0, currency: '', label: label || 'لا يوجد' };
+        }
+
+        return { value: 0, currency: '', label: 'لا يوجد' };
     } catch (error) {
         console.error('Error calling stored procedure P_GET_STRIP_TRANS_ALLOWANC:', error);
         console.error('Parameters used - employeeId:', employeeId, 'lang:', lang, 'city:', city);
-        
-        // Fallback to static data if stored procedure fails
         return { value: 0, currency: '', label: 'لا يوجد' };
     }
 }
+  
+// Retrieve actual room prices for a hotel from P_GET_STRIP_HOTEL_ROOMS @hotelCode, @date
+async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
+    try {
+        const code = String(hotelCode || '').trim().replace(/'/g, "''");
+        
+        // Try with date parameter first, then without if it fails
+        let rows;
+        const dateParam = date ? `, N'${date}'` : `, N'${new Date().toISOString().slice(0, 10)}'`;
+        
+        console.log(`Calling P_GET_STRIP_HOTEL_ROOMS with hotelCode: ${code}, date: ${date || 'today'}`);
+        
+        try {
+            // Try with date parameter first
+            rows = await prisma.$queryRawUnsafe(`
+                EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'${dateParam}
+            `);
+            console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, rows);
+        } catch (error) {
+            console.log(`P_GET_STRIP_HOTEL_ROOMS with date failed, trying without date:`, error.message);
+            // Fallback to without date parameter
+            rows = await prisma.$queryRawUnsafe(`
+                EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'
+            `);
+            console.log(`P_GET_STRIP_HOTEL_ROOMS without date result:`, rows);
+        }
+        
 
-async function getMaximumNoOfCompanionsfromDB(employeeId) {
+        // Normalize into a keyed map by room key (lowercase), with value number
+        const pricing = {};
+        const mapAbbrevKey = (k) => {
+            const n = String(k || '').toLowerCase().trim();
+            if (n === 's') return 'single';
+            if (n === 'd') return 'double';
+            if (n === 't') return 'trible';
+            if (n === 'fr') return 'family_room';
+            if (n === 'fs') return 'family_suite';
+            if (n === 'j') return 'joiner_suite';
+            return '';
+        };
+        const guessKeyFromName = (name) => {
+            const n = String(name || '').toLowerCase();
+            // Arabic keywords
+            if (/[\u0621-\u064A]/.test(n)) {
+                if (n.includes('مفرد') || n.includes('فردي')) return 'single';
+                if (n.includes('مزدوج') || n.includes('مزدوجه') || n.includes('دابل')) return 'double';
+                if (n.includes('ثلاث') || n.includes('ترابل') || n.includes('ثلاثي')) return 'trible';
+                if (n.includes('عائلي') && n.includes('سويت')) return 'family_suite';
+                if (n.includes('عائلي')) return 'family_room';
+                if (n.includes('سويت') || n.includes('جناح')) return 'joiner_suite';
+            } else {
+                // English keywords
+                if (n.includes('single')) return 'single';
+                if (n.includes('double') || n.includes('twin')) return 'double';
+                if (n.includes('triple') || n.includes('trbl') || n.includes('trible')) return 'trible';
+                if (n.includes('family') && n.includes('suite')) return 'family_suite';
+                if (n.includes('family')) return 'family_room';
+                if (n.includes('suite')) return 'joiner_suite';
+            }
+            return n.replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '') || 'unknown';
+        };
+
+        if (rows && rows.length > 0) {
+            // Map room type abbreviations to our standard keys
+            const roomTypeMapping = {
+                'S': 'single',
+                'D': 'double', 
+                'T': 'trible',
+                'FR': 'family_room',
+                'FS': 'family_suite',
+                'J': 'joiner_suite'
+            };
+            
+            // Check if we have the multi-row format (ROOM_TYPE, PRICE_DATE, ROOM_PRICE, EXTRA_BED_PRICE)
+            const hasMultiRowFormat = rows.some(row => 
+                row.ROOM_TYPE && row.PRICE_DATE && row.ROOM_PRICE !== undefined
+            );
+            
+            if (hasMultiRowFormat) {
+                console.log('Detected multi-row format with ROOM_TYPE, PRICE_DATE, ROOM_PRICE');
+                
+                // Filter rows for the requested date (or use first available date if no date specified)
+                const targetDate = date || new Date().toISOString().slice(0, 10);
+                const dateFilteredRows = rows.filter(row => 
+                    row.PRICE_DATE && row.PRICE_DATE.toString().startsWith(targetDate)
+                );
+                
+                // If no rows for target date, use the first available date
+                const rowsToUse = dateFilteredRows.length > 0 ? dateFilteredRows : rows;
+                const actualDate = rowsToUse[0]?.PRICE_DATE;
+                
+                console.log(`Using ${rowsToUse.length} rows for date: ${actualDate}`);
+                
+                // Extract prices for each room type
+                rowsToUse.forEach(row => {
+                    const roomType = row.ROOM_TYPE;
+                    const roomPrice = Number(row.ROOM_PRICE);
+                    const extraBedPrice = Number(row.EXTRA_BED_PRICE);
+                    
+                    if (roomType && !Number.isNaN(roomPrice) && roomPrice > 0) {
+                        const mappedType = roomTypeMapping[roomType];
+                        if (mappedType) {
+                            pricing[mappedType] = roomPrice;
+                            console.log(`Mapped ${roomType} -> ${mappedType}: ${roomPrice}`);
+                        }
+                    }
+                    
+                    // Set extra bed price (should be same for all room types)
+                    if (!Number.isNaN(extraBedPrice) && extraBedPrice > 0) {
+                        pricing.extra_bed_price = extraBedPrice;
+                    }
+                });
+                
+                console.log('Final pricing object:', pricing);
+            } else {
+                // Fallback to single row format (original logic)
+                const first = rows[0];
+                let mappedAny = false;
+                
+                // First, look for specific room type prices
+                for (const [k, v] of Object.entries(first || {})) {
+                    const num = Number(v);
+                    // Look for realistic prices (not epoch timestamps)
+                    if (!Number.isNaN(num) && num > 0 && num < 100000) {
+                        // Check if it's a known room type abbreviation
+                        if (roomTypeMapping[k]) {
+                            pricing[roomTypeMapping[k]] = num;
+                            mappedAny = true;
+                        } else {
+                            // Try other mapping methods
+                            const mapped = mapAbbrevKey(k) || guessKeyFromName(k);
+                            if (mapped) {
+                                pricing[mapped] = num;
+                                mappedAny = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Case 2: Multiple rows with name+price columns (fallback for other formats)
+        if (Object.keys(pricing).length === 0) {
+            (rows || []).forEach(r => {
+                const entries = Object.entries(r || {});
+                // Identify a reasonable price among numeric fields
+                let priceVal = 0;
+                for (const [, v] of entries) {
+                    const num = Number(v);
+                    if (!Number.isNaN(num) && num > 0 && num < 100000) { priceVal = num; break; }
+                }
+                // Determine key from known name fields or from any string field
+                const nameCandidate = r.ROOM_KEY || r.ROOMTYPE || r.ROOM_TYPE || r.TYPE || r.NAME || (() => {
+                    for (const [kk, vv] of entries) {
+                        if (typeof vv === 'string' && vv.trim()) return kk;
+                    }
+                    return '';
+                })();
+                const key = mapAbbrevKey(nameCandidate) || guessKeyFromName(nameCandidate);
+                if (key && priceVal) pricing[key] = priceVal;
+            });
+        }
+
+        // Also look for extra_bed_price in the results
+        const allRows = Array.isArray(rows) ? rows : [rows];
+        for (const row of allRows) {
+            if (row && typeof row === 'object') {
+                for (const [k, v] of Object.entries(row)) {
+                    const keyLower = String(k).toLowerCase();
+                    if (keyLower.includes('extra') && keyLower.includes('bed')) {
+                        const num = Number(v);
+                        if (!Number.isNaN(num) && num > 0 && num < 100000) {
+                            pricing.extra_bed_price = num;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        console.log('P_GET_STRIP_HOTEL_ROOMS rows for', code, rows);
+        console.log('Normalized pricing map for', code, pricing);
+
+        return pricing; // e.g., { single: 1200, double: 1700, trible: 2000 }
+    } catch (error) {
+        console.error('Error calling stored procedure P_GET_STRIP_HOTEL_ROOMS:', error);
+        console.error('Parameters used - hotelCode:', hotelCode);
+        return {};
+    }
+}
+
+async function getPolicyDataFromDB(employeeId) {
     try {
         const empCode = String(employeeId).replace(/^:+/, '').trim();
-        // Expect the proc to return a scalar or a single-row/column with the max value
         const rows = await prisma.$queryRawUnsafe(`
             EXEC P_GET_STRIP_POLICY '${empCode}'
         `);
         if (rows && rows.length > 0) {
             const row = rows[0];
-            // Try common column names; otherwise take first scalar value
-            const candidates = [
-                row.POLICY_STRIP_MAXCOMPAN,
-                row.MAX_COMPANIONS,
-                row.MaxCompanions,
-                row.MAX_NO_OF_COMPANIONS,
-                row.POLICY_STRIP_CompanionMax,
-            ].filter(v => typeof v !== 'undefined' && v !== null);
-            if (candidates.length > 0) return Number(candidates[0]) || 0;
-            const first = Object.values(row)[0];
-            return typeof first === 'number' ? first : Number(first) || 0;
+            
+            // Save all columns in variables as specified
+            return {
+                // Max companions and hotels
+                maxCompanions: Number(row.POLICY_STRIP_MAXCOMPAN) || 0,
+                maxHotels: Number(row.POLICY_STRIP_MAXHOTELS) || 0,
+                
+                // Date range
+                startDate: row.POLICY_STRIP_STARTDATE,
+                endDate: row.POLICY_STRIP_ENDDATE,
+                
+                // Employee contribution percentage
+                empContribution: Number(row.POLICY_STRIP_EMP_CONT) || 0,
+                
+                // All other policy columns
+                allColumns: row
+            };
         }
-        return 0;
+        return { 
+            maxCompanions: 0, 
+            maxHotels: 0, 
+            startDate: null, 
+            endDate: null, 
+            empContribution: 0,
+            allColumns: {} 
+        };
     } catch (error) {
         console.error('Error calling stored procedure P_GET_STRIP_POLICY:', error);
         console.error('Parameters used - employeeId:', employeeId);
-        return 0;
+        return { 
+            maxCompanions: 0, 
+            maxHotels: 0, 
+            startDate: null, 
+            endDate: null, 
+            empContribution: 0,
+            allColumns: {} 
+        };
+    }
+}
+
+// Load Employee Info - Execute P_GET_EMPLOYEE @lang, @empCode
+async function getEmployeeInfoFromDB(employeeId, lang = 'ar') {
+    try {
+        const langBit = lang === 'en' ? 1 : 0;
+        const empCode = String(employeeId).replace(/^:+/, '').trim();
+        
+        const result = await prisma.$queryRawUnsafe(`
+            EXEC P_GET_EMPLOYEE ${langBit}, '${empCode}'
+        `);
+        
+        return result && result.length > 0 ? result[0] : {};
+        
+    } catch (error) {
+        console.error('Error calling stored procedure P_GET_EMPLOYEE:', error);
+        console.error('Parameters used - employeeId:', employeeId, 'lang:', lang);
+        return {};
     }
 }
 
@@ -264,7 +537,9 @@ module.exports = {
     getCompanionsfromDB,
     getTransportAllowancefromDB,
     getEmployeeNamefromDB,
-    getMaximumNoOfCompanionsfromDB,
+    getEmployeeInfoFromDB,
+    getPolicyDataFromDB,
     getHotelsByCityFromDB,
-    getCitiesFromDB
+    getCitiesFromDB,
+    getHotelRoomsPricingFromDB
 };

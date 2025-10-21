@@ -1,5 +1,5 @@
 const { HOTELS } = require('../data/hotels');
-const { getHotelsByCityFromDB, getCitiesFromDB } = require('../controllers/dbController');
+const { getHotelsByCityFromDB, getCitiesFromDB, getPolicyDataFromDB, getHotelRoomsPricingFromDB } = require('../controllers/dbController');
 
 // function getAllCities() {
 //   return Object.keys(HOTELS);
@@ -16,6 +16,16 @@ async function getHotelsByCity(city, lang = 'ar') {
 
 async function getAllCities(lang = 'ar') {
   return await getCitiesFromDB(lang);
+}
+
+async function getHotelRoomPrices(hotelCode, date = null) {
+  // return await getHotelRoomsPricingFromDB(hotelCode, date);
+  return ROOM_PRICES[hotelCode];
+}
+
+
+async function getPolicyData(employeeId) {
+  return await getPolicyDataFromDB(employeeId);
 }
 
 
@@ -50,5 +60,7 @@ module.exports = {
   // getHotelById,
   // getMaxExtraBedsForHotel,
   getAllHotels,
-  getHotelsByCity
+  getHotelsByCity,
+  getPolicyData,
+  getHotelRoomPrices
 };

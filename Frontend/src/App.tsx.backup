@@ -202,10 +202,15 @@ function App({ employeeID }: AppProps) {
         maxExtraBeds: maxBeds
       }
     }));
-    
+    // Load real room prices for this hotel and cache them
+    try {
+      const pricing = await getHotelRoomPricesFromServer(hotel.id);
+      setHotelPricingCache(prev => ({ ...prev, [hotel.id]: pricing }));
+    } catch (e) {
+      console.error('Failed to load room prices for hotel', hotel.id, e);
+    }
     setShowHotelPopup(false);
-};
-
+  };
 
   const openCalendar = (col: number) => {
     setCalendarColumn(col);
@@ -265,16 +270,11 @@ function App({ employeeID }: AppProps) {
   type PricingPayload = Record<string, number> & { room_price?: number; extra_bed_price?: number };
   const [hotelPricingCache, setHotelPricingCache] = useState<Record<string, PricingPayload>>({});
 
-  const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): number => {
-    // Only use actual database data - no fallbacks
-    let cacheKey = hotelId;
+  const priceFor = async (hotelId: string, dateObj: Date, roomTypeKey: string): Promise<number> => {
+    const dateStr = dateObj.toISOString().slice(0, 10);
+    const cacheKey = `${hotelId}_${dateStr}`;
     
-    // If date is provided, use date-specific cache key
-    if (dateObj) {
-      const dateStr = dateObj.toISOString().slice(0, 10);
-      cacheKey = `${hotelId}_${dateStr}`;
-    }
-    
+    // Check if we have cached pricing for this hotel and date
     const hotelPricing = hotelPricingCache[cacheKey];
     
     if (hotelPricing) {
@@ -289,24 +289,40 @@ function App({ employeeID }: AppProps) {
       }
     }
 
+    // Fetch date-specific pricing from database
+    try {
+      const pricing = await getHotelRoomPricesFromServer(hotelId, dateStr);
+      setHotelPricingCache(prev => ({ ...prev, [cacheKey]: pricing }));
+      
+      if (typeof pricing[roomTypeKey] === 'number') {
+        return pricing[roomTypeKey] as number;
+      }
+      if (typeof pricing.room_price === 'number') {
+        return pricing.room_price;
+      }
+    } catch (e) {
+      console.error('Failed to fetch date-specific pricing:', e);
+    }
+
     return 0;
   };
 
-  const calculateTotal = (col: number): { total: number, employee: number } => {
+  const calculateTotal = async (col: number): Promise<{ total: number, employee: number }> => {
     const colData = columns[col];
     if (!colData.selectedHotel || !colData.arrivalDate) {
       return { total: 0, employee: 0 };
     }
 
+    const dateObj = new Date(colData.arrivalDate);
     let total = 0;
 
-    ROOM_TYPES.forEach(rt => {
+    for (const rt of ROOM_TYPES) {
       const count = colData.roomCounts[rt.key] || 0;
       if (count > 0) {
-        const price = priceFor(colData.selectedHotel!.id, rt.key);
+        const price = await priceFor(colData.selectedHotel!.id, dateObj, rt.key);
         total += price * count;
       }
-    });
+    }
 
     const employeeShare = empContribution > 0 ? (total * empContribution / 100) : (total * 0.6);
     return { total, employee: employeeShare };
@@ -439,28 +455,25 @@ function App({ employeeID }: AppProps) {
     </tr></thead><tbody>`;
 
     if (hotelId) {
-      // Fetch fresh pricing data for this hotel and date if not cached
-      const dateStr = dateObj.toISOString().slice(0, 10);
-      const cacheKey = `${hotelId}_${dateStr}`;
-      
-      if (!hotelPricingCache[cacheKey]) {
+      // Fetch fresh pricing data for this hotel if not cached
+      if (!hotelPricingCache[hotelId]) {
         try {
-          console.log('Fetching pricing for tooltip:', hotelId, 'on date:', dateStr);
-          const pricing = await getHotelRoomPricesFromServer(hotelId, dateStr);
-          setHotelPricingCache(prev => ({ ...prev, [cacheKey]: pricing }));
-          console.log(`Cached pricing for tooltip - hotel ${hotelId} on ${dateStr}:`, pricing);
+          console.log('Fetching pricing for tooltip:', hotelId);
+          const pricing = await getHotelRoomPricesFromServer(hotelId);
+          setHotelPricingCache(prev => ({ ...prev, [hotelId]: pricing }));
         } catch (error) {
           console.error('Failed to fetch pricing for tooltip:', error);
         }
       }
 
-      typesToShow.forEach(rt => {
-        const price = priceFor(hotelId, rt.key, dateObj);
+      // Fetch prices asynchronously for all room types
+      for (const rt of typesToShow) {
+        const price = await priceFor(hotelId, dateObj, rt.key);
         html += `<tr>
           <td style="padding:2px 8px">${rt.ar}</td>
           <td style="padding:2px 8px;text-align:left">EGP ${price}</td>
         </tr>`;
-      });
+      }
     } else {
       html += `<tr><td colspan="2" style="padding:2px 8px;text-align:center">اختر فندق أولاً</td></tr>`;
     }
@@ -495,77 +508,135 @@ function App({ employeeID }: AppProps) {
     return ordinals[num - 1] || `ال${num}`;
   };
 
-  const renderColumn = (col: number) => {
+  // Component for individual hotel column
+  const HotelColumn = ({ col }: { col: number }) => {
     const colData = columns[col];
-    const { total, employee } = calculateTotal(col);
+    const [total, setTotal] = useState(0);
+    const [employee, setEmployee] = useState(0);
+    
+    // Calculate total asynchronously
+    useEffect(() => {
+      const updateTotal = async () => {
+        const result = await calculateTotal(col);
+        setTotal(result.total);
+        setEmployee(result.employee);
+      };
+      updateTotal();
+    }, [col, colData.selectedHotel, colData.arrivalDate, colData.roomCounts, empContribution]);
 
     return (
       <section className="bg-white p-6 rounded-2xl shadow-lg">
         <h2 className="text-xl font-bold mb-3">
           الإختيار {getArabicOrdinal(col)}: إختر المدينة والفندق
         </h2>
-
-        <select
-          className="w-full border rounded p-3 mb-4 text-lg"
-          value={colData.selectedCity}
-          onChange={(e) => handleCityChange(col, e.target.value)}
-        >
-          <option value="">-- اختر المدينة --</option>
-          {Object.keys(HOTELS).map(city => (
-            <option key={city} value={city}>{city}</option>
-          ))}
-        </select>
-
-        <div className="flex items-center gap-3 mb-3">
-          <button
-            className="bg-indigo-600 text-white px-6 py-2 rounded-lg"
-            onClick={() => openHotelPopup(col)}
+        
+        {/* City Selection */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-2">المدينة:</label>
+          <select
+            value={colData.selectedCity}
+            onChange={(e) => handleCityChange(col, e.target.value)}
+            className="w-full p-2 border rounded-lg"
           >
-            اختيار الفندق
-          </button>
-          <span style={{ color: '#16a34a', fontWeight: '700', fontSize: '14px' }}>بدل انتقال</span>
-          <input
-            type="text"
-            readOnly
-            value={colData.travelAllowance ?? ''}
-            placeholder="لايوجد"
-            style={{
-              width: '84px',
-              padding: '6px 8px',
-              borderRadius: '8px',
-              background: '#ecfdf5',
-              color: '#065f46',
-              border: '1px solid #bbf7d0',
-              textAlign: 'center',
-              fontWeight: '600',
-              cursor: 'not-allowed'
-            }}
-          />
+            <option value="">اختر المدينة</option>
+            {Object.keys(HOTELS).map(city => (
+              <option key={city} value={city}>{city}</option>
+            ))}
+          </select>
         </div>
 
-        {colData.selectedHotel && (
-          <>
-            <img
-              src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60"
-              alt={colData.selectedHotel.ar}
-              style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }}
-              className="mb-2"
+        {/* Hotel Selection */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-2">الفندق:</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={colData.selectedHotel?.ar || ''}
+              readOnly
+              className="flex-1 p-2 border rounded-lg bg-gray-50"
+              placeholder="اختر فندق"
             />
-            <div className="mb-2 text-lg font-semibold text-blue-700">{colData.selectedHotel.ar}</div>
-          </>
-        )}
-        {!colData.selectedHotel && (
-          <div className="mb-2 text-lg font-semibold text-blue-700">لم يتم اختيار فندق</div>
-        )}
+            <button
+              onClick={() => openHotelPopup(col)}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            >
+              اختر
+            </button>
+          </div>
+        </div>
 
-        <label className="block font-semibold mb-1">أنواع الغرف والسرير الإضافي</label>
-        <div>
-          {ROOM_TYPES.map(rt => {
-            const maxBeds = colData.maxExtraBeds[rt.key] ?? 0;
-            const roomCount = colData.roomCounts[rt.key] ?? 0;
-            const reqBeds = colData.extraBedCounts[rt.key] ?? 0;
+        {/* Travel Allowance */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-2">بدل المواصلات:</label>
+          <div className="p-2 bg-gray-50 rounded-lg">
+            {colData.travelAllowance}
+          </div>
+        </div>
 
-            return (
+        {/* Date Selection */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-2">تاريخ الوصول:</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={colData.arrivalDate}
+              readOnly
+              className="flex-1 p-2 border rounded-lg bg-gray-50"
+              placeholder="اختر التاريخ"
+            />
+            <button
+              onClick={() => openCalendar(col)}
+              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+            >
+              اختر
+            </button>
+          </div>
+        </div>
+
+        {/* Room Selection */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-2">عدد الغرف:</label>
+          <div className="space-y-2">
+            {ROOM_TYPES.map(rt => (
+              <div key={rt.key} className="flex items-center gap-2">
+                <label className="text-sm w-20">{rt.ar}:</label>
+                <input
+                  type="number"
+                  min="0"
+                  max={colData.maxExtraBeds[rt.key] || 0}
+                  value={colData.roomCounts[rt.key] || 0}
+                  onChange={(e) => handleRoomCountChange(col, rt.key, parseInt(e.target.value) || 0)}
+                  className="w-16 p-1 border rounded text-center"
+                />
+                <span className="text-xs text-gray-500">
+                  (حد أقصى: {colData.maxExtraBeds[rt.key] || 0})
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Total Cost */}
+        {total > 0 && (
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="text-sm font-medium">
+              إجمالي التكلفة: {total} جنيه
+            </div>
+            <div className="text-sm text-gray-600">
+              حصة الموظف: {employee} جنيه
+            </div>
+          </div>
+        )}
+      </section>
+    );
+  };
+
+  const renderColumn = (col: number) => {
+    return <HotelColumn key={col} col={col} />;
+  };
+
+  return (
+    <div className="bg-gray-100 min-h-screen" dir="rtl" lang="ar" style={{ fontSize: '16px' }}>
               <div key={rt.key} className="flex items-center gap-2 mb-2" style={{ flexWrap: 'nowrap' }}>
                 <span style={{ width: '110px' }}>{rt.ar}</span>
                 <input
