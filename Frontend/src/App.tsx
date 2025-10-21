@@ -40,8 +40,6 @@ function App({ employeeID }: AppProps) {
   const [COMPANIONS, setCOMPANIONS] = useState<Companion[]>([]);
   const [employeeName, setEmployeeName] = useState<string>('');
   const [maximumNoOfCompanions, setMaximumNoOfCompanions] = useState<number>(0);
-
-  
   useEffect(() => {
     console.log('im loading now')
     const fetchInitialData = async () => {
@@ -511,7 +509,7 @@ function App({ employeeID }: AppProps) {
       <header className="bg-white shadow p-4 mb-4">
         <div className="max-w-7xl mx-auto flex items-start justify-between relative">
           <div className="absolute left-1/2 transform -translate-x-1/2">
-            <img src="Logo.png" width="300" height="200" alt="Logo" className="object-contain mx-auto" />
+            <img src="/Logo.png" width="300" height="200" alt="Logo" className="object-contain mx-auto" />
           </div>
 
           <div className="text-right ml-auto">
@@ -680,7 +678,7 @@ function App({ employeeID }: AppProps) {
 
       <footer className="bg-white shadow p-4 mt-8">
         <div className="max-w-6xl mx-auto flex items-center justify-center gap-4">
-          <img src="First.jpeg" alt="First logo" className="w-16 h-16 object-contain" />
+          <img src="/First.jpeg" alt="First logo" className="w-16 h-16 object-contain" />
           <div>
             <div className="text-lg font-bold">First Information &amp; Technology Solutions</div>
             <div className="text-sm text-gray-600">الشركة الأولى لنظم المعلومات والحلول التقنية</div>
