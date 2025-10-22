@@ -447,7 +447,7 @@ async function submitTripApplication(employeeId, familyIds, hotels=[]) {
                     `);
                         
                     await prisma.$queryRawUnsafe(`
-                        
+                        console.log('Submitting hotel 1 ${hotels[0].roomsData}');
                         EXEC P_STRIP_SUBMIT_HOTEL  ${employeeId}, '${hotels[0].hotelCode}', '${hotels[0].date}', '${hotels[0].roomsData}'
                     `);
 

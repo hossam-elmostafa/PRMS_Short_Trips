@@ -16,6 +16,7 @@ import {
 
 } from './services/Services';
 import Hotels from './components/Hotels';
+import { Columns } from 'lucide-react';
 
 
 
@@ -68,12 +69,8 @@ function App({ employeeID }: AppProps) {
       //console.log('Fetched hotels:', hotelsData);
       
       if (Array.isArray(companionsData)) {
-        console.log('Test 1',companionsData);
-        console.log('Test 2',companionsData.slice(0, 12))
         setCOMPANIONS(companionsData as Companion[]);
-        console.log('Test 3',COMPANIONS);
       } else {
-        console.log('Test 4',COMPANIONS);
         setCOMPANIONS((companionsData as { companions?: Companion[] })?.companions ?? []);
       }
       //console.log('Fetched companions:', companionsData);
@@ -105,7 +102,7 @@ function App({ employeeID }: AppProps) {
   });
 
   const [columns, setColumns] = useState<Record<number, ColumnState>>({});
-
+  //console.log('Columns:', columns);
   // Initialize columns based on maximumNoOfHotels
   useEffect(() => {
     const hotelCount = maximumNoOfHotels > 0 ? maximumNoOfHotels : 3; // Default to 3 if policy returns 0
@@ -125,7 +122,7 @@ function App({ employeeID }: AppProps) {
   }, [maximumNoOfHotels]);
 
   const handleCompanionChange = (value: string, checked: boolean) => {
-    console.log('selectedCompanions:',selectedCompanions,value);
+    //console.log('selectedCompanions:',selectedCompanions,value);
     if (checked) {
       if (selectedCompanions.length >= maximumNoOfCompanions) {
         alert(`الحد الأقصى للمرافقين هو ${maximumNoOfCompanions}`);
@@ -135,7 +132,7 @@ function App({ employeeID }: AppProps) {
     } else {
       setSelectedCompanions(selectedCompanions.filter(c => c !== value));
     }
-  };  console.log('Selected companions:', selectedCompanions);
+  };  //console.log('Selected companions:', selectedCompanions);
 
 
 
@@ -610,7 +607,7 @@ function App({ employeeID }: AppProps) {
                   style={{ width: '40px', textAlign: 'center', background: '#fff', border: '1px solid #bbb', marginRight: '6px' }}
                   title="عدد الغرف"
                 />
-                <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>مسموح سرر إضافية</span>
+                <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>مسموح سرر إضافية{col}</span>
                 <input
                   type="number"
                   min="0"
@@ -660,6 +657,58 @@ function App({ employeeID }: AppProps) {
       </section>
     );
   };
+
+  function getSelectedHotelsData(): object {
+    console.log('columns:', columns);
+
+    const getHotelIdByColumn = (columnNum:number) => columns[columnNum]?.selectedHotel?.id;
+    const hotelId = getHotelIdByColumn(1);
+
+    const getRoomCountsByColumn = (columnNum:number) => columns[columnNum]?.roomCounts;
+    const roomsData = getRoomCountsByColumn(1);
+    console.log('roomsData raw:', roomsData);
+    
+    const getArrivalDate = (columnNum:number) => columns[columnNum]?.arrivalDate;
+    const date = new Date(getArrivalDate(1));
+
+    const dateFormatted = date.toLocaleDateString('en-GB', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric'
+}).replace(/ /g, ' ').toUpperCase();
+
+    console.log('hotelCode[1]:', hotelId);
+    console.log('roomsData[1]:', roomsData);
+    console.log('arrivalDate[1]:', dateFormatted);
+
+  const res=[];
+  for (const col in columns) {
+    var colhotelCode = getHotelIdByColumn(Number(col));
+    var colRoomsData = getRoomCountsByColumn(Number(col));
+    var arrivalDateObj = new Date(getArrivalDate(Number(col)));
+    const date = new Date(getArrivalDate(1));
+    var coldateFormatted = date.toLocaleDateString('en-GB', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric'
+}).replace(/ /g, ' ').toUpperCase();
+
+      res.push({
+        hotelCode: colhotelCode,
+        date: coldateFormatted,
+        roomsData: Object.entries(colRoomsData).map(([key, count]) => `${key},${count},0`).join('|')
+      });
+      }
+      console.log('Final selected hotels data:', res);
+return res;
+    return(
+[
+                { hotelCode: "EG-ALX-001", date: "15 NOV 2025", roomsData: "D,2,0|S,1,0|J,1,0" },
+                { hotelCode: "EG-HUR-002", date: "16 NOV 2025", roomsData: "S,2,2" },
+                { hotelCode: "EG-ALX-003", date: "17 NOV 2025", roomsData: "S,3,1" }]
+)
+
+  }
 
   function getCompanionsFormated(): string {
     const result = selectedCompanions
@@ -747,13 +796,7 @@ function App({ employeeID }: AppProps) {
 
         <div className="flex justify-center mt-8 mb-1">
           <button onClick={function() { 
-            console.log('Test1525');
-            console.log();
-            submitTripFromServer(employeeID, getCompanionsFormated(),[
-                { hotelCode: "EG-ALX-001", date: "15 NOV 2025", roomsData: "D,2,0|S,1,0|J,1,0" },
-                { hotelCode: "EG-HUR-002", date: "16 NOV 2025", roomsData: "S,2,2" },
-                { hotelCode: "EG-ALX-003", date: "17 NOV 2025", roomsData: "S,3,1" }
-            ])}} className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
+            submitTripFromServer(employeeID, getCompanionsFormated(),getSelectedHotelsData())}} className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
             إرسال الطلب ورحلة سعيدة
           </button>
         </div>

@@ -114,7 +114,7 @@ export async function getCompanionsFromServer(employeeID: number) {
   try {
     const response = await fetch('http://localhost:3000/api/companions/' + employeeID);
     const result = await response.json();
-    console.log('Companions fetched from server:', result);
+    //console.log('Companions fetched from server:', result);
     if (result.success) {
       // Transform the data into the format expected by the app
       const COMPANIONS: Companion[] = result.data;
