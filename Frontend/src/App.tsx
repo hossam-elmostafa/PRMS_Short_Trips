@@ -47,7 +47,7 @@ function App({ employeeID }: AppProps) {
   const [policyEndDate, setPolicyEndDate] = useState<string | null>(null);
   const [empContribution, setEmpContribution] = useState<number>(0);
   useEffect(() => {
-    console.log('im loading now')
+    //console.log('im loading now')
     const fetchInitialData = async () => {
       // Fetch all data in parallel for better performance
       const [hotelsData, companionsData, roomTypesData, , employeeName, policyData] = await Promise.all([
@@ -60,17 +60,17 @@ function App({ employeeID }: AppProps) {
       ]);
     
       setHOTELS(hotelsData);
-      console.log('Fetched hotels:', hotelsData);
+      //console.log('Fetched hotels:', hotelsData);
       
       if (Array.isArray(companionsData)) {
         setCOMPANIONS(companionsData as Companion[]);
       } else {
         setCOMPANIONS((companionsData as { companions?: Companion[] })?.companions ?? []);
       }
-      console.log('Fetched companions:', companionsData);
+      //console.log('Fetched companions:', companionsData);
       
       setROOM_TYPES(Array.isArray(roomTypesData) ? roomTypesData : []);
-      console.log('Fetched room types:', roomTypesData);
+      //console.log('Fetched room types:', roomTypesData);
       
       // Transport options are not used anymore; allowance is fetched per city
       setEmployeeName(employeeName)
@@ -190,6 +190,7 @@ function App({ employeeID }: AppProps) {
     if (currentColumn === null) return;
 
     const maxBeds: Record<string, number> = {};
+    //console.log(ROOM_TYPES);
     ROOM_TYPES.forEach(rt => {
       maxBeds[rt.key] = Math.floor(Math.random() * 3);
     });
@@ -226,7 +227,11 @@ function App({ employeeID }: AppProps) {
 
   const selectDate = (dateObj: Date) => {
     if (calendarColumn === null) return;
-    const dateStr = dateObj.toISOString().slice(0, 10);
+    //const dateStr = dateObj.toISOString().slice(0, 10);
+    const yyyy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const dd = String(dateObj.getDate()).padStart(2, "0");
+    const dateStr = yyyy+'-'+mm+'-'+dd;
     setColumns(prev => ({
       ...prev,
       [calendarColumn]: {
@@ -271,16 +276,28 @@ function App({ employeeID }: AppProps) {
     
     // If date is provided, use date-specific cache key
     if (dateObj) {
-      const dateStr = dateObj.toISOString().slice(0, 10);
+      //const dateStr = dateObj.toISOString().slice(0, 10);
+    const yyyy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const dd = String(dateObj.getDate()).padStart(2, "0");
+    const dateStr = yyyy+'-'+mm+'-'+dd;
+
       cacheKey = `${hotelId}_${dateStr}`;
     }
     
     const hotelPricing = hotelPricingCache[cacheKey];
-    
+    //console.log(`Pricing lookup for hotel ${hotelId} (key: ${cacheKey}):`, hotelPricing);
     if (hotelPricing) {
       // Try specific room type price first
-      if (typeof hotelPricing[roomTypeKey] === 'number') {
-        return hotelPricing[roomTypeKey] as number;
+
+    // Find the first object where ROOM_TYPE === "S"
+    const foundRoom = hotelPricing.find(room => room.ROOM_TYPE === roomTypeKey);
+    //console.log('Found room for type :', roomTypeKey,foundRoom);
+      
+      //console.log(roomTypeKey)
+      //console.log(foundRoom['ROOM_PRICE'])
+      if (foundRoom && typeof foundRoom['ROOM_PRICE'] === 'number') {
+        return foundRoom['ROOM_PRICE'] as number;
       }
       
       // Use generic room_price for all room types if no specific pricing
@@ -299,7 +316,7 @@ function App({ employeeID }: AppProps) {
     }
 
     let total = 0;
-
+    //console.log(ROOM_TYPES);
     ROOM_TYPES.forEach(rt => {
       const count = colData.roomCounts[rt.key] || 0;
       if (count > 0) {
@@ -370,16 +387,16 @@ function App({ employeeID }: AppProps) {
               const isValid = dateObj >= policyStartDateObj && dateObj <= policyEndDateObj;
               
               // Debug logging for November dates
-              if (dateObj.getMonth() === 10 && (dateObj.getDate() === 1 || dateObj.getDate() === 2)) {
-                console.log('November date check:', { 
-                  dateObj: dateObj.toISOString(),
-                  policyStart: policyStartDateObj.toISOString(),
-                  policyEnd: policyEndDateObj.toISOString(),
-                  isValid,
-                  startComparison: dateObj >= policyStartDateObj,
-                  endComparison: dateObj <= policyEndDateObj
-                });
-              }
+              // if (dateObj.getMonth() === 10 && (dateObj.getDate() === 1 || dateObj.getDate() === 2)) {
+              //   console.log('November date check:', { 
+              //     dateObj: dateObj.toISOString(),
+              //     policyStart: policyStartDateObj.toISOString(),
+              //     policyEnd: policyEndDateObj.toISOString(),
+              //     isValid,
+              //     startComparison: dateObj >= policyStartDateObj,
+              //     endComparison: dateObj <= policyEndDateObj
+              //   });
+              // }
               
               return isValid;
             };
@@ -425,7 +442,7 @@ function App({ employeeID }: AppProps) {
     const hotelId = calendarColumn !== null && columns[calendarColumn].selectedHotel
       ? columns[calendarColumn].selectedHotel!.id
       : null;
-
+    //console.log(ROOM_TYPES);
     let typesToShow = ROOM_TYPES;
     if (calendarColumn !== null) {
       const hasRooms = ROOM_TYPES.filter(rt => (columns[calendarColumn].roomCounts[rt.key] || 0) > 0);
@@ -440,15 +457,16 @@ function App({ employeeID }: AppProps) {
 
     if (hotelId) {
       // Fetch fresh pricing data for this hotel and date if not cached
-      const dateStr = dateObj.toISOString().slice(0, 10);
+      const dateStr = yyyy+'-'+mm+'-'+dd;//dateObj.toISOString().slice(0, 10);
+      //console.log('Preparing tooltip for hotel:', hotelId, 'on date:', dateStr);
       const cacheKey = `${hotelId}_${dateStr}`;
       
       if (!hotelPricingCache[cacheKey]) {
         try {
-          console.log('Fetching pricing for tooltip:', hotelId, 'on date:', dateStr);
+          //console.log('Fetching pricing for tooltip:', hotelId, 'on date:', dateStr);
           const pricing = await getHotelRoomPricesFromServer(hotelId, dateStr);
           setHotelPricingCache(prev => ({ ...prev, [cacheKey]: pricing }));
-          console.log(`Cached pricing for tooltip - hotel ${hotelId} on ${dateStr}:`, pricing);
+          //console.log(`Cached pricing for tooltip - hotel ${hotelId} on ${dateStr}:`, pricing);
         } catch (error) {
           console.error('Failed to fetch pricing for tooltip:', error);
         }
@@ -456,6 +474,8 @@ function App({ employeeID }: AppProps) {
 
       typesToShow.forEach(rt => {
         const price = priceFor(hotelId, rt.key, dateObj);
+        //console.log(`Tooltip price for hotel ${hotelId}, room type ${rt.key} on ${dateStr}:`, price);
+        //const price = priceFor(hotelId, ROOM_PRICE, dateObj);
         html += `<tr>
           <td style="padding:2px 8px">${rt.ar}</td>
           <td style="padding:2px 8px;text-align:left">EGP ${price}</td>

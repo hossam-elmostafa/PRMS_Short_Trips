@@ -19,8 +19,7 @@ async function getAllCities(lang = 'ar') {
 }
 
 async function getHotelRoomPrices(hotelCode, date = null) {
-  // return await getHotelRoomsPricingFromDB(hotelCode, date);
-  return ROOM_PRICES[hotelCode];
+  return await getHotelRoomsPricingFromDB(hotelCode, date);
 }
 
 

@@ -1,5 +1,6 @@
 const { COMPANIONS } = require('../data/companions');
 const prisma = require('../lib/prisma');
+const { ROOM_PRICES } = require('../data/roomPrices');
 
 async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
     try {
@@ -38,7 +39,8 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
                 if (match && match.code) {
                     cityCode = String(match.code).trim().toUpperCase();
                 }
-                try { console.log('City resolution:', { input: cityInput, resolvedCode: cityCode }); } catch (_) {}
+                try { //console.log('City resolution:', { input: cityInput, resolvedCode: cityCode }); 
+                } catch (_) {}
             } catch (_) {
                 // ignore and fallback to original input
             }
@@ -97,7 +99,9 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
         });
 
         // Temporary log to verify counts and names during debugging
-        try { console.log('Hotels fetched for city', cityCode, 'count:', mapped.length, mapped.map(h => h.ar)); } catch (_) {}
+        try { //console.log('Hotels fetched for city', cityCode, 'count:', mapped.length, mapped.map(h => h.ar)); 
+
+        } catch (_) {}
         return mapped;
     } catch (error) {
         console.error('Error calling stored procedure P_GET_STRIP_HOTEL:', error);
@@ -278,6 +282,10 @@ async function getTransportAllowancefromDB(employeeId, lang = 'en', city = 'ALEX
   
 // Retrieve actual room prices for a hotel from P_GET_STRIP_HOTEL_ROOMS @hotelCode, @date
 async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
+//       const result = ROOM_PRICES[hotelCode].filter(item => item.PRICE_DATE === date);
+//   console.log(result);
+//   return result;
+
     try {
         const code = String(hotelCode || '').trim().replace(/'/g, "''");
         
@@ -285,21 +293,22 @@ async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
         let rows;
         const dateParam = date ? `, N'${date}'` : `, N'${new Date().toISOString().slice(0, 10)}'`;
         
-        console.log(`Calling P_GET_STRIP_HOTEL_ROOMS with hotelCode: ${code}, date: ${date || 'today'}`);
+        //console.log(`Calling P_GET_STRIP_HOTEL_ROOMS with hotelCode: ${code}, date: ${date || 'today'}`);
         
         try {
             // Try with date parameter first
+            //console.log(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'${dateParam}`);
             rows = await prisma.$queryRawUnsafe(`
-                EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'${dateParam}
+                EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}
             `);
-            console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, rows);
+            //console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, rows);
         } catch (error) {
-            console.log(`P_GET_STRIP_HOTEL_ROOMS with date failed, trying without date:`, error.message);
+            //console.log(`P_GET_STRIP_HOTEL_ROOMS with date failed, trying without date:`, error.message);
             // Fallback to without date parameter
             rows = await prisma.$queryRawUnsafe(`
                 EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'
             `);
-            console.log(`P_GET_STRIP_HOTEL_ROOMS without date result:`, rows);
+            //console.log(`P_GET_STRIP_HOTEL_ROOMS without date result:`, rows);
         }
         
 
@@ -354,7 +363,7 @@ async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
             );
             
             if (hasMultiRowFormat) {
-                console.log('Detected multi-row format with ROOM_TYPE, PRICE_DATE, ROOM_PRICE');
+                //console.log('Detected multi-row format with ROOM_TYPE, PRICE_DATE, ROOM_PRICE');
                 
                 // Filter rows for the requested date (or use first available date if no date specified)
                 const targetDate = date || new Date().toISOString().slice(0, 10);
@@ -366,7 +375,7 @@ async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
                 const rowsToUse = dateFilteredRows.length > 0 ? dateFilteredRows : rows;
                 const actualDate = rowsToUse[0]?.PRICE_DATE;
                 
-                console.log(`Using ${rowsToUse.length} rows for date: ${actualDate}`);
+                //console.log(`Using ${rowsToUse.length} rows for date: ${actualDate}`);
                 
                 // Extract prices for each room type
                 rowsToUse.forEach(row => {
@@ -378,7 +387,7 @@ async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
                         const mappedType = roomTypeMapping[roomType];
                         if (mappedType) {
                             pricing[mappedType] = roomPrice;
-                            console.log(`Mapped ${roomType} -> ${mappedType}: ${roomPrice}`);
+                            //console.log(`Mapped ${roomType} -> ${mappedType}: ${roomPrice}`);
                         }
                     }
                     
@@ -388,7 +397,7 @@ async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
                     }
                 });
                 
-                console.log('Final pricing object:', pricing);
+                //console.log('Final pricing object:', pricing);
             } else {
                 // Fallback to single row format (original logic)
                 const first = rows[0];
@@ -455,10 +464,12 @@ async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
             }
         }
 
-        console.log('P_GET_STRIP_HOTEL_ROOMS rows for', code, rows);
+        //console.log('P_GET_STRIP_HOTEL_ROOMS rows for', code, rows);
         console.log('Normalized pricing map for', code, pricing);
 
-        return pricing; // e.g., { single: 1200, double: 1700, trible: 2000 }
+        updatedPriceing=buildRoomPrices(date,pricing);
+        console.log('Updated pricing array for', code, updatedPriceing);
+        return updatedPriceing; // e.g., { single: 1200, double: 1700, trible: 2000 }
     } catch (error) {
         console.error('Error calling stored procedure P_GET_STRIP_HOTEL_ROOMS:', error);
         console.error('Parameters used - hotelCode:', hotelCode);
@@ -466,6 +477,28 @@ async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
     }
 }
 
+function buildRoomPrices(date, prices) {
+  // Map between input keys and ROOM_TYPE codes
+  const typeMap = {
+    single: "S",
+    double: "D",
+    trible: "T",
+    family_room: "F",
+    joiner_suite: "J"
+  };
+
+  // Create the array result
+  const result = Object.entries(typeMap)
+    .filter(([key]) => prices[key] !== undefined) // include only existing keys
+    .map(([key, code]) => ({
+      ROOM_TYPE: code,
+      PRICE_DATE: date,
+      ROOM_PRICE: prices[key],
+      EXTRA_BED_PRICE: prices.extra_bed_price
+    }));
+
+  return result;
+}
 async function getPolicyDataFromDB(employeeId) {
     try {
         const empCode = String(employeeId).replace(/^:+/, '').trim();

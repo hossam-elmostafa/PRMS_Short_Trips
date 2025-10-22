@@ -27,7 +27,7 @@ export async function getHotelsFromServer() {
   try {
     const response = await fetch('http://localhost:3000/api/hotels');
     const hotelResult = await response.json();
-    console.log('Hotels fetched from server:', hotelResult);
+    //console.log('Hotels fetched from server:', hotelResult);
     
     if (hotelResult.success) {
       // Transform the data into the format expected by the app
@@ -69,8 +69,9 @@ export async function getHotelRoomPricesFromServer(hotelCode: string, date?: str
     // Always pass date parameter to get date-specific pricing
     const dateParam = date || new Date().toISOString().slice(0, 10);
     const url = `http://localhost:3000/api/hotel/${encodeURIComponent(hotelCode)}/rooms?date=${encodeURIComponent(dateParam)}`;
-    
-    console.log(`Fetching hotel room prices for ${hotelCode} on date ${dateParam}`);
+    console.log('Constructed URL for fetching hotel room prices:', url);
+
+    //console.log(`Fetching hotel room prices for ${hotelCode} on date ${dateParam}`);
     
     const response = await fetch(url);
     if (!response.ok) {
@@ -81,7 +82,7 @@ export async function getHotelRoomPricesFromServer(hotelCode: string, date?: str
       throw new Error(result.message || 'Failed to fetch hotel room prices');
     }
     
-    console.log(`Received pricing data for ${hotelCode}:`, result.data);
+    //console.log(`Received pricing data for ${hotelCode}:`, result.data);
     
     // Support both map of room type => price and { room_price, extra_bed_price }
     return result.data as HotelRoomPrices;
@@ -116,7 +117,7 @@ export async function getCompanionsFromServer(employeeID: number) {
     if (result.success) {
       // Transform the data into the format expected by the app
       const COMPANIONS: Companion[] = result.data;
-      console.log('Companions fetched from server:', COMPANIONS);
+      //console.log('Companions fetched from server:', COMPANIONS);
       
     return COMPANIONS;
     } else {

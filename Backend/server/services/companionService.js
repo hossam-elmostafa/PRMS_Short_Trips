@@ -27,7 +27,7 @@ function mapRelationshipType(relType, lang = 'ar') {
 }
 
 async function getCompanions(employeeId, lang = 'en'){
-  console.log('Fetching companions for employee:', employeeId, 'lang:', lang);
+  //console.log('Fetching companions for employee:', employeeId, 'lang:', lang);
   const companions = await getCompanionsfromDB(employeeId, lang);
   
   // Always apply Arabic relationship mapping

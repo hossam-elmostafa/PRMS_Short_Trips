@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const hotelService = require('../services/hotelService');
-
+const { ROOM_PRICES } = require('../data/roomPrices');
 // router.get('/cities', (req, res) => {
 //   const cities = hotelService.getAllCities();
 //   res.json({ success: true, data: cities });
@@ -43,16 +43,18 @@ router.get('/cities', async (req, res) => {
 
 // Get actual room prices for a specific hotel and date
 router.get('/hotel/:hotelCode/rooms', async (req, res) => {
-  // try {
-  //   const { hotelCode } = req.params;
-  //   const { date } = req.query; // Optional date parameter
-  //   const pricing = await hotelService.getHotelRoomPrices(hotelCode, date);
-  //   res.json({ success: true, data: pricing });
-  // } catch (error) {
-  //   console.error('Error in hotel rooms pricing route:', error);
-  //   res.status(500).json({ success: false, message: 'Internal server error' });
-  // }
-  res.json({ success: true, data: ROOM_PRICES });
+  try {
+    const { hotelCode } = req.params;
+    const { date } = req.query; // Optional date parameter
+    const pricing = await hotelService.getHotelRoomPrices(hotelCode, date);
+    //console.log (pricing);
+    res.json({ success: true, data: pricing });
+  } catch (error) {
+    console.error('Error in hotel rooms pricing route:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+
+//  res.json({ success: true, data: ROOM_PRICES });
 });
 
 
@@ -67,6 +69,16 @@ router.get('/policy/:employeeId', async (req, res) => {
   }
 });
 
+router.get('/form/submit/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const policyData = await hotelService.getPolicyData(employeeId);
+    res.json({ success: true, data: policyData });
+  } catch (error) {
+    console.error('Error in policy route:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
 
 
 
