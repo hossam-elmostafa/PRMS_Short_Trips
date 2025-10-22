@@ -5,6 +5,7 @@ export interface Hotel {
 }
 
 export interface Companion {
+  RELID: string;
   rel: string;
   name: string;
 }
@@ -113,7 +114,7 @@ export async function getCompanionsFromServer(employeeID: number) {
   try {
     const response = await fetch('http://localhost:3000/api/companions/' + employeeID);
     const result = await response.json();
-    
+    console.log('Companions fetched from server:', result);
     if (result.success) {
       // Transform the data into the format expected by the app
       const COMPANIONS: Companion[] = result.data;
@@ -231,3 +232,34 @@ export async function getMaximumNoOfCompanionsFromServer(employeeID: number) {
     throw error; // Re-throw the error to handle it in the component
   }
 }
+
+export async function submitTripFromServer(employeeID: number, familyIds: number[], hotels: { hotelCode: string; date: string; roomsData: string }[]) {
+const tripData = {
+            employeeId: employeeID,
+            familyIds: familyIds,
+            hotels: hotels
+        };
+            try {
+            const res = await fetch('http://localhost:3000/api/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(tripData)
+            });
+
+            const data = await res.json();
+            console.log('Response from server:', data);
+            return;
+            if (res.ok) {
+                console.log('Success:', data);
+            } else {
+                console.error('Error:', data);
+            }
+        } catch (err) {
+            console.error('Error:', err);
+        } finally {
+        }
+    };
+
+

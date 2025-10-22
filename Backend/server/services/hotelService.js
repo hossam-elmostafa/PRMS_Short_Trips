@@ -19,15 +19,17 @@ async function getAllCities(lang = 'ar') {
 }
 
 async function getHotelRoomPrices(hotelCode, date = null) {
+  // return await get  return await getHotelRoomsPricingFromDB(hotelCode, date);
   return await getHotelRoomsPricingFromDB(hotelCode, date);
 }
-
 
 async function getPolicyData(employeeId) {
   return await getPolicyDataFromDB(employeeId);
 }
 
-
+async function submitTrip(employeeId, familyIds, hotels) {
+ return await submitTripApplicationToDB(employeeId, familyIds, hotels);
+}
 // function getHotelsByCity(city) {
 //   return HOTELS[city] || [];
 // }
@@ -61,5 +63,6 @@ module.exports = {
   getAllHotels,
   getHotelsByCity,
   getPolicyData,
-  getHotelRoomPrices
+  getHotelRoomPrices,
+  submitTrip
 };

@@ -150,7 +150,7 @@ async function getCompanionsfromDB(employeeId, lang = 'en') {
             INSERT INTO @Results
             EXEC P_GET_STRIP_EMP_FAMILY ${langBit}, '${empCode}'
             
-            SELECT EMPFAMILY_RELTYPE AS rel,EMPFAMILY_NAME AS name FROM @Results
+            SELECT EMPFAMILY_RelativeID AS RELID ,EMPFAMILY_RELTYPE AS rel,EMPFAMILY_NAME AS name FROM @Results
         `);
         
         return result;
@@ -297,208 +297,64 @@ async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
         
         try {
             // Try with date parameter first
-            //console.log(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'${dateParam}`);
-            rows = await prisma.$queryRawUnsafe(`
-                EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}
-            `);
-            //console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, rows);
+            console.log(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'${dateParam}`);
+            console.log('1');
+            rows = await prisma.$queryRawUnsafe(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'`);
+            console.log('2');
+    
+             //console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, rows);
+             
+             const filteredRows = rows.filter(item => 
+  item.PRICE_DATE instanceof Date && 
+  item.PRICE_DATE.toISOString().slice(0, 10) === date
+);
+             console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, filteredRows);
+             const result = filteredRows
+  .map(item => {
+    if (item.ROOM_TYPE === 'FR') return { ...item, ROOM_TYPE: 'F' };
+    if (item.ROOM_TYPE === 'FS') return { ...item, ROOM_TYPE: 'J' };
+    return item;
+  })
+  .filter(item => item.ROOM_TYPE !== 'J' || item.ROOM_PRICE === 3500); // keep only the one converted from FS
+
+             return result;
         } catch (error) {
             //console.log(`P_GET_STRIP_HOTEL_ROOMS with date failed, trying without date:`, error.message);
             // Fallback to without date parameter
-            rows = await prisma.$queryRawUnsafe(`
-                EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'
-            `);
-            //console.log(`P_GET_STRIP_HOTEL_ROOMS without date result:`, rows);
+          
+            console.log(error.message);
+            return [];
         }
         
 
-        // Normalize into a keyed map by room key (lowercase), with value number
-        const pricing = {};
-        const mapAbbrevKey = (k) => {
-            const n = String(k || '').toLowerCase().trim();
-            if (n === 's') return 'single';
-            if (n === 'd') return 'double';
-            if (n === 't') return 'trible';
-            if (n === 'fr') return 'family_room';
-            if (n === 'fs') return 'family_suite';
-            if (n === 'j') return 'joiner_suite';
-            return '';
-        };
-        const guessKeyFromName = (name) => {
-            const n = String(name || '').toLowerCase();
-            // Arabic keywords
-            if (/[\u0621-\u064A]/.test(n)) {
-                if (n.includes('مفرد') || n.includes('فردي')) return 'single';
-                if (n.includes('مزدوج') || n.includes('مزدوجه') || n.includes('دابل')) return 'double';
-                if (n.includes('ثلاث') || n.includes('ترابل') || n.includes('ثلاثي')) return 'trible';
-                if (n.includes('عائلي') && n.includes('سويت')) return 'family_suite';
-                if (n.includes('عائلي')) return 'family_room';
-                if (n.includes('سويت') || n.includes('جناح')) return 'joiner_suite';
-            } else {
-                // English keywords
-                if (n.includes('single')) return 'single';
-                if (n.includes('double') || n.includes('twin')) return 'double';
-                if (n.includes('triple') || n.includes('trbl') || n.includes('trible')) return 'trible';
-                if (n.includes('family') && n.includes('suite')) return 'family_suite';
-                if (n.includes('family')) return 'family_room';
-                if (n.includes('suite')) return 'joiner_suite';
-            }
-            return n.replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '') || 'unknown';
-        };
-
-        if (rows && rows.length > 0) {
-            // Map room type abbreviations to our standard keys
-            const roomTypeMapping = {
-                'S': 'single',
-                'D': 'double', 
-                'T': 'trible',
-                'FR': 'family_room',
-                'FS': 'family_suite',
-                'J': 'joiner_suite'
-            };
-            
-            // Check if we have the multi-row format (ROOM_TYPE, PRICE_DATE, ROOM_PRICE, EXTRA_BED_PRICE)
-            const hasMultiRowFormat = rows.some(row => 
-                row.ROOM_TYPE && row.PRICE_DATE && row.ROOM_PRICE !== undefined
-            );
-            
-            if (hasMultiRowFormat) {
-                //console.log('Detected multi-row format with ROOM_TYPE, PRICE_DATE, ROOM_PRICE');
-                
-                // Filter rows for the requested date (or use first available date if no date specified)
-                const targetDate = date || new Date().toISOString().slice(0, 10);
-                const dateFilteredRows = rows.filter(row => 
-                    row.PRICE_DATE && row.PRICE_DATE.toString().startsWith(targetDate)
-                );
-                
-                // If no rows for target date, use the first available date
-                const rowsToUse = dateFilteredRows.length > 0 ? dateFilteredRows : rows;
-                const actualDate = rowsToUse[0]?.PRICE_DATE;
-                
-                //console.log(`Using ${rowsToUse.length} rows for date: ${actualDate}`);
-                
-                // Extract prices for each room type
-                rowsToUse.forEach(row => {
-                    const roomType = row.ROOM_TYPE;
-                    const roomPrice = Number(row.ROOM_PRICE);
-                    const extraBedPrice = Number(row.EXTRA_BED_PRICE);
-                    
-                    if (roomType && !Number.isNaN(roomPrice) && roomPrice > 0) {
-                        const mappedType = roomTypeMapping[roomType];
-                        if (mappedType) {
-                            pricing[mappedType] = roomPrice;
-                            //console.log(`Mapped ${roomType} -> ${mappedType}: ${roomPrice}`);
-                        }
-                    }
-                    
-                    // Set extra bed price (should be same for all room types)
-                    if (!Number.isNaN(extraBedPrice) && extraBedPrice > 0) {
-                        pricing.extra_bed_price = extraBedPrice;
-                    }
-                });
-                
-                //console.log('Final pricing object:', pricing);
-            } else {
-                // Fallback to single row format (original logic)
-                const first = rows[0];
-                let mappedAny = false;
-                
-                // First, look for specific room type prices
-                for (const [k, v] of Object.entries(first || {})) {
-                    const num = Number(v);
-                    // Look for realistic prices (not epoch timestamps)
-                    if (!Number.isNaN(num) && num > 0 && num < 100000) {
-                        // Check if it's a known room type abbreviation
-                        if (roomTypeMapping[k]) {
-                            pricing[roomTypeMapping[k]] = num;
-                            mappedAny = true;
-                        } else {
-                            // Try other mapping methods
-                            const mapped = mapAbbrevKey(k) || guessKeyFromName(k);
-                            if (mapped) {
-                                pricing[mapped] = num;
-                                mappedAny = true;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Case 2: Multiple rows with name+price columns (fallback for other formats)
-        if (Object.keys(pricing).length === 0) {
-            (rows || []).forEach(r => {
-                const entries = Object.entries(r || {});
-                // Identify a reasonable price among numeric fields
-                let priceVal = 0;
-                for (const [, v] of entries) {
-                    const num = Number(v);
-                    if (!Number.isNaN(num) && num > 0 && num < 100000) { priceVal = num; break; }
-                }
-                // Determine key from known name fields or from any string field
-                const nameCandidate = r.ROOM_KEY || r.ROOMTYPE || r.ROOM_TYPE || r.TYPE || r.NAME || (() => {
-                    for (const [kk, vv] of entries) {
-                        if (typeof vv === 'string' && vv.trim()) return kk;
-                    }
-                    return '';
-                })();
-                const key = mapAbbrevKey(nameCandidate) || guessKeyFromName(nameCandidate);
-                if (key && priceVal) pricing[key] = priceVal;
-            });
-        }
-
-        // Also look for extra_bed_price in the results
-        const allRows = Array.isArray(rows) ? rows : [rows];
-        for (const row of allRows) {
-            if (row && typeof row === 'object') {
-                for (const [k, v] of Object.entries(row)) {
-                    const keyLower = String(k).toLowerCase();
-                    if (keyLower.includes('extra') && keyLower.includes('bed')) {
-                        const num = Number(v);
-                        if (!Number.isNaN(num) && num > 0 && num < 100000) {
-                            pricing.extra_bed_price = num;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        //console.log('P_GET_STRIP_HOTEL_ROOMS rows for', code, rows);
-        console.log('Normalized pricing map for', code, pricing);
-
-        updatedPriceing=buildRoomPrices(date,pricing);
-        console.log('Updated pricing array for', code, updatedPriceing);
-        return updatedPriceing; // e.g., { single: 1200, double: 1700, trible: 2000 }
-    } catch (error) {
+} catch (error) {
         console.error('Error calling stored procedure P_GET_STRIP_HOTEL_ROOMS:', error);
-        console.error('Parameters used - hotelCode:', hotelCode);
-        return {};
+        console.error('Parameters used - hotelCode:', hotelCode, 'date:', date);
+        return [];
     }
 }
+// function buildRoomPrices(date, prices) {
+//   // Map between input keys and ROOM_TYPE codes
+//   const typeMap = {
+//     single: "S",
+//     double: "D",
+//     trible: "T",
+//     family_room: "F",
+//     joiner_suite: "J"
+//   };
 
-function buildRoomPrices(date, prices) {
-  // Map between input keys and ROOM_TYPE codes
-  const typeMap = {
-    single: "S",
-    double: "D",
-    trible: "T",
-    family_room: "F",
-    joiner_suite: "J"
-  };
+//   // Create the array result
+//   const result = Object.entries(typeMap)
+//     .filter(([key]) => prices[key] !== undefined) // include only existing keys
+//     .map(([key, code]) => ({
+//       ROOM_TYPE: code,
+//       PRICE_DATE: date,
+//       ROOM_PRICE: prices[key],
+//       EXTRA_BED_PRICE: prices.extra_bed_price
+//     }));
 
-  // Create the array result
-  const result = Object.entries(typeMap)
-    .filter(([key]) => prices[key] !== undefined) // include only existing keys
-    .map(([key, code]) => ({
-      ROOM_TYPE: code,
-      PRICE_DATE: date,
-      ROOM_PRICE: prices[key],
-      EXTRA_BED_PRICE: prices.extra_bed_price
-    }));
-
-  return result;
-}
+//   return result;
+// }
 async function getPolicyDataFromDB(employeeId) {
     try {
         const empCode = String(employeeId).replace(/^:+/, '').trim();
@@ -566,6 +422,168 @@ async function getEmployeeInfoFromDB(employeeId, lang = 'ar') {
     }
 }
 
+/*
+    function to call the database with fixed data
+EXEC P_STRIP_SUBMIT_FAMILY '100005','100005-210|100005-209|100005-208'
+EXEC P_STRIP_SUBMIT_HOTEL  '100005', 'EG-ALX-001', '15 NOV 2025', 'D,2,0|S,1,0|J,1,0'
+EXEC P_STRIP_SUBMIT_HOTEL  '100005', 'EG-HUR-002', '16 NOV 2025', 'S,2,2'
+EXEC P_STRIP_SUBMIT_HOTEL  '100005', 'EG-ALX-003', '17 NOV 2025', 'S,3,1'
+
+EXEC P_STRIP_SUBMIT  '100005'
+
+*/
+async function submitTripApplication(employeeId, familyIds, hotels=[]) {
+    if (employeeId && familyIds && hotels && hotels.length > 0  )
+    {
+                try {
+                    await prisma.$executeRawUnsafe(
+                    `DELETE FROM PRMS_STRIP WHERE STRIP_EmpNo = ${employeeId}`
+                    );
+                    await prisma.$queryRawUnsafe(`EXEC P_STRIP_SUBMIT_CLEAR_HOTEL ${employeeId}`);
+                
+
+                    await prisma.$queryRawUnsafe(`
+                        EXEC P_STRIP_SUBMIT_FAMILY ${employeeId},'${familyIds}'
+                    `);
+                        
+                    await prisma.$queryRawUnsafe(`
+                        
+                        EXEC P_STRIP_SUBMIT_HOTEL  ${employeeId}, '${hotels[0].hotelCode}', '${hotels[0].date}', '${hotels[0].roomsData}'
+                    `);
+
+                    await prisma.$queryRawUnsafe(`
+                        EXEC P_STRIP_SUBMIT_HOTEL  ${employeeId}, '${hotels[1].hotelCode}', '${hotels[1].date}', '${hotels[1].roomsData}'
+                    `);
+                    await prisma.$queryRawUnsafe(`
+                        EXEC P_STRIP_SUBMIT_HOTEL  ${employeeId}, '${hotels[2].hotelCode}', '${hotels[2].date}', '${hotels[2].roomsData}'
+                    `);
+
+                    await prisma.$queryRawUnsafe(`
+                        EXEC P_STRIP_SUBMIT  ${employeeId}
+                    `);
+
+
+                    return {
+                        success: true,
+                        message: 'Messagge from submitTripApplication',
+                    };
+        
+                } catch (error) {
+                    console.error('Error in P_STRIP_SUBMIT_FAMILY:', error);
+                    return {
+                        success: false,
+                        message: 'Failed to submit family members',
+                        error: error.message,
+                        results
+                    };
+                }
+
+                return {
+            success: false,
+            message: 'No parameters provided to submitTripApplication'
+        };
+    }   
+}
+
+ async function submitTripApplicationV2(employeeId, familyIds, hotels = []) {
+    try {
+        const empCode = String(employeeId).replace(/^:+/, '').trim();
+        const esc = (s) => String(s || '').replace(/'/g, "''");
+        
+        const results = {
+            family: null,
+            hotels: [],
+            final: null
+        };
+        
+        // Step 1: Submit family members
+        if (familyIds) {
+            try {
+                const familyIdsStr = String(familyIds).trim();
+                console.log(`Calling P_STRIP_SUBMIT_FAMILY with empCode: ${empCode}, familyIds: ${familyIdsStr}`);
+                
+                await prisma.$queryRawUnsafe(`
+                    EXEC P_STRIP_SUBMIT_FAMILY '${esc(empCode)}', '${esc(familyIdsStr)}'
+                `);
+                
+                results.family = { success: true, message: 'Family members submitted successfully' };
+            } catch (error) {
+                console.error('Error in P_STRIP_SUBMIT_FAMILY:', error);
+                return {
+                    success: false,
+                    message: 'Failed to submit family members',
+                    error: error.message,
+                    results
+                };
+            }
+        }
+        
+        // Step 2: Submit all hotels
+        for (const hotel of hotels) {
+            try {
+                const hotelCode = String(hotel.hotelCode || '').trim();
+                const date = String(hotel.date || '').trim();
+                const roomsData = String(hotel.roomsData || '').trim();
+                
+                console.log(`Calling P_STRIP_SUBMIT_HOTEL with empCode: ${empCode}, hotel: ${hotelCode}, date: ${date}, rooms: ${roomsData}`);
+                
+                await prisma.$queryRawUnsafe(`
+                    EXEC P_STRIP_SUBMIT_HOTEL '${esc(empCode)}', '${esc(hotelCode)}', '${esc(date)}', '${esc(roomsData)}'
+                `);
+                
+                results.hotels.push({ 
+                    success: true, 
+                    hotelCode,
+                    message: 'Hotel booking submitted successfully' 
+                });
+            } catch (error) {
+                console.error('Error in P_STRIP_SUBMIT_HOTEL:', error);
+                return {
+                    success: false,
+                    message: `Failed to submit hotel: ${hotel.hotelCode}`,
+                    error: error.message,
+                    results
+                };
+            }
+        }
+        
+        // Step 3: Final submit
+        try {
+            console.log(`Calling P_STRIP_SUBMIT with empCode: ${empCode}`);
+            
+            await prisma.$queryRawUnsafe(`
+                EXEC P_STRIP_SUBMIT '${esc(empCode)}'
+            `);
+            
+            results.final = { success: true, message: 'Trip application submitted successfully' };
+        } catch (error) {
+            console.error('Error in P_STRIP_SUBMIT:', error);
+            return {
+                success: false,
+                message: 'Failed to complete final submission',
+                error: error.message,
+                results
+            };
+        }
+        
+        return {
+            success: true,
+            message: 'Complete trip application submitted successfully',
+            results
+        };
+        
+    } catch (error) {
+        console.error('Error in submitTripApplication:', error);
+        return {
+            success: false,
+            message: error.message || 'Failed to submit trip application',
+            error: error
+        };
+    }
+}
+
+
+
 module.exports = {
     getCompanionsfromDB,
     getTransportAllowancefromDB,
@@ -574,5 +592,6 @@ module.exports = {
     getPolicyDataFromDB,
     getHotelsByCityFromDB,
     getCitiesFromDB,
-    getHotelRoomsPricingFromDB
+    getHotelRoomsPricingFromDB,
+    submitTripApplication
 };

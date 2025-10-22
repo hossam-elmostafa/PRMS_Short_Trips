@@ -11,7 +11,9 @@ import {
   Companion,
   RoomType,
   getEmployeeNameFromServer,
-  getPolicyDataFromServer
+  getPolicyDataFromServer,
+  submitTripFromServer
+
 } from './services/Services';
 
 
@@ -56,15 +58,21 @@ function App({ employeeID }: AppProps) {
         getRoomTypesFromServer(),
         getTransportOptionsFromServer(employeeID),
         getEmployeeNameFromServer(employeeID),
-        getPolicyDataFromServer(employeeID)
+        getPolicyDataFromServer(employeeID),
       ]);
+
+      
     
       setHOTELS(hotelsData);
       //console.log('Fetched hotels:', hotelsData);
       
       if (Array.isArray(companionsData)) {
+        console.log('Test 1',companionsData);
+        console.log('Test 2',companionsData.slice(0, 12))
         setCOMPANIONS(companionsData as Companion[]);
+        console.log('Test 3',COMPANIONS);
       } else {
+        console.log('Test 4',COMPANIONS);
         setCOMPANIONS((companionsData as { companions?: Companion[] })?.companions ?? []);
       }
       //console.log('Fetched companions:', companionsData);
@@ -115,6 +123,7 @@ function App({ employeeID }: AppProps) {
   }, [maximumNoOfHotels]);
 
   const handleCompanionChange = (value: string, checked: boolean) => {
+    console.log('selectedCompanions:',selectedCompanions,value);
     if (checked) {
       if (selectedCompanions.length >= maximumNoOfCompanions) {
         alert(`الحد الأقصى للمرافقين هو ${maximumNoOfCompanions}`);
@@ -124,7 +133,10 @@ function App({ employeeID }: AppProps) {
     } else {
       setSelectedCompanions(selectedCompanions.filter(c => c !== value));
     }
-  };
+  };  console.log('Selected companions:', selectedCompanions);
+
+
+
 
   const handleCityChange = (col: number, city: string) => {
     setColumns(prev => ({
@@ -647,6 +659,14 @@ function App({ employeeID }: AppProps) {
     );
   };
 
+  function getCompanionsFormated(): string {
+    const result = selectedCompanions
+  .map(item => item.split('|').pop()) // extract last part after '|'
+  .join('|');  
+  return result;
+    //return '100005-210|100005-209|100005-208';
+  }
+
   return (
     <div className="bg-gray-100 min-h-screen" dir="rtl" lang="ar" style={{ fontSize: '16px' }}>
       <header className="bg-white shadow p-4 mb-4">
@@ -690,11 +710,11 @@ function App({ employeeID }: AppProps) {
                 <div key={i} className="flex items-center gap-3">
                   <input
                     type="checkbox"
-                    checked={selectedCompanions.includes(`${c.rel}|${c.name}`)}
-                    onChange={(e) => handleCompanionChange(`${c.rel}|${c.name}`, e.target.checked)}
+                    checked={selectedCompanions.includes(`${c.rel}|${c.name}|${c.RELID}`)}
+                    onChange={(e) => handleCompanionChange(`${c.rel}|${c.name}|${c.RELID}`, e.target.checked)}
                     style={{ width: '20px', height: '20px' }}
                   />
-                  <span>{c.rel} — {c.name}</span>
+                  <span>{c.rel} — {c.name} </span>
                 </div>
               ))}
             </div>
@@ -724,7 +744,13 @@ function App({ employeeID }: AppProps) {
         </div>
 
         <div className="flex justify-center mt-8 mb-1">
-          <button className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
+          <button onClick={function() { 
+            console.log(selectedCompanions);
+            submitTripFromServer(employeeID, getCompanionsFormated(),[
+                { hotelCode: "EG-ALX-001", date: "15 NOV 2025", roomsData: "D,2,0|S,1,0|J,1,0" },
+                { hotelCode: "EG-HUR-002", date: "16 NOV 2025", roomsData: "S,2,2" },
+                { hotelCode: "EG-ALX-003", date: "17 NOV 2025", roomsData: "S,3,1" }
+            ])}} className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
             إرسال الطلب ورحلة سعيدة
           </button>
         </div>

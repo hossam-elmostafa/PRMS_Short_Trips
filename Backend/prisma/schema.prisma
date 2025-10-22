@@ -109,11 +109,11 @@ model CMN_BdgtPlan {
   BdgtPlan_LastUpdatedDate    DateTime?             @db.DateTime
   BdgtPlan_UpdateBy           String?               @db.VarChar(100)
   BdgtPlan_Active             String                @db.VarChar(1)
-  CMN_BdgtPlanAprvl           CMN_BdgtPlanAprvl[]   @ignore
-  CMN_BdgtPlanBudget          CMN_BdgtPlanBudget[]  @ignore
-  CMN_BdgtPlanDoc             CMN_BdgtPlanDoc[]     @ignore
-  CMN_BdgtPlanInv             CMN_BdgtPlanInv[]     @ignore
-  CMN_BdgtPlanItemDtl         CMN_BdgtPlanItemDtl[] @ignore
+  CMN_BdgtPlanAprvl           CMN_BdgtPlanAprvl[]
+  CMN_BdgtPlanBudget          CMN_BdgtPlanBudget[]
+  CMN_BdgtPlanDoc             CMN_BdgtPlanDoc[]
+  CMN_BdgtPlanInv             CMN_BdgtPlanInv[]
+  CMN_BdgtPlanItemDtl         CMN_BdgtPlanItemDtl[]
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
@@ -426,7 +426,7 @@ model CMN_COUNTRIES {
   COUNTRIES_CURRENCY    String?       @db.VarChar(50)
   COUNTRIES_TNAME       String?       @db.VarChar(50)
   COUNTRIES_NATIONALITY String?       @db.VarChar(50)
-  CMN_CITIES            CMN_CITIES[]  @ignore
+  CMN_CITIES            CMN_CITIES[]
   CMN_COMPPRF           CMN_COMPPRF[]
   CMN_VENDOR            CMN_VENDOR[]
 
@@ -954,12 +954,12 @@ model CMN_VENDOR {
   VENDOR_REGEGPCDate         DateTime?           @db.DateTime
   CMN_COUNTRIES              CMN_COUNTRIES?      @relation(fields: [VENDOR_COUNTRY], references: [COUNTRIES_CODE], onDelete: NoAction, map: "FK_CMN_VENDOR_VENDOR_COUNTRY")
   CMN_DEPART                 CMN_DEPART?         @relation(fields: [VENDOR_DEPART], references: [DEPART_CODE], onDelete: NoAction, onUpdate: NoAction, map: "FK_WEB_CMN_VENDOR_CMN_DEPART_DEPART_CODE_VENDOR_DEPART")
-  CMN_VENDORACC              CMN_VENDORACC[]     @ignore
-  CMN_VENDORAUTH             CMN_VENDORAUTH[]    @ignore
-  CMN_VENDORBRANCH           CMN_VENDORBRANCH[]  @ignore
-  CMN_VENDORDOC              CMN_VENDORDOC[]     @ignore
-  CMN_VENDORRoomTyp          CMN_VENDORRoomTyp[] @ignore
-  CMN_VENDORUnitDtl          CMN_VENDORUnitDtl[] @ignore
+  CMN_VENDORACC              CMN_VENDORACC[]
+  CMN_VENDORAUTH             CMN_VENDORAUTH[]
+  CMN_VENDORBRANCH           CMN_VENDORBRANCH[]
+  CMN_VENDORDOC              CMN_VENDORDOC[]
+  CMN_VENDORRoomTyp          CMN_VENDORRoomTyp[]
+  CMN_VENDORUnitDtl          CMN_VENDORUnitDtl[]
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
@@ -1266,12 +1266,16 @@ model PRMS_Hotel {
   Hotel_ExtraChargePolicy String?                 @db.VarChar(1)
   HOTEL_PIC               Bytes?                  @db.Image
   HOTEL_STRIP_YEAR        Int?
-  PRMS_HotelAcc           PRMS_HotelAcc[]         @ignore
-  PRMS_HotelAuth          PRMS_HotelAuth[]        @ignore
-  PRMS_HotelChildPolicy   PRMS_HotelChildPolicy[] @ignore
-  PRMS_HotelDoc           PRMS_HotelDoc[]         @ignore
-  PRMS_HotelRoom          PRMS_HotelRoom[]        @ignore
-  PRMS_HotelTerms         PRMS_HotelTerms[]       @ignore
+  Hotel_WE_THU            Int?                    @default(0, map: "DF__PRMS_Hote__Hotel__18984625")
+  Hotel_WE_FRI            Int?                    @default(0, map: "DF__PRMS_Hote__Hotel__198C6A5E")
+  Hotel_WE_SAT            Int?                    @default(0, map: "DF__PRMS_Hote__Hotel__1A808E97")
+  Hotel_WE_SUN            Int?                    @default(0, map: "DF__PRMS_Hote__Hotel__1B74B2D0")
+  PRMS_HotelAcc           PRMS_HotelAcc[]
+  PRMS_HotelAuth          PRMS_HotelAuth[]
+  PRMS_HotelChildPolicy   PRMS_HotelChildPolicy[]
+  PRMS_HotelDoc           PRMS_HotelDoc[]
+  PRMS_HotelRoom          PRMS_HotelRoom[]
+  PRMS_HotelTerms         PRMS_HotelTerms[]
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
@@ -1341,19 +1345,26 @@ model PRMS_HotelDoc {
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model PRMS_HotelRoom {
-  AutoFieldNum             Int         @default(autoincrement())
-  HotelRoom_Hotel          String?     @db.VarChar(50)
-  HotelRoom_RoomType       String?     @db.VarChar(2)
-  HotelRoom_BedsCount      Int
-  HotelRoom_Months         String?     @db.VarChar(50)
-  HotelRoom_RoomPrice      Int?
-  HotelRoom_RoomDiscPrice  Int?
-  HotelRoom_Curr           String?     @db.VarChar(50)
-  HotelRoom_Note           String?     @db.VarChar(500)
-  HotelRoom_Active         Int?
-  HotelRoom_ExtraBedsCount Int?        @default(0, map: "DF__PRMS_Hote__Hotel__106D1478")
-  HotelRoom_ExtraBedPrice  Int?        @default(0, map: "DF__PRMS_Hote__Hotel__116138B1")
-  PRMS_Hotel               PRMS_Hotel? @relation(fields: [HotelRoom_Hotel], references: [Hotel_Code], onDelete: Cascade, map: "FK_PRMS_HotelRoom_PRMS_Hotel")
+  AutoFieldNum               Int         @default(autoincrement())
+  HotelRoom_Hotel            String?     @db.VarChar(50)
+  HotelRoom_RoomType         String?     @db.VarChar(2)
+  HotelRoom_BedsCount        Int
+  HotelRoom_RoomPrice        Int?
+  HotelRoom_RoomDiscPrice    Int?
+  HotelRoom_Curr             String?     @db.VarChar(50)
+  HotelRoom_Note             String?     @db.VarChar(500)
+  HotelRoom_Active           Int?
+  HotelRoom_ExtraBedsCount   Int?        @default(0, map: "DF__PRMS_Hote__Hotel__106D1478")
+  HotelRoom_ExtraBedPrice    Int?        @default(0, map: "DF__PRMS_Hote__Hotel__116138B1")
+  HotelRoom_From1            DateTime?   @db.DateTime
+  HotelRoom_From2            DateTime?   @db.DateTime
+  HotelRoom_From3            DateTime?   @db.DateTime
+  HotelRoom_To1              DateTime?   @db.DateTime
+  HotelRoom_To2              DateTime?   @db.DateTime
+  HotelRoom_To3              DateTime?   @db.DateTime
+  HotelRoom_RoomPrice_WE     Int?
+  HotelRoom_ExtraBedPrice_WE Int?
+  PRMS_Hotel                 PRMS_Hotel? @relation(fields: [HotelRoom_Hotel], references: [Hotel_Code], onDelete: Cascade, map: "FK_PRMS_HotelRoom_PRMS_Hotel")
 
   @@ignore
 }
@@ -1505,18 +1516,6 @@ model PRMS_STripHotel {
   STripHotel_TotRoomCost         Float?     @default(0, map: "DF__PRMS_STri__STrip__6D8DEC8F")
   STripHotel_TotEmpCost          Float?
   STripHotel_TransAlownsValue    Int?       @default(0, map: "DF__PRMS_STri__STrip__6A476B90")
-  STripHotel_SRoomBedCount       Int?       @default(0, map: "DF__PRMS_STri__STrip__6B3B8FC9")
-  STripHotel_DRoomBedCount       Int?       @default(0, map: "DF__PRMS_STri__STrip__6C2FB402")
-  STripHotel_TRoomBedCount       Int?       @default(0, map: "DF__PRMS_STri__STrip__6D23D83B")
-  STripHotel_FRRoomBedCount      Int?       @default(0, map: "DF__PRMS_STri__STrip__6E17FC74")
-  STripHotel_FSRoomBedCount      Int?       @default(0, map: "DF__PRMS_STri__STrip__6F0C20AD")
-  STripHotel_JRoomBedCount       Int?       @default(0, map: "DF__PRMS_STri__STrip__700044E6")
-  STripHotel_SRoomExBedCount     Int?       @default(0, map: "DF__PRMS_STri__STrip__70F4691F")
-  STripHotel_DRoomExBedCount     Int?       @default(0, map: "DF__PRMS_STri__STrip__71E88D58")
-  STripHotel_TRoomExBedCount     Int?       @default(0, map: "DF__PRMS_STri__STrip__72DCB191")
-  STripHotel_FRRoomExBedCount    Int?       @default(0, map: "DF__PRMS_STri__STrip__73D0D5CA")
-  STripHotel_FSRoomExBedCount    Int?       @default(0, map: "DF__PRMS_STri__STrip__74C4FA03")
-  STripHotel_JRoomExBedCount     Int?       @default(0, map: "DF__PRMS_STri__STrip__75B91E3C")
   STripHotel_ExBedSRoomPrice     Int?       @default(0, map: "DF__PRMS_STri__STrip__76AD4275")
   STripHotel_ExBedDRoomPrice     Int?       @default(0, map: "DF__PRMS_STri__STrip__77A166AE")
   STripHotel_ExBedTRoomPrice     Int?       @default(0, map: "DF__PRMS_STri__STrip__78958AE7")
