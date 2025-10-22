@@ -15,6 +15,7 @@ import {
   submitTripFromServer
 
 } from './services/Services';
+import Hotels from './components/Hotels';
 
 
 
@@ -87,6 +88,7 @@ function App({ employeeID }: AppProps) {
       setPolicyStartDate(policyData.startDate)
       setPolicyEndDate(policyData.endDate)
       setEmpContribution(policyData.empContribution || 0)
+      
     };
 
     fetchInitialData();
@@ -745,7 +747,8 @@ function App({ employeeID }: AppProps) {
 
         <div className="flex justify-center mt-8 mb-1">
           <button onClick={function() { 
-            console.log(selectedCompanions);
+            console.log('Test1525');
+            console.log();
             submitTripFromServer(employeeID, getCompanionsFormated(),[
                 { hotelCode: "EG-ALX-001", date: "15 NOV 2025", roomsData: "D,2,0|S,1,0|J,1,0" },
                 { hotelCode: "EG-HUR-002", date: "16 NOV 2025", roomsData: "S,2,2" },
