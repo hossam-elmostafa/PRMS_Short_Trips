@@ -13,7 +13,6 @@ import {
   getEmployeeNameFromServer,
   getPolicyDataFromServer,
   submitTripFromServer
-
 } from './services/Services';
 import Hotels from './components/Hotels';
 import { Columns } from 'lucide-react';
@@ -37,9 +36,12 @@ interface AppProps {
   employeeID: number;
 }
 
+// Define types for hotel pricing cache
+type RoomPricing = { ROOM_TYPE: string; ROOM_PRICE: number };
+type PricingPayload = RoomPricing[] | (Record<string, number> & { room_price?: number; extra_bed_price?: number });
+
 function App({ employeeID }: AppProps) {
   const [ROOM_TYPES, setROOM_TYPES] = useState<RoomType[]>([]);
-  // const [TRANSPORT_OPTIONS, setTRANSPORT_OPTIONS] = useState<string[]>([]);
   const [HOTELS, setHOTELS] = useState<Record<string, Hotel[]>>({});
   const [selectedCompanions, setSelectedCompanions] = useState<string[]>([]);
   const [showHotelPopup, setShowHotelPopup] = useState(false);
@@ -51,10 +53,10 @@ function App({ employeeID }: AppProps) {
   const [policyStartDate, setPolicyStartDate] = useState<string | null>(null);
   const [policyEndDate, setPolicyEndDate] = useState<string | null>(null);
   const [empContribution, setEmpContribution] = useState<number>(0);
+  const [hotelPricingCache, setHotelPricingCache] = useState<Record<string, PricingPayload>>({});
+  
   useEffect(() => {
-    //console.log('im loading now')
     const fetchInitialData = async () => {
-      // Fetch all data in parallel for better performance
       const [hotelsData, companionsData, roomTypesData, , employeeName, policyData] = await Promise.all([
         getHotelsFromServer(),
         getCompanionsFromServer(employeeID),
@@ -64,36 +66,26 @@ function App({ employeeID }: AppProps) {
         getPolicyDataFromServer(employeeID),
       ]);
 
-      
-    
       setHOTELS(hotelsData);
-      //console.log('Fetched hotels:', hotelsData);
       
       if (Array.isArray(companionsData)) {
         setCOMPANIONS(companionsData as Companion[]);
       } else {
         setCOMPANIONS((companionsData as { companions?: Companion[] })?.companions ?? []);
       }
-      //console.log('Fetched companions:', companionsData);
       
       setROOM_TYPES(Array.isArray(roomTypesData) ? roomTypesData : []);
-      //console.log('Fetched room types:', roomTypesData);
-      
-      // Transport options are not used anymore; allowance is fetched per city
       setEmployeeName(employeeName)
       setMaximumNoOfCompanions(policyData.maxCompanions || 0)
       setMaximumNoOfHotels(policyData.maxHotels || 0)
       setPolicyStartDate(policyData.startDate)
       setPolicyEndDate(policyData.endDate)
       setEmpContribution(policyData.empContribution || 0)
-      
     };
 
     fetchInitialData();
-    
   }, [employeeID]);
 
-  
   const [currentColumn, setCurrentColumn] = useState<number | null>(null);
   const [calendarColumn, setCalendarColumn] = useState<number | null>(null);
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
@@ -103,10 +95,18 @@ function App({ employeeID }: AppProps) {
   });
 
   const [columns, setColumns] = useState<Record<number, ColumnState>>({});
-  //console.log('Columns:', columns);
-  // Initialize columns based on maximumNoOfHotels
+  
+  // Force re-render when pricing cache or empContribution changes
   useEffect(() => {
-    const hotelCount = maximumNoOfHotels > 0 ? maximumNoOfHotels : 3; // Default to 3 if policy returns 0
+    // Trigger re-render by updating a dummy value
+    const timer = setTimeout(() => {
+      setColumns(prev => ({ ...prev }));
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [hotelPricingCache, empContribution]);
+  
+  useEffect(() => {
+    const hotelCount = maximumNoOfHotels > 0 ? maximumNoOfHotels : 3;
     const newColumns: Record<number, ColumnState> = {};
     for (let i = 1; i <= hotelCount; i++) {
       newColumns[i] = { 
@@ -123,7 +123,6 @@ function App({ employeeID }: AppProps) {
   }, [maximumNoOfHotels]);
 
   const handleCompanionChange = (value: string, checked: boolean) => {
-    //console.log('selectedCompanions:',selectedCompanions,value);
     if (checked) {
       if (selectedCompanions.length >= maximumNoOfCompanions) {
         alert(`الحد الأقصى للمرافقين هو ${maximumNoOfCompanions}`);
@@ -133,10 +132,7 @@ function App({ employeeID }: AppProps) {
     } else {
       setSelectedCompanions(selectedCompanions.filter(c => c !== value));
     }
-  };  //console.log('Selected companions:', selectedCompanions);
-
-
-
+  };
 
   const handleCityChange = (col: number, city: string) => {
     setColumns(prev => ({
@@ -151,11 +147,9 @@ function App({ employeeID }: AppProps) {
     if (city) {
       (async () => {
         try {
-          // Refresh hotels for the city
           const hotels = await getHotelsByCityFromServer(city, 'ar');
           setHOTELS(prev => ({ ...prev, [city]: hotels }));
 
-          // Fetch employee-specific transport allowance from DB SP
           const allowance = await getTransportAllowanceFromServer(employeeID, city, 'en');
           setColumns(prev => ({
             ...prev,
@@ -178,14 +172,12 @@ function App({ employeeID }: AppProps) {
       return;
     }
     try {
-      // Ensure latest hotels for the selected city are loaded before opening
       const hotels = await getHotelsByCityFromServer(city, 'ar');
       setHOTELS(prev => ({ ...prev, [city]: hotels }));
     } catch (e) {
       console.error('Failed to refresh hotels for city before opening popup', city, e);
     }
     setCurrentColumn(col);
-    // If a hotel already selected, preload its real room prices
     const selected = columns[col].selectedHotel;
     if (selected && selected.id) {
       try {
@@ -202,11 +194,11 @@ function App({ employeeID }: AppProps) {
     if (currentColumn === null) return;
 
     const maxBeds: Record<string, number> = {};
-    //console.log(ROOM_TYPES);
     ROOM_TYPES.forEach(rt => {
       maxBeds[rt.key] = Math.floor(Math.random() * 3);
     });
 
+    // First update the columns with the selected hotel
     setColumns(prev => ({
       ...prev,
       [currentColumn]: {
@@ -217,13 +209,30 @@ function App({ employeeID }: AppProps) {
     }));
     
     setShowHotelPopup(false);
-};
 
+    // Then fetch pricing for this hotel
+    try {
+      console.log('Fetching pricing for selected hotel:', hotel.id);
+      const pricing = await getHotelRoomPricesFromServer(hotel.id);
+      console.log('Received pricing data:', pricing);
+      console.log('Pricing data type:', Array.isArray(pricing) ? 'Array' : 'Object');
+      if (Array.isArray(pricing)) {
+        console.log('First few items:', pricing.slice(0, 3));
+      }
+      
+      setHotelPricingCache(prev => {
+        const updated = { ...prev, [hotel.id]: pricing };
+        console.log('Updated pricing cache. Keys:', Object.keys(updated));
+        return updated;
+      });
+    } catch (e) {
+      console.error('Failed to load room prices for hotel', hotel.id, e);
+    }
+  };
 
   const openCalendar = (col: number) => {
     setCalendarColumn(col);
     
-    // Use policy date range if available
     if (policyStartDate) {
       const startDate = new Date(policyStartDate);
       setCalendarYear(startDate.getFullYear());
@@ -239,7 +248,6 @@ function App({ employeeID }: AppProps) {
 
   const selectDate = (dateObj: Date) => {
     if (calendarColumn === null) return;
-    //const dateStr = dateObj.toISOString().slice(0, 10);
     const yyyy = dateObj.getFullYear();
     const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
     const dd = String(dateObj.getDate()).padStart(2, "0");
@@ -257,13 +265,17 @@ function App({ employeeID }: AppProps) {
 
   const updateRoomCount = (col: number, roomKey: string, value: number) => {
     const val = Math.max(0, value);
-    setColumns(prev => ({
-      ...prev,
-      [col]: {
-        ...prev[col],
-        roomCounts: { ...prev[col].roomCounts, [roomKey]: val }
-      }
-    }));
+    setColumns(prev => {
+      const updated = {
+        ...prev,
+        [col]: {
+          ...prev[col],
+          roomCounts: { ...prev[col].roomCounts, [roomKey]: val }
+        }
+      };
+      // Force re-render by returning new object reference
+      return { ...updated };
+    });
   };
 
   const updateExtraBedCount = (col: number, roomKey: string, value: number) => {
@@ -278,22 +290,15 @@ function App({ employeeID }: AppProps) {
     }));
   };
 
-  // Cache for fetched hotel pricing by hotel code
-  type PricingPayload = Record<string, number> & { room_price?: number; extra_bed_price?: number };
-  const [hotelPricingCache, setHotelPricingCache] = useState<Record<string, PricingPayload>>({});
-
   const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): number => {
-    // Only use actual database data - no fallbacks
     let cacheKey = hotelId;
     console.log ('priceFor called with:', { hotelId, roomTypeKey, dateObj });
     // If date is provided, use date-specific cache key
     if (dateObj) {
-      //const dateStr = dateObj.toISOString().slice(0, 10);
-    const yyyy = dateObj.getFullYear();
-    const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
-    const dd = String(dateObj.getDate()).padStart(2, "0");
-    const dateStr = yyyy+'-'+mm+'-'+dd;
-
+      const yyyy = dateObj.getFullYear();
+      const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+      const dd = String(dateObj.getDate()).padStart(2, "0");
+      const dateStr = yyyy+'-'+mm+'-'+dd;
       cacheKey = `${hotelId}_${dateStr}`;
     }
     
@@ -313,12 +318,13 @@ function App({ employeeID }: AppProps) {
         return foundRoom['ROOM_PRICE'] as number;
       }
       
-      // Use generic room_price for all room types if no specific pricing
-      if (typeof hotelPricing.room_price === 'number') {
+      if (!Array.isArray(hotelPricing) && typeof hotelPricing.room_price === 'number') {
+        console.log(`  Using generic room_price: ${hotelPricing.room_price}`);
         return hotelPricing.room_price;
       }
     }
 
+    console.log(`  No price found, returning 0`);
     return 0;
   };
 
@@ -386,37 +392,20 @@ function App({ employeeID }: AppProps) {
             }
             const dateObj = new Date(calendarYear, calendarMonth, d);
             
-            // Don't show prices in calendar - will be shown in tooltip only
             const selectedHotel = calendarColumn !== null && columns[calendarColumn].selectedHotel;
             const priceText = selectedHotel ? 'انقر لعرض الأسعار' : 'اختر فندق أولاً';
 
-            // Check if date is within policy range
             const isWithinPolicyRange = () => {
               if (!policyStartDate || !policyEndDate) return true;
               
-              // Convert policy dates to Date objects for proper comparison
               const policyStartDateObj = new Date(policyStartDate);
               const policyEndDateObj = new Date(policyEndDate);
               
-              // Set time to start/end of day for accurate comparison
               policyStartDateObj.setHours(0, 0, 0, 0);
               policyEndDateObj.setHours(23, 59, 59, 999);
               dateObj.setHours(0, 0, 0, 0);
               
               const isValid = dateObj >= policyStartDateObj && dateObj <= policyEndDateObj;
-              
-              // Debug logging for November dates
-              // if (dateObj.getMonth() === 10 && (dateObj.getDate() === 1 || dateObj.getDate() === 2)) {
-              //   console.log('November date check:', { 
-              //     dateObj: dateObj.toISOString(),
-              //     policyStart: policyStartDateObj.toISOString(),
-              //     policyEnd: policyEndDateObj.toISOString(),
-              //     isValid,
-              //     startComparison: dateObj >= policyStartDateObj,
-              //     endComparison: dateObj <= policyEndDateObj
-              //   });
-              // }
-              
               return isValid;
             };
 
@@ -462,7 +451,7 @@ function App({ employeeID }: AppProps) {
     const hotelId = calendarColumn !== null && columns[calendarColumn].selectedHotel
       ? columns[calendarColumn].selectedHotel!.id
       : null;
-    //console.log(ROOM_TYPES);
+    
     let typesToShow = ROOM_TYPES;
     if (calendarColumn !== null) {
       const hasRooms = ROOM_TYPES.filter(rt => (columns[calendarColumn].roomCounts[rt.key] || 0) > 0);
@@ -484,10 +473,8 @@ function App({ employeeID }: AppProps) {
       
       if (!hotelPricingCache[cacheKey]) {
         try {
-          //console.log('Fetching pricing for tooltip:', hotelId, 'on date:', dateStr);
           const pricing = await getHotelRoomPricesFromServer(hotelId, dateStr);
           setHotelPricingCache(prev => ({ ...prev, [cacheKey]: pricing }));
-          //console.log(`Cached pricing for tooltip - hotel ${hotelId} on ${dateStr}:`, pricing);
         } catch (error) {
           console.error('Failed to fetch pricing for tooltip:', error);
         }
@@ -496,8 +483,6 @@ function App({ employeeID }: AppProps) {
       typesToShow.forEach(rt => {
         console.log(dateObj)
         const price = priceFor(hotelId, rt.key, dateObj);
-        //console.log(`Tooltip price for hotel ${hotelId}, room type ${rt.key} on ${dateStr}:`, price);
-        //const price = priceFor(hotelId, ROOM_PRICE, dateObj);
         html += `<tr>
           <td style="padding:2px 8px">${rt.ar}</td>
           <td style="padding:2px 8px;text-align:left">EGP ${price}</td>
@@ -509,11 +494,10 @@ function App({ employeeID }: AppProps) {
 
     html += `</tbody></table>`;
 
-    // Only use extra bed price from database when hotel is selected
     if (hotelId) {
       let extraBedPrice = 0;
       const hotelPricing = hotelPricingCache[hotelId];
-      if (hotelPricing && typeof hotelPricing.extra_bed_price === 'number') {
+      if (hotelPricing && !Array.isArray(hotelPricing) && typeof hotelPricing.extra_bed_price === 'number') {
         extraBedPrice = hotelPricing.extra_bed_price;
       }
       if (extraBedPrice > 0) {
@@ -526,7 +510,6 @@ function App({ employeeID }: AppProps) {
     setTooltip({ show: true, x: e.clientX, y: e.clientY, content: html });
   };
 
-  // Function to get Arabic ordinal numbers
   const getArabicOrdinal = (num: number): string => {
     const ordinals = [
       'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 
@@ -539,10 +522,47 @@ function App({ employeeID }: AppProps) {
 
   const renderColumn = (col: number) => {
     const colData = columns[col];
-    const { total, employee } = calculateTotal(col);
+    
+    // Force recalculation on every render to ensure fresh empContribution value
+    let total = 0;
+    if (colData.selectedHotel && colData.arrivalDate) {
+            const dateObj = new Date(colData.arrivalDate);
+
+      const cacheData = hotelPricingCache[colData.selectedHotel.id];
+      console.log(`=== Calculating total for column ${col} ===`);
+      console.log('Hotel ID:', colData.selectedHotel.id);
+      console.log('Arrival Date:', colData.arrivalDate);
+      console.log('Room Counts:', colData.roomCounts);
+      console.log('Cache Keys:', Object.keys(hotelPricingCache));
+      console.log('Actual Cache Data for this hotel:', cacheData);
+      console.log('Is Array?', Array.isArray(cacheData));
+      
+      ROOM_TYPES.forEach(rt => {
+        const count = colData.roomCounts[rt.key] || 0;
+        console.log(`Checking room type ${rt.key} (${rt.ar}): count=${count}`);
+        if (count > 0) {
+          const price = priceFor(colData.selectedHotel!.id, rt.key, dateObj);
+          console.log(`  -> Price found: ${price}, Subtotal: ${price * count}`);
+          total += price * count;
+        } else {
+          console.log(`  -> Skipped (count is 0)`);
+        }
+      });
+    } else {
+      console.log(`Column ${col}: Missing hotel or date`, {
+        hasHotel: !!colData.selectedHotel,
+        hasDate: !!colData.arrivalDate
+      });
+    }
+    
+    const contributionPercent = empContribution > 0 ? empContribution : 60;
+    const employee = (total * contributionPercent) / 100;
+    
+    console.log(`Column ${col} FINAL Total: ${total} EGP, Employee contribution: ${contributionPercent}%, Employee pays: ${employee} EGP`);
+    console.log('===================\n');
 
     return (
-      <section className="bg-white p-6 rounded-2xl shadow-lg">
+      <section key={col} className="bg-white p-6 rounded-2xl shadow-lg">
         <h2 className="text-xl font-bold mb-3">
           الإختيار {getArabicOrdinal(col)}: إختر المدينة والفندق
         </h2>
@@ -660,8 +680,8 @@ function App({ employeeID }: AppProps) {
         {total > 0 && (
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px', borderRadius: '8px' }} className="mt-4">
             <div className="font-semibold">
-              إجمالي تكلفة الرحلة: EGP {total}<br />
-              إجمالي تكلفة الموظف: ({empContribution || 60}%) EGP {employee}
+              إجمالي تكلفة الرحلة: EGP {total.toFixed(2)}<br />
+              إجمالي تكلفة الموظف: ({empContribution > 0 ? empContribution : 60}%) EGP {employee.toFixed(2)}
             </div>
           </div>
         )}
@@ -726,8 +746,7 @@ return res;
   .map(item => item.split('|').pop()) // extract last part after '|'
   .join('|');  
   return result;
-    //return '100005-210|100005-209|100005-208';
-  }
+}
 
   return (
     <div className="bg-gray-100 min-h-screen" dir="rtl" lang="ar" style={{ fontSize: '16px' }}>
@@ -761,45 +780,30 @@ return res;
       <main className="w-full px-4 pb-12">
         <div className="mt-6 mb-2 flex justify-center text-3xl font-bold gap-[300px]">
           <span>اسم الموظف: {employeeName}</span>
-          <span>الرقم الوظيفى: {employeeID.toString()}</span>
+          <span>الرقم الوظيفى: {employeeID}</span>
         </div>
 
         <div className="mt-4 mb-8">
           <section className="bg-white p-6 rounded-2xl shadow-lg">
             <label className="block font-semibold mb-2">المرافقون — الحد الأقصى هو {maximumNoOfCompanions}</label>
             <div className="grid grid-cols-4 gap-2">
-              {COMPANIONS.slice(0, 12).map((c, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedCompanions.includes(`${c.rel}|${c.name}|${c.RELID}`)}
-                    onChange={(e) => handleCompanionChange(`${c.rel}|${c.name}|${c.RELID}`, e.target.checked)}
-                    style={{ width: '20px', height: '20px' }}
-                  />
-                  <span>{c.rel} — {c.name} </span>
-                </div>
-              ))}
+              {COMPANIONS.slice(0, 12).map((c, i) => {
+                const companionValue = `${c.rel}|${c.name}|${c.RELID}`;
+                return (
+                  <div key={`companion-${i}`} className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedCompanions.includes(companionValue)}
+                      onChange={(e) => handleCompanionChange(companionValue, e.target.checked)}
+                      style={{ width: '20px', height: '20px' }}
+                    />
+                    <span>{c.rel} — {c.name} </span>
+                  </div>
+                );
+              })}
             </div>
           </section>
         </div>
-
-        {/* Policy information section - commented out as not in requirements
-        {maximumNoOfHotels > 0 ? (
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-blue-800">سياسة الرحلة</h3>
-              <p className="text-blue-600">الحد الأقصى للفنادق: {maximumNoOfHotels} | الحد الأقصى للمرافقين: {maximumNoOfCompanions}</p>
-            </div>
-          </div>
-        ) : (
-          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-yellow-800">ملاحظة</h3>
-              <p className="text-yellow-600">لم يتم العثور على سياسة محددة - سيتم عرض 3 خيارات فنادق افتراضية</p>
-            </div>
-          </div>
-        )}
-        */}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-none">
           {Object.keys(columns).map(colKey => renderColumn(Number(colKey)))}
@@ -807,7 +811,7 @@ return res;
 
         <div className="flex justify-center mt-8 mb-1">
           <button onClick={function() { 
-            submitTripFromServer(employeeID, getCompanionsFormated(),getSelectedHotelsData())}} className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
+            submitTripFromServer(employeeID, getCompanionsFormatted(),getSelectedHotelsData())}} className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
             إرسال الطلب ورحلة سعيدة
           </button>
         </div>
