@@ -12,6 +12,22 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "nodemon": "^3.1.10",
+    "pkg": "^5.8.1",
     "prisma": "^6.17.1"
+  },
+  "_comment": "Packaging process",
+  "bin": "server/app.js",
+  "pkg": {
+    "scripts": [
+      "server/**/*.js"
+    ],
+    "assets": [
+      "server/views/**/*",
+      "server/Client/build/**/*",
+      "node_modules/prisma/**",
+      "node_modules/.prisma/**",
+      "prisma/schema.prisma",
+      ".env"
+    ]
   }
 }

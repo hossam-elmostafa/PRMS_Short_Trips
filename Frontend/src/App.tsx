@@ -17,6 +17,7 @@ import {
 } from './services/Services';
 import Hotels from './components/Hotels';
 import { Columns } from 'lucide-react';
+import { data } from 'react-router-dom';
 
 
 
@@ -284,7 +285,7 @@ function App({ employeeID }: AppProps) {
   const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): number => {
     // Only use actual database data - no fallbacks
     let cacheKey = hotelId;
-    
+    console.log ('priceFor called with:', { hotelId, roomTypeKey, dateObj });
     // If date is provided, use date-specific cache key
     if (dateObj) {
       //const dateStr = dateObj.toISOString().slice(0, 10);
@@ -303,11 +304,12 @@ function App({ employeeID }: AppProps) {
 
     // Find the first object where ROOM_TYPE === "S"
     const foundRoom = hotelPricing.find(room => room.ROOM_TYPE === roomTypeKey);
-    //console.log('Found room for type :', roomTypeKey,foundRoom);
+    console.log('Found room for type :', roomTypeKey,foundRoom);
       
-      //console.log(roomTypeKey)
+      console.log(roomTypeKey)
       //console.log(foundRoom['ROOM_PRICE'])
       if (foundRoom && typeof foundRoom['ROOM_PRICE'] === 'number') {
+        console.log('Returning : '+ foundRoom['ROOM_PRICE'])
         return foundRoom['ROOM_PRICE'] as number;
       }
       
@@ -321,8 +323,11 @@ function App({ employeeID }: AppProps) {
   };
 
   const calculateTotal = (col: number): { total: number, employee: number } => {
+    //console.log('calculateTotal');
     const colData = columns[col];
+    //console.log('Column data:', colData);
     if (!colData.selectedHotel || !colData.arrivalDate) {
+      //console.log('No hotel or arrival date selected for column', col);
       return { total: 0, employee: 0 };
     }
 
@@ -330,13 +335,16 @@ function App({ employeeID }: AppProps) {
     //console.log(ROOM_TYPES);
     ROOM_TYPES.forEach(rt => {
       const count = colData.roomCounts[rt.key] || 0;
+      //console.log(`Room type ${rt.key}: count =`, count);
       if (count > 0) {
-        const price = priceFor(colData.selectedHotel!.id, rt.key);
+        const price = priceFor(colData.selectedHotel!.id, rt.key, new Date(colData.arrivalDate));
+        console.log ('Price for room type', rt.key, 'is', price);
         total += price * count;
       }
     });
 
     const employeeShare = empContribution > 0 ? (total * empContribution / 100) : (total * 0.6);
+    //console.log(`Total for column ${col}:`, total, 'Employee share:', employeeShare);
     return { total, employee: employeeShare };
   };
 
@@ -445,6 +453,7 @@ function App({ employeeID }: AppProps) {
   };
 
   const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
+    //console.log('Showing tooltip for date:', dateObj);
     const yyyy = dateObj.getFullYear();
     const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
     const dd = String(dateObj.getDate()).padStart(2, "0");
@@ -468,7 +477,8 @@ function App({ employeeID }: AppProps) {
 
     if (hotelId) {
       // Fetch fresh pricing data for this hotel and date if not cached
-      const dateStr = yyyy+'-'+mm+'-'+dd;//dateObj.toISOString().slice(0, 10);
+      const dateStr = yyyy+'-'+mm+'-'+dd;
+      //dateObj.toISOString().slice(0, 10);
       //console.log('Preparing tooltip for hotel:', hotelId, 'on date:', dateStr);
       const cacheKey = `${hotelId}_${dateStr}`;
       
@@ -484,6 +494,7 @@ function App({ employeeID }: AppProps) {
       }
 
       typesToShow.forEach(rt => {
+        console.log(dateObj)
         const price = priceFor(hotelId, rt.key, dateObj);
         //console.log(`Tooltip price for hotel ${hotelId}, room type ${rt.key} on ${dateStr}:`, price);
         //const price = priceFor(hotelId, ROOM_PRICE, dateObj);
@@ -659,14 +670,14 @@ function App({ employeeID }: AppProps) {
   };
 
   function getSelectedHotelsData(): object {
-    console.log('columns:', columns);
+    //console.log('columns:', columns);
 
     const getHotelIdByColumn = (columnNum:number) => columns[columnNum]?.selectedHotel?.id;
     const hotelId = getHotelIdByColumn(1);
 
     const getRoomCountsByColumn = (columnNum:number) => columns[columnNum]?.roomCounts;
     const roomsData = getRoomCountsByColumn(1);
-    console.log('roomsData raw:', roomsData);
+    //console.log('roomsData raw:', roomsData);
     
     const getArrivalDate = (columnNum:number) => columns[columnNum]?.arrivalDate;
     const date = new Date(getArrivalDate(1));
@@ -677,9 +688,9 @@ function App({ employeeID }: AppProps) {
   year: 'numeric'
 }).replace(/ /g, ' ').toUpperCase();
 
-    console.log('hotelCode[1]:', hotelId);
-    console.log('roomsData[1]:', roomsData);
-    console.log('arrivalDate[1]:', dateFormatted);
+    //console.log('hotelCode[1]:', hotelId);
+    //console.log('roomsData[1]:', roomsData);
+    //console.log('arrivalDate[1]:', dateFormatted);
 
   const res=[];
   for (const col in columns) {
@@ -699,7 +710,7 @@ function App({ employeeID }: AppProps) {
         roomsData: Object.entries(colRoomsData).map(([key, count]) => `${key},${count},0`).join('|')
       });
       }
-      console.log('Final selected hotels data:', res);
+      //console.log('Final selected hotels data:', res);
 return res;
     return(
 [

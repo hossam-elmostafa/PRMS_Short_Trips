@@ -26,7 +26,7 @@ export interface RoomType {
 
 export async function getHotelsFromServer() {
   try {
-    const response = await fetch('http://localhost:3000/api/hotels');
+    const response = await fetch('http://www.first-systems.com:909/api/hotels');
     const hotelResult = await response.json();
     //console.log('Hotels fetched from server:', hotelResult);
     
@@ -47,7 +47,7 @@ export async function getHotelsFromServer() {
 
 export async function getHotelsByCityFromServer(city: string, lang: 'ar' | 'en' = 'ar') {
   try {
-    const response = await fetch(`http://localhost:3000/api/hotels/${encodeURIComponent(city)}?lang=${lang}`);
+    const response = await fetch(`http://www.first-systems.com:909/api/hotels/${encodeURIComponent(city)}?lang=${lang}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -69,7 +69,7 @@ export async function getHotelRoomPricesFromServer(hotelCode: string, date?: str
   try {
     // Always pass date parameter to get date-specific pricing
     const dateParam = date || new Date().toISOString().slice(0, 10);
-    const url = `http://localhost:3000/api/hotel/${encodeURIComponent(hotelCode)}/rooms?date=${encodeURIComponent(dateParam)}`;
+    const url = `http://www.first-systems.com:909/api/hotel/${encodeURIComponent(hotelCode)}/rooms?date=${encodeURIComponent(dateParam)}`;
     console.log('Constructed URL for fetching hotel room prices:', url);
 
     //console.log(`Fetching hotel room prices for ${hotelCode} on date ${dateParam}`);
@@ -95,7 +95,7 @@ export async function getHotelRoomPricesFromServer(hotelCode: string, date?: str
 
 export async function getCitiesFromServer(lang: 'ar' | 'en' = 'ar') {
   try {
-    const response = await fetch(`http://localhost:3000/api/cities?lang=${lang}`);
+    const response = await fetch(`http://www.first-systems.com:909/api/cities?lang=${lang}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -112,7 +112,7 @@ export async function getCitiesFromServer(lang: 'ar' | 'en' = 'ar') {
 
 export async function getCompanionsFromServer(employeeID: number) {
   try {
-    const response = await fetch('http://localhost:3000/api/companions/' + employeeID);
+    const response = await fetch('http://www.first-systems.com:909/api/companions/' + employeeID);
     const result = await response.json();
     //console.log('Companions fetched from server:', result);
     if (result.success) {
@@ -134,7 +134,7 @@ export async function getCompanionsFromServer(employeeID: number) {
 
 export async function getRoomTypesFromServer() {
   try {
-    const response = await fetch('http://localhost:3000/api/room-types');
+    const response = await fetch('http://www.first-systems.com:909/api/room-types');
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -152,7 +152,7 @@ export async function getRoomTypesFromServer() {
 
 export async function getTransportOptionsFromServer(employeeID: number) {
   try {
-    const response = await fetch('http://localhost:3000/api/transport-options/' + employeeID);
+    const response = await fetch('http://www.first-systems.com:909/api/transport-options/' + employeeID);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -170,7 +170,7 @@ export async function getTransportOptionsFromServer(employeeID: number) {
 // Fetch transport allowance using proc EXEC P_GET_STRIP_TRANS_ALLOWANC @lang,@city,@empcode
 export async function getTransportAllowanceFromServer(employeeID: number, city: string, lang: 'ar' | 'en' = 'ar') {
   try {
-    const url = `http://localhost:3000/api/transport-allowance/${employeeID}?city=${encodeURIComponent(city)}&lang=${lang}`;
+    const url = `http://www.first-systems.com:909/api/transport-allowance/${employeeID}?city=${encodeURIComponent(city)}&lang=${lang}`;
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -191,7 +191,7 @@ export async function getTransportAllowanceFromServer(employeeID: number, city: 
 
 export async function getEmployeeNameFromServer(employeeID: number) {
   try {
-    const response = await fetch('http://localhost:3000/api/employee/' + employeeID);
+    const response = await fetch('http://www.first-systems.com:909/api/employee/' + employeeID);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -208,7 +208,7 @@ export async function getEmployeeNameFromServer(employeeID: number) {
 
 export async function getPolicyDataFromServer(employeeID: number) {
   try {
-    const response = await fetch(`http://localhost:3000/api/policy/${employeeID}`);
+    const response = await fetch(`http://www.first-systems.com:909/api/policy/${employeeID}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -240,7 +240,7 @@ const tripData = {
             hotels: hotels
         };
             try {
-            const res = await fetch('http://localhost:3000/api/submit', {
+            const res = await fetch('http://www.first-systems.com:909/api/submit', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -250,10 +250,11 @@ const tripData = {
 
             const data = await res.json();
             console.log('Response from server:', data);
-            return;
             if (res.ok) {
+                alert('تم إرسال الطلب بنجاح!');
                 console.log('Success:', data);
             } else {
+              alert('حدث خطأ في إرسال الطلب');
                 console.error('Error:', data);
             }
         } catch (err) {

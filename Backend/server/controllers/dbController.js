@@ -1,6 +1,9 @@
 const { COMPANIONS } = require('../data/companions');
+require('dotenv').config();
 const prisma = require('../lib/prisma');
 const { ROOM_PRICES } = require('../data/roomPrices');
+
+
 
 async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
     try {
