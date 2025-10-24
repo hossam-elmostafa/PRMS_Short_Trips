@@ -717,7 +717,7 @@ function App({ employeeID }: AppProps) {
     var colhotelCode = getHotelIdByColumn(Number(col));
     var colRoomsData = getRoomCountsByColumn(Number(col));
     // var arrivalDateObj = new Date(getArrivalDate(Number(col)));
-    const date = new Date(getArrivalDate(1));
+    const date = new Date(getArrivalDate(Number(col)));
     var coldateFormatted = date.toLocaleDateString('en-GB', {
   day: '2-digit',
   month: 'short',

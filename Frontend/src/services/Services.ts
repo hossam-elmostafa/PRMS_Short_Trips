@@ -1,5 +1,5 @@
-//const baseURL = 'www.first-systems.com';
-const baseURL = 'localhost';
+const baseURL = 'www.first-systems.com';
+//const baseURL = 'localhost';
 export interface Hotel {
   id: string;
   en: string;
@@ -246,6 +246,7 @@ export async function submitTripFromServer(employeeID: number, familyIds: string
     familyIds: familyIds,
     hotels: validHotels
   };
+  
             try {
             const res = await fetch('http://'+baseURL+':909/api/submit', {
                 method: 'POST',
