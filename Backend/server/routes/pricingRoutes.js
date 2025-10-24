@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pricingService = require('../services/pricingService');
 const e = require('cors');
-submitTripApplication = require('../controllers/dbController').submitTripApplication;
+const submitTripApplication = require('../controllers/dbController').submitTripApplication;
 
 // router.post('/calculate-room-price', (req, res) => {
 //   const { hotelId, date, roomTypeKey } = req.body;
@@ -76,7 +76,7 @@ submitTripApplication = require('../controllers/dbController').submitTripApplica
 
 //   res.json({ success: true, data: prices });
 // });
-router.get('/submitt', async (req, res) => {
+router.get('/submit', async (req, res) => {
     // try {
     //     const { employeeId, familyIds, hotels } = req.body;
 
@@ -114,7 +114,7 @@ router.get('/submitt', async (req, res) => {
         //     familyIds,
         //     hotels || []
         // );
-
+        console.log('Submitting trip application with test data');
         const result = await submitTripApplication();
 
         // Return appropriate status code based on result
@@ -144,7 +144,7 @@ router.post('/submit', async(req, res) => {
   //           { hotelCode: 'EG-ALX-003', date: '17 NOV 2025', roomsData: 'S,3,1' }
   //       ];
   const { employeeId, familyIds, hotels } = req.body;
-  console.log('Received submission data:', { employeeId, familyIds, hotels });
+  //console.log('Received submission data:', { employeeId, familyIds, hotels });
 
         // Validate required fields
         if (!employeeId) {
@@ -153,7 +153,6 @@ router.post('/submit', async(req, res) => {
                 message: 'Employee ID is required'
             });
         }
-
         // Validate hotels array if provided
         if (hotels && !Array.isArray(hotels)) {
             return res.status(400).json({
@@ -179,6 +178,7 @@ router.post('/submit', async(req, res) => {
   const result =  await submitTripApplication(employeeId, familyIds, hotels);
 
         // Return appropriate status code based on result
+        //console.log(result);
         if (result.success) {
             return res.status(200).json(result);
         } else {

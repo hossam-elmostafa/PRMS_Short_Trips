@@ -20,8 +20,10 @@ router.get('/hotels/:city', async (req, res) => {
   }
 });
 
-router.get('/hotels', (req, res) => {
-  const hotels = hotelService.getAllHotels();
+router.get('/hotels', async(req, res) => {
+  //console.log('Fetching all hotels');
+  const hotels = await hotelService.getAllHotels();
+  //console.log('Hotels fetched:', hotels);
 
   if (hotels.length === 0) {
     return res.status(404).json({ success: false, message: 'Hotel not found' });

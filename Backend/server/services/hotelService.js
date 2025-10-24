@@ -1,13 +1,14 @@
 const { HOTELS } = require('../data/hotels');
-const { getHotelsByCityFromDB, getCitiesFromDB, getPolicyDataFromDB, getHotelRoomsPricingFromDB } = require('../controllers/dbController');
+const { getHotelsFromDB,getHotelsByCityFromDB, getCitiesFromDB, getPolicyDataFromDB, getHotelRoomsPricingFromDB } = require('../controllers/dbController');
 
 // function getAllCities() {
 //   return Object.keys(HOTELS);
 // }
 
 
-function getAllHotels() {
-  return HOTELS;
+async function getAllHotels() {
+  //return HOTELS;
+  return await getHotelsFromDB();
 }
 
 async function getHotelsByCity(city, lang = 'ar') {

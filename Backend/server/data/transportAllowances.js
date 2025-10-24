@@ -12,6 +12,6 @@ const TRANSPORT_OPTIONS = ['لايوجد', '300', '400', '500', '600', '700'];
 // };
 
 module.exports = {
-  TRANSPORT_OPTIONS,
+  //TRANSPORT_OPTIONS,
   // CITY_TRANSPORT_MAP
 };

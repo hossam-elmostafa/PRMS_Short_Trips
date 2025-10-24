@@ -212,17 +212,17 @@ function App({ employeeID }: AppProps) {
 
     // Then fetch pricing for this hotel
     try {
-      console.log('Fetching pricing for selected hotel:', hotel.id);
+      //console.log('Fetching pricing for selected hotel:', hotel.id);
       const pricing = await getHotelRoomPricesFromServer(hotel.id);
-      console.log('Received pricing data:', pricing);
-      console.log('Pricing data type:', Array.isArray(pricing) ? 'Array' : 'Object');
+      //console.log('Received pricing data:', pricing);
+      //console.log('Pricing data type:', Array.isArray(pricing) ? 'Array' : 'Object');
       if (Array.isArray(pricing)) {
-        console.log('First few items:', pricing.slice(0, 3));
+        //console.log('First few items:', pricing.slice(0, 3));
       }
       
       setHotelPricingCache(prev => {
         const updated = { ...prev, [hotel.id]: pricing };
-        console.log('Updated pricing cache. Keys:', Object.keys(updated));
+        //console.log('Updated pricing cache. Keys:', Object.keys(updated));
         return updated;
       });
     } catch (e) {
@@ -292,7 +292,7 @@ function App({ employeeID }: AppProps) {
 
   const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): number => {
     let cacheKey = hotelId;
-    console.log ('priceFor called with:', { hotelId, roomTypeKey, dateObj });
+    //console.log ('priceFor called with:', { hotelId, roomTypeKey, dateObj });
     // If date is provided, use date-specific cache key
     if (dateObj) {
       const yyyy = dateObj.getFullYear();
@@ -309,22 +309,22 @@ function App({ employeeID }: AppProps) {
 
     // Find the first object where ROOM_TYPE === "S"
     const foundRoom = hotelPricing.find(room => room.ROOM_TYPE === roomTypeKey);
-    console.log('Found room for type :', roomTypeKey,foundRoom);
+    //console.log('Found room for type :', roomTypeKey,foundRoom);
       
-      console.log(roomTypeKey)
+      //console.log(roomTypeKey)
       //console.log(foundRoom['ROOM_PRICE'])
       if (foundRoom && typeof foundRoom['ROOM_PRICE'] === 'number') {
-        console.log('Returning : '+ foundRoom['ROOM_PRICE'])
+        //console.log('Returning : '+ foundRoom['ROOM_PRICE'])
         return foundRoom['ROOM_PRICE'] as number;
       }
       
       if (!Array.isArray(hotelPricing) && typeof hotelPricing.room_price === 'number') {
-        console.log(`  Using generic room_price: ${hotelPricing.room_price}`);
+        //console.log(`  Using generic room_price: ${hotelPricing.room_price}`);
         return hotelPricing.room_price;
       }
     }
 
-    console.log(`  No price found, returning 0`);
+    //console.log(`  No price found, returning 0`);
     return 0;
   };
 
@@ -344,7 +344,7 @@ function App({ employeeID }: AppProps) {
       //console.log(`Room type ${rt.key}: count =`, count);
       if (count > 0) {
         const price = priceFor(colData.selectedHotel!.id, rt.key, new Date(colData.arrivalDate));
-        console.log ('Price for room type', rt.key, 'is', price);
+        //console.log ('Price for room type', rt.key, 'is', price);
         total += price * count;
       }
     });
@@ -481,7 +481,7 @@ function App({ employeeID }: AppProps) {
       }
 
       typesToShow.forEach(rt => {
-        console.log(dateObj)
+        //console.log(dateObj)
         const price = priceFor(hotelId, rt.key, dateObj);
         html += `<tr>
           <td style="padding:2px 8px">${rt.ar}</td>
@@ -529,37 +529,37 @@ function App({ employeeID }: AppProps) {
             const dateObj = new Date(colData.arrivalDate);
 
       const cacheData = hotelPricingCache[colData.selectedHotel.id];
-      console.log(`=== Calculating total for column ${col} ===`);
-      console.log('Hotel ID:', colData.selectedHotel.id);
-      console.log('Arrival Date:', colData.arrivalDate);
-      console.log('Room Counts:', colData.roomCounts);
-      console.log('Cache Keys:', Object.keys(hotelPricingCache));
-      console.log('Actual Cache Data for this hotel:', cacheData);
-      console.log('Is Array?', Array.isArray(cacheData));
+      //console.log(`=== Calculating total for column ${col} ===`);
+      //console.log('Hotel ID:', colData.selectedHotel.id);
+      //console.log('Arrival Date:', colData.arrivalDate);
+      //console.log('Room Counts:', colData.roomCounts);
+      //console.log('Cache Keys:', Object.keys(hotelPricingCache));
+      //console.log('Actual Cache Data for this hotel:', cacheData);
+      //console.log('Is Array?', Array.isArray(cacheData));
       
       ROOM_TYPES.forEach(rt => {
         const count = colData.roomCounts[rt.key] || 0;
-        console.log(`Checking room type ${rt.key} (${rt.ar}): count=${count}`);
+        //console.log(`Checking room type ${rt.key} (${rt.ar}): count=${count}`);
         if (count > 0) {
           const price = priceFor(colData.selectedHotel!.id, rt.key, dateObj);
-          console.log(`  -> Price found: ${price}, Subtotal: ${price * count}`);
+          //console.log(`  -> Price found: ${price}, Subtotal: ${price * count}`);
           total += price * count;
         } else {
-          console.log(`  -> Skipped (count is 0)`);
+          //console.log(`  -> Skipped (count is 0)`);
         }
       });
     } else {
-      console.log(`Column ${col}: Missing hotel or date`, {
-        hasHotel: !!colData.selectedHotel,
-        hasDate: !!colData.arrivalDate
-      });
+      // console.log(`Column ${col}: Missing hotel or date`, {
+      //   hasHotel: !!colData.selectedHotel,
+      //   hasDate: !!colData.arrivalDate
+      // });
     }
     
     const contributionPercent = empContribution > 0 ? empContribution : 60;
     const employee = (total * contributionPercent) / 100;
     
-    console.log(`Column ${col} FINAL Total: ${total} EGP, Employee contribution: ${contributionPercent}%, Employee pays: ${employee} EGP`);
-    console.log('===================\n');
+    //console.log(`Column ${col} FINAL Total: ${total} EGP, Employee contribution: ${contributionPercent}%, Employee pays: ${employee} EGP`);
+    //console.log('===================\n');
 
     return (
       <section key={col} className="bg-white p-6 rounded-2xl shadow-lg">
@@ -638,7 +638,7 @@ function App({ employeeID }: AppProps) {
                   style={{ width: '40px', textAlign: 'center', background: '#fff', border: '1px solid #bbb', marginRight: '6px' }}
                   title="عدد الغرف"
                 />
-                <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>مسموح سرر إضافية{col}</span>
+                <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>مسموح سرر إضافية</span>
                 <input
                   type="number"
                   min="0"
@@ -689,24 +689,24 @@ function App({ employeeID }: AppProps) {
     );
   };
 
-  function getSelectedHotelsData(): object {
+  function getSelectedHotelsData(): { hotelCode: string; date: string; roomsData: string; }[] {
     //console.log('columns:', columns);
 
     const getHotelIdByColumn = (columnNum:number) => columns[columnNum]?.selectedHotel?.id;
-    const hotelId = getHotelIdByColumn(1);
+    //const hotelId = getHotelIdByColumn(1);
 
     const getRoomCountsByColumn = (columnNum:number) => columns[columnNum]?.roomCounts;
-    const roomsData = getRoomCountsByColumn(1);
+    //const roomsData = getRoomCountsByColumn(1);
     //console.log('roomsData raw:', roomsData);
     
     const getArrivalDate = (columnNum:number) => columns[columnNum]?.arrivalDate;
-    const date = new Date(getArrivalDate(1));
+    // const date = new Date(getArrivalDate(1));
 
-    const dateFormatted = date.toLocaleDateString('en-GB', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric'
-}).replace(/ /g, ' ').toUpperCase();
+//     const dateFormatted = date.toLocaleDateString('en-GB', {
+//   day: '2-digit',
+//   month: 'short',
+//   year: 'numeric'
+// }).replace(/ /g, ' ').toUpperCase();
 
     //console.log('hotelCode[1]:', hotelId);
     //console.log('roomsData[1]:', roomsData);
@@ -716,7 +716,7 @@ function App({ employeeID }: AppProps) {
   for (const col in columns) {
     var colhotelCode = getHotelIdByColumn(Number(col));
     var colRoomsData = getRoomCountsByColumn(Number(col));
-    var arrivalDateObj = new Date(getArrivalDate(Number(col)));
+    // var arrivalDateObj = new Date(getArrivalDate(Number(col)));
     const date = new Date(getArrivalDate(1));
     var coldateFormatted = date.toLocaleDateString('en-GB', {
   day: '2-digit',
@@ -725,7 +725,7 @@ function App({ employeeID }: AppProps) {
 }).replace(/ /g, ' ').toUpperCase();
 
       res.push({
-        hotelCode: colhotelCode,
+        hotelCode: colhotelCode??'',
         date: coldateFormatted,
         roomsData: Object.entries(colRoomsData).map(([key, count]) => `${key},${count},0`).join('|')
       });
@@ -811,7 +811,7 @@ return res;
 
         <div className="flex justify-center mt-8 mb-1">
           <button onClick={function() { 
-            submitTripFromServer(employeeID, getCompanionsFormatted(),getSelectedHotelsData())}} className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
+            submitTripFromServer(employeeID, getCompanionsFormated(),getSelectedHotelsData())}} className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
             إرسال الطلب ورحلة سعيدة
           </button>
         </div>

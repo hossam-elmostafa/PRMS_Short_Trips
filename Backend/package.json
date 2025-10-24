@@ -4,6 +4,9 @@
   "scripts": {
     "start": "nodemon server/app.js",
     "dev": "nodemon server/app.js",
+  "debug": "node --inspect-brk=9229 server/app.js",
+  "debug:no-break": "node --inspect=9229 server/app.js",
+  "dev:debug": "nodemon --inspect=9229 server/app.js",
     "build": "echo \"No build needed for Node.js server\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

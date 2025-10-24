@@ -1,43 +1,44 @@
-const HOTELS = {
-  "القاهرة": [
-    {id:"c_fs_nile", en:"Four Seasons Hotel Cairo at Nile Plaza", ar:"فندق فورسيزونز نايل بلازا"},
-    {id:"c_ramses", en:"Ramses Hilton Cairo", ar:"رمسيس هيلتون"},
-    {id:"c_fairmont", en:"Fairmont Nile City", ar:"فيرمونت نايل سيتي"},
-    {id:"c_mena", en:"Marriott Mena House", ar:"ماريوت مينا هاوس"},
-    {id:"c_conrad", en:"Conrad Cairo", ar:"كونراد القاهرة"},
-  ],
-  "الإسكندرية": [
-    {id:"a_fs", en:"Four Seasons Alexandria at San Stefano", ar:"فورسيزونز الإسكندرية"},
-    {id:"a_hilton", en:"Hilton Alexandria Corniche", ar:"هيلتون الإسكندرية كورنيش"},
-    {id:"a_steigen", en:"Steigenberger Cecil", ar:"شتايجنبرجر سيسيل"},
-  ],
-  "شرم الشيخ": [
-    {id:"s_rixos", en:"Rixos Premium Seagate", ar:"ريكسوس بريميوم سيجيت"},
-    {id:"s_baron", en:"Baron Resort Sharm El Sheikh", ar:"بارون شرم"},
-    {id:"s_savoy", en:"Savoy Sharm El Sheikh", ar:"سافوي شرم"},
-  ],
-  "الغردقة": [
-    {id:"h_steigen", en:"Steigenberger Al Dau Beach", ar:"شتايجنبرجر الداو"},
-    {id:"h_jaz", en:"Jaz Aquamarine", ar:"جاز أكوامارين"},
-    {id:"h_pick", en:"Pickalbatros Sea World", ar:"بيكالبتروس سي وورلد"},
-  ],
-  "الأقصر": [
-    {id:"l_sofitel", en:"Sofitel Winter Palace Luxor", ar:"سوفيتيل ونتر بالاس الأقصر"},
-    {id:"l_hilton", en:"Hilton Luxor Resort & Spa", ar:"هيلتون الأقصر"},
-  ],
-  "أسوان": [
-    {id:"as_old", en:"Sofitel Legend Old Cataract Aswan", ar:"سوفيتيل أولد كتراكت أسوان"},
-    {id:"as_moven", en:"Mövenpick Resort Aswan", ar:"موفنبيك أسوان"},
-  ],
-  "سهل حشيش": [
-    {id:"sh_oberoi", en:"The Oberoi Sahl Hasheesh", ar:"أوبروي سهل حشيش"},
-    {id:"sb_kemp", en:"Kempinski Soma Bay", ar:"كيمبنسكي سوما باي"},
-  ],
-  "منتجعات البحر الأحمر": [
-    {id:"r_baron", en:"Baron Palace Resort", ar:"بارون بالاس"},
-    {id:"r_grand", en:"The Grand Resort", ar:"الجراند ريزورت"},
-  ]
-};
+const HOTELS = {};
+// {
+//   "القاهرة": [
+//     {id:"c_fs_nile", en:"Four Seasons Hotel Cairo at Nile Plaza", ar:"فندق فورسيزونز نايل بلازا"},
+//     {id:"c_ramses", en:"Ramses Hilton Cairo", ar:"رمسيس هيلتون"},
+//     {id:"c_fairmont", en:"Fairmont Nile City", ar:"فيرمونت نايل سيتي"},
+//     {id:"c_mena", en:"Marriott Mena House", ar:"ماريوت مينا هاوس"},
+//     {id:"c_conrad", en:"Conrad Cairo", ar:"كونراد القاهرة"},
+//   ],
+//   "الإسكندرية": [
+//     {id:"a_fs", en:"Four Seasons Alexandria at San Stefano", ar:"فورسيزونز الإسكندرية"},
+//     {id:"a_hilton", en:"Hilton Alexandria Corniche", ar:"هيلتون الإسكندرية كورنيش"},
+//     {id:"a_steigen", en:"Steigenberger Cecil", ar:"شتايجنبرجر سيسيل"},
+//   ],
+//   "شرم الشيخ": [
+//     {id:"s_rixos", en:"Rixos Premium Seagate", ar:"ريكسوس بريميوم سيجيت"},
+//     {id:"s_baron", en:"Baron Resort Sharm El Sheikh", ar:"بارون شرم"},
+//     {id:"s_savoy", en:"Savoy Sharm El Sheikh", ar:"سافوي شرم"},
+//   ],
+//   "الغردقة": [
+//     {id:"h_steigen", en:"Steigenberger Al Dau Beach", ar:"شتايجنبرجر الداو"},
+//     {id:"h_jaz", en:"Jaz Aquamarine", ar:"جاز أكوامارين"},
+//     {id:"h_pick", en:"Pickalbatros Sea World", ar:"بيكالبتروس سي وورلد"},
+//   ],
+//   "الأقصر": [
+//     {id:"l_sofitel", en:"Sofitel Winter Palace Luxor", ar:"سوفيتيل ونتر بالاس الأقصر"},
+//     {id:"l_hilton", en:"Hilton Luxor Resort & Spa", ar:"هيلتون الأقصر"},
+//   ],
+//   "أسوان": [
+//     {id:"as_old", en:"Sofitel Legend Old Cataract Aswan", ar:"سوفيتيل أولد كتراكت أسوان"},
+//     {id:"as_moven", en:"Mövenpick Resort Aswan", ar:"موفنبيك أسوان"},
+//   ],
+//   "سهل حشيش": [
+//     {id:"sh_oberoi", en:"The Oberoi Sahl Hasheesh", ar:"أوبروي سهل حشيش"},
+//     {id:"sb_kemp", en:"Kempinski Soma Bay", ar:"كيمبنسكي سوما باي"},
+//   ],
+//   "منتجعات البحر الأحمر": [
+//     {id:"r_baron", en:"Baron Palace Resort", ar:"بارون بالاس"},
+//     {id:"r_grand", en:"The Grand Resort", ar:"الجراند ريزورت"},
+//   ]
+// };
 
 // const HOTEL_BASE_PRICES = {
 //   c_fs_nile: 1600, c_ramses: 1200, c_fairmont: 1400, c_mena: 1300, c_conrad: 1350,
@@ -58,7 +59,7 @@ const HOTELS = {
 // };
 
 module.exports = {
-  HOTELS,
+  //HOTELS,
   // HOTEL_BASE_PRICES,
   // EXTRA_BED_PRICES
 };

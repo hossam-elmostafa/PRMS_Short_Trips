@@ -38,4 +38,6 @@ const ROOM_PRICES = {"EG-CAI-001":[
 //     : "J", PRICE_DATE: '2025-11-02', ROOM_PRICE: 2100 ,EXTRA_BED_PRICE:300 },
 // ]};
 
-module.exports = { ROOM_PRICES };
+module.exports = { 
+//  ROOM_PRICES
+ };

@@ -10,10 +10,10 @@ const companionRoutes = require('./routes/companionRoutes');
 
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 909;
 
 // 2. Define your CORS options
-const allowedOrigins = ['http://www.first-systems.com:909','http://localhost:909','http://localhost:5005'];
+const allowedOrigins = ['http://www.first-systems.com:909','http://localhost:909','http://localhost:5005','http://localhost:5173'];
 
 const corsOptions = {
   origin: function (origin, callback) {
