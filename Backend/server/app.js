@@ -31,6 +31,53 @@ app.use(express.json());
 
 ////////////////////////////////////////////////
 // Serve static files from the React app's build directory
+// Allow serving a runtime config.json from an external file outside the packaged app.
+// Set environment variable RUNTIME_CONFIG_PATH to the absolute path of the config.json
+// you want to serve (this file can live outside the EXE). If not provided or the
+// file is missing, we fall back to the embedded Client/build/config.json.
+const RUNTIME_CONFIG_PATH = process.env.RUNTIME_CONFIG_PATH || process.env.RUNTIME_CONFIG_FILE || process.env.BASE_API_CONFIG_PATH;
+
+app.get('/config.json', (req, res) => {
+  // Try external path first
+  if (RUNTIME_CONFIG_PATH) {
+    try {
+      if (fs.existsSync(RUNTIME_CONFIG_PATH)) {
+        const stats = fs.statSync(RUNTIME_CONFIG_PATH);
+        if (stats.isFile()) {
+          const data = fs.readFileSync(RUNTIME_CONFIG_PATH, 'utf8');
+          res.set('Content-Type', 'application/json');
+          res.set('Cache-Control', 'no-cache');
+          return res.send(data);
+        } else {
+          console.warn('[config] runtime config path exists but is not a file:', RUNTIME_CONFIG_PATH);
+        }
+      } else {
+        console.info('[config] runtime config not found at', RUNTIME_CONFIG_PATH);
+      }
+    } catch (err) {
+      console.error('[config] error reading runtime config:', err && err.message ? err.message : err);
+    }
+  }
+
+  // Fallback to embedded config.json inside the build folder
+  const embeddedConfig = path.join(__dirname, 'Client/build', 'config.json');
+  if (fs.existsSync(embeddedConfig)) {
+    try {
+      const data = fs.readFileSync(embeddedConfig, 'utf8');
+      res.set('Content-Type', 'application/json');
+      res.set('Cache-Control', 'no-cache');
+      return res.send(data);
+    } catch (err) {
+      console.error('[config] error reading embedded config:', err);
+    }
+  }
+
+  // Nothing available — return empty object so client has a valid JSON response
+  res.set('Content-Type', 'application/json');
+  res.set('Cache-Control', 'no-cache');
+  return res.send('{}');
+});
+
 app.use(express.static(path.join(__dirname, 'Client/build'), {
   index: false, // Prevent express.static from serving index.html
 }));

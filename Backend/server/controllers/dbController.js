@@ -330,6 +330,7 @@ async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
 //       const result = ROOM_PRICES[hotelCode].filter(item => item.PRICE_DATE === date);
 //   console.log(result);
 //   return result;
+console.log(1);
 
     try {
         const code = String(hotelCode || '').trim().replace(/'/g, "''");
@@ -343,23 +344,26 @@ async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
         try {
             // Try with date parameter first
             //console.log(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'${dateParam}`);
-            rows = await prisma.$queryRawUnsafe(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'`);
-    
+            //rows = await prisma.$queryRawUnsafe(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'`);
+            rows = await prisma.$queryRawUnsafe(`SELECT * FROM GetHotelRoomPrices(N'${code}') where PRICE_DATE =N'${date}'`);
+            //console.log(`P_GET_STRIP_HOTEL_ROOMS ${code}`);
              //console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, rows);
              
-             const filteredRows = rows.filter(item => 
-  item.PRICE_DATE instanceof Date && 
-  item.PRICE_DATE.toISOString().slice(0, 10) === date
-);
-             //console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, filteredRows);
-             const result = filteredRows
-  .map(item => {
-    if (item.ROOM_TYPE === 'FR') return { ...item, ROOM_TYPE: 'F' };
-    if (item.ROOM_TYPE === 'FS') return { ...item, ROOM_TYPE: 'J' };
-    return item;
-  })
-  .filter(item => item.ROOM_TYPE !== 'J' || item.ROOM_PRICE === 3500); // keep only the one converted from FS
-
+//              const filteredRows = rows.filter(item => 
+//   item.PRICE_DATE instanceof Date && 
+//   item.PRICE_DATE.toISOString().slice(0, 10) === date
+// );
+    //console.log(`P_GET_STRIP_HOTEL_ROOMS with date filteredRows:`, filteredRows);
+             
+             //const result = filteredRows
+             const result = rows
+//   .map(item => {
+//     if (item.ROOM_TYPE === 'FR') return { ...item, ROOM_TYPE: 'F' };
+//     if (item.ROOM_TYPE === 'FS') return { ...item, ROOM_TYPE: 'J' };
+//     return item;
+//   })
+  //.filter(item => item.ROOM_TYPE !== 'J' || item.ROOM_PRICE === 3500); // keep only the one converted from FS
+            console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, result);
              return result;
         } catch (error) {
             //console.log(`P_GET_STRIP_HOTEL_ROOMS with date failed, trying without date:`, error.message);

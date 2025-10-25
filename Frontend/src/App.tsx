@@ -14,9 +14,9 @@ import {
   getPolicyDataFromServer,
   submitTripFromServer
 } from './services/Services';
-import Hotels from './components/Hotels';
-import { Columns } from 'lucide-react';
-import { data } from 'react-router-dom';
+// import Hotels from './components/Hotels';
+// import { Columns } from 'lucide-react';
+// import { data } from 'react-router-dom';
 
 
 
@@ -307,20 +307,21 @@ function App({ employeeID }: AppProps) {
     if (hotelPricing) {
       // Try specific room type price first
 
-    // Find the first object where ROOM_TYPE === "S"
-    const foundRoom = hotelPricing.find(room => room.ROOM_TYPE === roomTypeKey);
-    //console.log('Found room for type :', roomTypeKey,foundRoom);
-      
-      //console.log(roomTypeKey)
-      //console.log(foundRoom['ROOM_PRICE'])
-      if (foundRoom && typeof foundRoom['ROOM_PRICE'] === 'number') {
-        //console.log('Returning : '+ foundRoom['ROOM_PRICE'])
-        return foundRoom['ROOM_PRICE'] as number;
-      }
-      
-      if (!Array.isArray(hotelPricing) && typeof hotelPricing.room_price === 'number') {
-        //console.log(`  Using generic room_price: ${hotelPricing.room_price}`);
-        return hotelPricing.room_price;
+      //const foundRoom = hotelPricing.find(room => room.ROOM_TYPE === roomTypeKey);
+      // If the cached pricing is an array, search for the matching room type
+      if (Array.isArray(hotelPricing)) {
+        const foundRoom = hotelPricing.find(room => room.ROOM_TYPE === roomTypeKey);
+        //console.log('Found room for type :', roomTypeKey,foundRoom);
+        if (foundRoom && typeof foundRoom.ROOM_PRICE === 'number') {
+          //console.log('Returning : '+ foundRoom['ROOM_PRICE'])
+          return foundRoom.ROOM_PRICE as number;
+        }
+      } else {
+        // Otherwise the cached pricing is an object with generic prices
+        if (typeof hotelPricing.room_price === 'number') {
+          //console.log(`  Using generic room_price: ${hotelPricing.room_price}`);
+          return hotelPricing.room_price;
+        }
       }
     }
 
@@ -328,31 +329,31 @@ function App({ employeeID }: AppProps) {
     return 0;
   };
 
-  const calculateTotal = (col: number): { total: number, employee: number } => {
-    //console.log('calculateTotal');
-    const colData = columns[col];
-    //console.log('Column data:', colData);
-    if (!colData.selectedHotel || !colData.arrivalDate) {
-      //console.log('No hotel or arrival date selected for column', col);
-      return { total: 0, employee: 0 };
-    }
+  // const calculateTotal = (col: number): { total: number, employee: number } => {
+  //   //console.log('calculateTotal');
+  //   const colData = columns[col];
+  //   //console.log('Column data:', colData);
+  //   if (!colData.selectedHotel || !colData.arrivalDate) {
+  //     //console.log('No hotel or arrival date selected for column', col);
+  //     return { total: 0, employee: 0 };
+  //   }
 
-    let total = 0;
-    //console.log(ROOM_TYPES);
-    ROOM_TYPES.forEach(rt => {
-      const count = colData.roomCounts[rt.key] || 0;
-      //console.log(`Room type ${rt.key}: count =`, count);
-      if (count > 0) {
-        const price = priceFor(colData.selectedHotel!.id, rt.key, new Date(colData.arrivalDate));
-        //console.log ('Price for room type', rt.key, 'is', price);
-        total += price * count;
-      }
-    });
+  //   let total = 0;
+  //   //console.log(ROOM_TYPES);
+  //   ROOM_TYPES.forEach(rt => {
+  //     const count = colData.roomCounts[rt.key] || 0;
+  //     //console.log(`Room type ${rt.key}: count =`, count);
+  //     if (count > 0) {
+  //       const price = priceFor(colData.selectedHotel!.id, rt.key, new Date(colData.arrivalDate));
+  //       //console.log ('Price for room type', rt.key, 'is', price);
+  //       total += price * count;
+  //     }
+  //   });
 
-    const employeeShare = empContribution > 0 ? (total * empContribution / 100) : (total * 0.6);
-    //console.log(`Total for column ${col}:`, total, 'Employee share:', employeeShare);
-    return { total, employee: employeeShare };
-  };
+  //   const employeeShare = empContribution > 0 ? (total * empContribution / 100) : (total * 0.6);
+  //   //console.log(`Total for column ${col}:`, total, 'Employee share:', employeeShare);
+  //   return { total, employee: employeeShare };
+  // };
 
   const monthName = (y: number, m: number) => {
     const ar = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
@@ -560,7 +561,11 @@ function App({ employeeID }: AppProps) {
     
     //console.log(`Column ${col} FINAL Total: ${total} EGP, Employee contribution: ${contributionPercent}%, Employee pays: ${employee} EGP`);
     //console.log('===================\n');
-
+//     if(colData?.selectedHotel?.ar)
+// {    console.log(`colData?.selectedHotel?.ar`);
+//     console.log(colData?.selectedHotel?.ar);
+//     console.log(colData?.selectedHotel?.en);
+// }
     return (
       <section key={col} className="bg-white p-6 rounded-2xl shadow-lg">
         <h2 className="text-xl font-bold mb-3">
@@ -613,7 +618,7 @@ function App({ employeeID }: AppProps) {
               style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }}
               className="mb-2"
             />
-            <div className="mb-2 text-lg font-semibold text-blue-700">{colData.selectedHotel.ar}</div>
+            <div className="mb-2 text-lg font-semibold text-blue-700">{colData.selectedHotel.en}</div> {/* HSM I don`t know why "en" contains arabic data */}
           </>
         )}
         {!colData.selectedHotel && (
@@ -689,7 +694,8 @@ function App({ employeeID }: AppProps) {
     );
   };
 
-  function getSelectedHotelsData(): { hotelCode: string; date: string; roomsData: string; }[] {
+  function getSelectedHotelsData(): { hotelCode: string; hotelName:string; date: string; roomsData: string; }[] {
+    
     //console.log('columns:', columns);
 
     const getHotelIdByColumn = (columnNum:number) => columns[columnNum]?.selectedHotel?.id;
@@ -715,6 +721,7 @@ function App({ employeeID }: AppProps) {
   const res=[];
   for (const col in columns) {
     var colhotelCode = getHotelIdByColumn(Number(col));
+    var colHotelName = columns[Number(col)]?.selectedHotel?.en; //HSM I don`t know why "en" contains arabic data    
     var colRoomsData = getRoomCountsByColumn(Number(col));
     // var arrivalDateObj = new Date(getArrivalDate(Number(col)));
     const date = new Date(getArrivalDate(Number(col)));
@@ -726,18 +733,19 @@ function App({ employeeID }: AppProps) {
 
       res.push({
         hotelCode: colhotelCode??'',
+        hotelName: colHotelName??'',
         date: coldateFormatted,
         roomsData: Object.entries(colRoomsData).map(([key, count]) => `${key},${count},0`).join('|')
       });
       }
       //console.log('Final selected hotels data:', res);
 return res;
-    return(
-[
-                { hotelCode: "EG-ALX-001", date: "15 NOV 2025", roomsData: "D,2,0|S,1,0|J,1,0" },
-                { hotelCode: "EG-HUR-002", date: "16 NOV 2025", roomsData: "S,2,2" },
-                { hotelCode: "EG-ALX-003", date: "17 NOV 2025", roomsData: "S,3,1" }]
-)
+//     return(
+// [
+//                 { hotelCode: "EG-ALX-001", date: "15 NOV 2025", roomsData: "D,2,0|S,1,0|J,1,0" },
+//                 { hotelCode: "EG-HUR-002", date: "16 NOV 2025", roomsData: "S,2,2" },
+//                 { hotelCode: "EG-ALX-003", date: "17 NOV 2025", roomsData: "S,3,1" }]
+// )
 
   }
 
