@@ -1,4 +1,3 @@
-const { COMPANIONS } = require('../data/companions');
 const { getCompanionsfromDB, getEmployeeNamefromDB, getMaximumNoOfCompanionsfromDB } = require('../controllers/dbController');
 
 // Relationship type mapping from English codes to Arabic terms
@@ -27,7 +26,6 @@ function mapRelationshipType(relType, lang = 'ar') {
 }
 
 async function getCompanions(employeeId, lang = 'en'){
-  //console.log('Fetching companions for employee:', employeeId, 'lang:', lang);
   const companions = await getCompanionsfromDB(employeeId, lang);
   
   // Always apply Arabic relationship mapping

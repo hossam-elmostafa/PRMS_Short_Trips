@@ -1,11 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const hotelService = require('../services/hotelService');
-const { ROOM_PRICES } = require('../data/roomPrices');
-// router.get('/cities', (req, res) => {
-//   const cities = hotelService.getAllCities();
-//   res.json({ success: true, data: cities });
-// });
 
 router.get('/hotels/:city', async (req, res) => {
   try {
@@ -21,9 +16,7 @@ router.get('/hotels/:city', async (req, res) => {
 });
 
 router.get('/hotels', async(req, res) => {
-  //console.log('Fetching all hotels');
   const hotels = await hotelService.getAllHotels();
-  //console.log('Hotels fetched:', hotels);
 
   if (hotels.length === 0) {
     return res.status(404).json({ success: false, message: 'Hotel not found' });
@@ -56,7 +49,6 @@ router.get('/hotel/:hotelCode/rooms', async (req, res) => {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 
-//  res.json({ success: true, data: ROOM_PRICES });
 });
 
 
@@ -81,25 +73,5 @@ router.get('/form/submit/:employeeId', async (req, res) => {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
-
-
-
-// router.get('/hotel/:hotelId', (req, res) => {
-//   const { hotelId } = req.params;
-//   const hotel = hotelService.getHotelById(hotelId);
-
-//   if (!hotel) {
-//     return res.status(404).json({ success: false, message: 'Hotel not found' });
-//   }
-
-//   res.json({ success: true, data: hotel });
-// });
-
-// router.get('/hotel/:hotelId/extra-beds', (req, res) => {
-//   const { hotelId } = req.params;
-//   const maxExtraBeds = hotelService.getMaxExtraBedsForHotel(hotelId);
-
-//   res.json({ success: true, data: maxExtraBeds });
-// });
 
 module.exports = router;

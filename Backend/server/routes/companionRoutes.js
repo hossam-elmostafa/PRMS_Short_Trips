@@ -50,8 +50,4 @@ router.get('/maximum-no-of-companions/:employeeId', async (req, res) => {
   }
 });
 
-
-
-
-
 module.exports = router;

@@ -14,9 +14,6 @@ import {
   getPolicyDataFromServer,
   submitTripFromServer
 } from './services/Services';
-// import Hotels from './components/Hotels';
-// import { Columns } from 'lucide-react';
-// import { data } from 'react-router-dom';
 
 
 
@@ -212,17 +209,12 @@ function App({ employeeID }: AppProps) {
 
     // Then fetch pricing for this hotel
     try {
-      //console.log('Fetching pricing for selected hotel:', hotel.id);
       const pricing = await getHotelRoomPricesFromServer(hotel.id);
-      //console.log('Received pricing data:', pricing);
-      //console.log('Pricing data type:', Array.isArray(pricing) ? 'Array' : 'Object');
       if (Array.isArray(pricing)) {
-        //console.log('First few items:', pricing.slice(0, 3));
       }
       
       setHotelPricingCache(prev => {
         const updated = { ...prev, [hotel.id]: pricing };
-        //console.log('Updated pricing cache. Keys:', Object.keys(updated));
         return updated;
       });
     } catch (e) {
@@ -292,7 +284,6 @@ function App({ employeeID }: AppProps) {
 
   const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): number => {
     let cacheKey = hotelId;
-    //console.log ('priceFor called with:', { hotelId, roomTypeKey, dateObj });
     // If date is provided, use date-specific cache key
     if (dateObj) {
       const yyyy = dateObj.getFullYear();
@@ -303,57 +294,24 @@ function App({ employeeID }: AppProps) {
     }
     
     const hotelPricing = hotelPricingCache[cacheKey];
-    //console.log(`Pricing lookup for hotel ${hotelId} (key: ${cacheKey}):`, hotelPricing);
     if (hotelPricing) {
       // Try specific room type price first
 
-      //const foundRoom = hotelPricing.find(room => room.ROOM_TYPE === roomTypeKey);
       // If the cached pricing is an array, search for the matching room type
       if (Array.isArray(hotelPricing)) {
         const foundRoom = hotelPricing.find(room => room.ROOM_TYPE === roomTypeKey);
-        //console.log('Found room for type :', roomTypeKey,foundRoom);
         if (foundRoom && typeof foundRoom.ROOM_PRICE === 'number') {
-          //console.log('Returning : '+ foundRoom['ROOM_PRICE'])
           return foundRoom.ROOM_PRICE as number;
         }
       } else {
         // Otherwise the cached pricing is an object with generic prices
         if (typeof hotelPricing.room_price === 'number') {
-          //console.log(`  Using generic room_price: ${hotelPricing.room_price}`);
           return hotelPricing.room_price;
         }
       }
     }
-
-    //console.log(`  No price found, returning 0`);
     return 0;
   };
-
-  // const calculateTotal = (col: number): { total: number, employee: number } => {
-  //   //console.log('calculateTotal');
-  //   const colData = columns[col];
-  //   //console.log('Column data:', colData);
-  //   if (!colData.selectedHotel || !colData.arrivalDate) {
-  //     //console.log('No hotel or arrival date selected for column', col);
-  //     return { total: 0, employee: 0 };
-  //   }
-
-  //   let total = 0;
-  //   //console.log(ROOM_TYPES);
-  //   ROOM_TYPES.forEach(rt => {
-  //     const count = colData.roomCounts[rt.key] || 0;
-  //     //console.log(`Room type ${rt.key}: count =`, count);
-  //     if (count > 0) {
-  //       const price = priceFor(colData.selectedHotel!.id, rt.key, new Date(colData.arrivalDate));
-  //       //console.log ('Price for room type', rt.key, 'is', price);
-  //       total += price * count;
-  //     }
-  //   });
-
-  //   const employeeShare = empContribution > 0 ? (total * empContribution / 100) : (total * 0.6);
-  //   //console.log(`Total for column ${col}:`, total, 'Employee share:', employeeShare);
-  //   return { total, employee: employeeShare };
-  // };
 
   const monthName = (y: number, m: number) => {
     const ar = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
@@ -468,8 +426,6 @@ function App({ employeeID }: AppProps) {
     if (hotelId) {
       // Fetch fresh pricing data for this hotel and date if not cached
       const dateStr = yyyy+'-'+mm+'-'+dd;
-      //dateObj.toISOString().slice(0, 10);
-      //console.log('Preparing tooltip for hotel:', hotelId, 'on date:', dateStr);
       const cacheKey = `${hotelId}_${dateStr}`;
       
       if (!hotelPricingCache[cacheKey]) {
@@ -482,7 +438,6 @@ function App({ employeeID }: AppProps) {
       }
 
       typesToShow.forEach(rt => {
-        //console.log(dateObj)
         const price = priceFor(hotelId, rt.key, dateObj);
         html += `<tr>
           <td style="padding:2px 8px">${rt.ar}</td>
@@ -529,43 +484,18 @@ function App({ employeeID }: AppProps) {
     if (colData.selectedHotel && colData.arrivalDate) {
             const dateObj = new Date(colData.arrivalDate);
 
-      const cacheData = hotelPricingCache[colData.selectedHotel.id];
-      //console.log(`=== Calculating total for column ${col} ===`);
-      //console.log('Hotel ID:', colData.selectedHotel.id);
-      //console.log('Arrival Date:', colData.arrivalDate);
-      //console.log('Room Counts:', colData.roomCounts);
-      //console.log('Cache Keys:', Object.keys(hotelPricingCache));
-      //console.log('Actual Cache Data for this hotel:', cacheData);
-      //console.log('Is Array?', Array.isArray(cacheData));
-      
       ROOM_TYPES.forEach(rt => {
         const count = colData.roomCounts[rt.key] || 0;
-        //console.log(`Checking room type ${rt.key} (${rt.ar}): count=${count}`);
         if (count > 0) {
           const price = priceFor(colData.selectedHotel!.id, rt.key, dateObj);
-          //console.log(`  -> Price found: ${price}, Subtotal: ${price * count}`);
           total += price * count;
-        } else {
-          //console.log(`  -> Skipped (count is 0)`);
-        }
+        } 
       });
-    } else {
-      // console.log(`Column ${col}: Missing hotel or date`, {
-      //   hasHotel: !!colData.selectedHotel,
-      //   hasDate: !!colData.arrivalDate
-      // });
-    }
+    } 
     
     const contributionPercent = empContribution > 0 ? empContribution : 60;
     const employee = (total * contributionPercent) / 100;
     
-    //console.log(`Column ${col} FINAL Total: ${total} EGP, Employee contribution: ${contributionPercent}%, Employee pays: ${employee} EGP`);
-    //console.log('===================\n');
-//     if(colData?.selectedHotel?.ar)
-// {    console.log(`colData?.selectedHotel?.ar`);
-//     console.log(colData?.selectedHotel?.ar);
-//     console.log(colData?.selectedHotel?.en);
-// }
     return (
       <section key={col} className="bg-white p-6 rounded-2xl shadow-lg">
         <h2 className="text-xl font-bold mb-3">
@@ -696,27 +626,10 @@ function App({ employeeID }: AppProps) {
 
   function getSelectedHotelsData(): { hotelCode: string; hotelName:string; date: string; roomsData: string; }[] {
     
-    //console.log('columns:', columns);
 
     const getHotelIdByColumn = (columnNum:number) => columns[columnNum]?.selectedHotel?.id;
-    //const hotelId = getHotelIdByColumn(1);
-
     const getRoomCountsByColumn = (columnNum:number) => columns[columnNum]?.roomCounts;
-    //const roomsData = getRoomCountsByColumn(1);
-    //console.log('roomsData raw:', roomsData);
-    
     const getArrivalDate = (columnNum:number) => columns[columnNum]?.arrivalDate;
-    // const date = new Date(getArrivalDate(1));
-
-//     const dateFormatted = date.toLocaleDateString('en-GB', {
-//   day: '2-digit',
-//   month: 'short',
-//   year: 'numeric'
-// }).replace(/ /g, ' ').toUpperCase();
-
-    //console.log('hotelCode[1]:', hotelId);
-    //console.log('roomsData[1]:', roomsData);
-    //console.log('arrivalDate[1]:', dateFormatted);
 
   const res=[];
   for (const col in columns) {
@@ -738,14 +651,7 @@ function App({ employeeID }: AppProps) {
         roomsData: Object.entries(colRoomsData).map(([key, count]) => `${key},${count},0`).join('|')
       });
       }
-      //console.log('Final selected hotels data:', res);
 return res;
-//     return(
-// [
-//                 { hotelCode: "EG-ALX-001", date: "15 NOV 2025", roomsData: "D,2,0|S,1,0|J,1,0" },
-//                 { hotelCode: "EG-HUR-002", date: "16 NOV 2025", roomsData: "S,2,2" },
-//                 { hotelCode: "EG-ALX-003", date: "17 NOV 2025", roomsData: "S,3,1" }]
-// )
 
   }
 

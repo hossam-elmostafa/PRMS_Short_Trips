@@ -30,7 +30,6 @@ export async function getHotelsFromServer() {
   console.log('Fetching hotels from server at api base:', getApiBase());
   const response = await fetch(`http://${getApiBase()}/api/hotels`);
     const hotelResult = await response.json();
-    //console.log('Hotels fetched from server:', hotelResult);
     
     if (hotelResult.success) {
       // Transform the data into the format expected by the app
@@ -72,9 +71,7 @@ export async function getHotelRoomPricesFromServer(hotelCode: string, date?: str
     // Always pass date parameter to get date-specific pricing
     const dateParam = date || new Date().toISOString().slice(0, 10);
   const url = `http://${getApiBase()}/api/hotel/${encodeURIComponent(hotelCode)}/rooms?date=${encodeURIComponent(dateParam)}`;
-    console.log('Constructed URL for fetching hotel room prices:', url);
 
-    //console.log(`Fetching hotel room prices for ${hotelCode} on date ${dateParam}`);
     
     const response = await fetch(url);
     if (!response.ok) {
@@ -84,8 +81,6 @@ export async function getHotelRoomPricesFromServer(hotelCode: string, date?: str
     if (!result.success) {
       throw new Error(result.message || 'Failed to fetch hotel room prices');
     }
-    
-    //console.log(`Received pricing data for ${hotelCode}:`, result.data);
     
     // Support both map of room type => price and { room_price, extra_bed_price }
     return result.data as HotelRoomPrices;
@@ -116,11 +111,9 @@ export async function getCompanionsFromServer(employeeID: number) {
   try {
   const response = await fetch('http://' + getApiBase() + '/api/companions/' + employeeID);
     const result = await response.json();
-    //console.log('Companions fetched from server:', result);
     if (result.success) {
       // Transform the data into the format expected by the app
       const COMPANIONS: Companion[] = result.data;
-      //console.log('Companions fetched from server:', COMPANIONS);
       
     return COMPANIONS;
     } else {
@@ -181,7 +174,6 @@ export async function getTransportAllowanceFromServer(employeeID: number, city: 
     if (!result.success) {
       throw new Error(result.message || 'Failed to fetch transport allowance');
     }
-    // result.data: { value: number, currency: string, label: string }
     return result.data as { value: number; currency: string; label: string };
   } catch (error) {
     console.error('Error fetching transport allowance:', error);
@@ -257,7 +249,6 @@ export function CalculateRoomsCount(parts: string[] | null | undefined): number 
     if (tokens.length === 0) return;
 
     const type = (tokens[0] || '').toUpperCase();
-    // tokens[1] -> roomsCount, tokens[2] -> extras
     const roomsCount = tokens.length > 1 ? Number(tokens[1]) : 0;
     const extras = tokens.length > 2 ? Number(tokens[2]) : 0;
 
@@ -310,15 +301,11 @@ export function validateTripData(tripData: {
       errors.push(`الفندق ${h.hotelName || '<unknown>'}: يفتقد التاريخ.`);
     }
     const rooms = (h.roomsData ?? '').toString();
-    //console.log('Validating hotel roomsData for hotelCode:', h.hotelCode, 'roomsData:', rooms);
     if (!rooms || rooms.trim() === '') {
       errors.push(`الفندق ${h.hotelName || '<unknown>'}: بيانات الغرف فارغة. `);
-    //} else if (!rooms.includes('|')) {
-      //errors.push(`Hotel ${h.hotelCode || '<unknown>'} roomsData must contain '|' separators.`);
     } else {
       const parts = rooms.split('|').map(s => s.trim());
       const RoomsCount = CalculateRoomsCount(parts);
-      //console.log('Validating hotel roomsData:', { hotelCode: h.hotelCode, roomsData: rooms, parts, RoomsCount });
       const expected = familyCount + 1; // employee + family members
       if (RoomsCount !== expected) {
         errors.push(`فندق ${h.hotelName || '<unknown>'}: عدد الأسرة المتوقع ${expected} سرير   (موظف + ${familyCount} من العائلة), ولكن المطلوب ${RoomsCount} سرير.`);
@@ -347,7 +334,6 @@ export async function submitTripFromServer(employeeID: number, familyIds: string
     hotels: validHotels
   };
   // Validate trip data before sending
-  //console.log('Submitting trip data:', tripData);
   const validation = validateTripData(tripData);
   if (!validation.valid) {
     const msg = 'الرجاء تصحيح الأخطاء التالية قبل الإرسال:\n' + validation.errors.join('\n');
@@ -367,7 +353,6 @@ export async function submitTripFromServer(employeeID: number, familyIds: string
     });
 
     const data = await res.json();
-    //console.log('Response from server:', data);
     if (res.ok) {
       alert('تم إرسال الطلب بنجاح!');
     } else {
@@ -379,5 +364,3 @@ export async function submitTripFromServer(employeeID: number, familyIds: string
   } finally {
   }
     };
-
-

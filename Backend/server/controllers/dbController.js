@@ -1,13 +1,10 @@
-const { COMPANIONS } = require('../data/companions');
 require('dotenv').config();
 const prisma = require('../lib/prisma');
-const { ROOM_PRICES } = require('../data/roomPrices');
 
 
 
 async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
     try {
-        const langBit = lang === 'en' ? 1 : 0;
         let cityInput = String(city).trim();
 
         const normalizeArabic = (s) => {
@@ -42,7 +39,7 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
                 if (match && match.code) {
                     cityCode = String(match.code).trim().toUpperCase();
                 }
-                try { //console.log('City resolution:', { input: cityInput, resolvedCode: cityCode }); 
+                try { 
                 } catch (_) {}
             } catch (_) {
                 // ignore and fallback to original input
@@ -102,7 +99,7 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
         });
 
         // Temporary log to verify counts and names during debugging
-        try { //console.log('Hotels fetched for city', cityCode, 'count:', mapped.length, mapped.map(h => h.ar)); 
+        try {  
 
         } catch (_) {}
         return mapped;
@@ -126,8 +123,6 @@ async function getHotelsFromDB(lang = 'ar') {
             LEFT JOIN CMN_CITIES c ON c.CITIES_CODE = h.Hotel_City
             WHERE ISNULL(h.Hotel_Active, 'Y') = 'Y'
         `);
-            //console.log('getHotelsFromDB: fetched', (rows || []).length, 'hotels from database');
-            //console.log('getHotelsFromDB: fetched', (rows ));
         const hotelsByCity = {};
         (rows || []).forEach(r => {
             //console.log(r);
@@ -141,7 +136,6 @@ async function getHotelsFromDB(lang = 'ar') {
             if (!hotelsByCity[cityKey]) hotelsByCity[cityKey] = [];
             hotelsByCity[cityKey].push({ id: code, en, ar });
         });
-        //console.log('getHotelsFromDB: organized hotels by city:', hotelsByCity);
         return hotelsByCity;
     } catch (error) {
         console.error('getHotelsFromDB: database query failed:', error && error.message ? error.message : error);
@@ -204,8 +198,7 @@ async function getCompanionsfromDB(employeeId, lang = 'en') {
         console.error('Error calling stored procedure P_GET_STRIP_EMP_FAMILY:', error);
         console.error('Parameters used - employeeId:', employeeId, 'lang:', lang);
         
-        // Fallback to static data if stored procedure fails
-        return COMPANIONS[employeeId] || [];
+        return '';
     }
 }
 
@@ -327,49 +320,23 @@ async function getTransportAllowancefromDB(employeeId, lang = 'en', city = 'ALEX
   
 // Retrieve actual room prices for a hotel from P_GET_STRIP_HOTEL_ROOMS @hotelCode, @date
 async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
-//       const result = ROOM_PRICES[hotelCode].filter(item => item.PRICE_DATE === date);
-//   console.log(result);
-//   return result;
-console.log(1);
 
     try {
         const code = String(hotelCode || '').trim().replace(/'/g, "''");
         
         // Try with date parameter first, then without if it fails
         let rows;
-        const dateParam = date ? `, N'${date}'` : `, N'${new Date().toISOString().slice(0, 10)}'`;
         
-        //console.log(`Calling P_GET_STRIP_HOTEL_ROOMS with hotelCode: ${code}, date: ${date || 'today'}`);
         
         try {
             // Try with date parameter first
-            //console.log(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'${dateParam}`);
-            //rows = await prisma.$queryRawUnsafe(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}'`);
             rows = await prisma.$queryRawUnsafe(`SELECT * FROM GetHotelRoomPrices(N'${code}') where PRICE_DATE =N'${date}'`);
-            //console.log(`P_GET_STRIP_HOTEL_ROOMS ${code}`);
-             //console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, rows);
-             
-//              const filteredRows = rows.filter(item => 
-//   item.PRICE_DATE instanceof Date && 
-//   item.PRICE_DATE.toISOString().slice(0, 10) === date
-// );
-    //console.log(`P_GET_STRIP_HOTEL_ROOMS with date filteredRows:`, filteredRows);
-             
-             //const result = filteredRows
              const result = rows
-//   .map(item => {
-//     if (item.ROOM_TYPE === 'FR') return { ...item, ROOM_TYPE: 'F' };
-//     if (item.ROOM_TYPE === 'FS') return { ...item, ROOM_TYPE: 'J' };
-//     return item;
-//   })
-  //.filter(item => item.ROOM_TYPE !== 'J' || item.ROOM_PRICE === 3500); // keep only the one converted from FS
             console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, result);
              return result;
         } catch (error) {
-            //console.log(`P_GET_STRIP_HOTEL_ROOMS with date failed, trying without date:`, error.message);
             // Fallback to without date parameter
           
-            //console.log(error.message);
             return [];
         }
         
@@ -380,28 +347,7 @@ console.log(1);
         return [];
     }
 }
-// function buildRoomPrices(date, prices) {
-//   // Map between input keys and ROOM_TYPE codes
-//   const typeMap = {
-//     single: "S",
-//     double: "D",
-//     trible: "T",
-//     family_room: "F",
-//     joiner_suite: "J"
-//   };
 
-//   // Create the array result
-//   const result = Object.entries(typeMap)
-//     .filter(([key]) => prices[key] !== undefined) // include only existing keys
-//     .map(([key, code]) => ({
-//       ROOM_TYPE: code,
-//       PRICE_DATE: date,
-//       ROOM_PRICE: prices[key],
-//       EXTRA_BED_PRICE: prices.extra_bed_price
-//     }));
-
-//   return result;
-// }
 async function getPolicyDataFromDB(employeeId) {
     try {
         const empCode = String(employeeId).replace(/^:+/, '').trim();
@@ -469,18 +415,7 @@ async function getEmployeeInfoFromDB(employeeId, lang = 'ar') {
     }
 }
 
-/*
-    function to call the database with fixed data
-EXEC P_STRIP_SUBMIT_FAMILY '100005','100005-210|100005-209|100005-208'
-EXEC P_STRIP_SUBMIT_HOTEL  '100005', 'EG-ALX-001', '15 NOV 2025', 'D,2,0|S,1,0|J,1,0'
-EXEC P_STRIP_SUBMIT_HOTEL  '100005', 'EG-HUR-002', '16 NOV 2025', 'S,2,2'
-EXEC P_STRIP_SUBMIT_HOTEL  '100005', 'EG-ALX-003', '17 NOV 2025', 'S,3,1'
-
-EXEC P_STRIP_SUBMIT  '100005'
-
-*/
 async function submitTripApplication(employeeId, familyIds, hotels=[]) {
-    //console.log('submitTripApplication called with:', { employeeId, familyIds, hotels });
     if (employeeId && familyIds && hotels && hotels.length > 0  )
     {
                 try {
@@ -502,17 +437,14 @@ async function submitTripApplication(employeeId, familyIds, hotels=[]) {
                             const h = hotels[i];
                             try {
                                 if (!h || !h.hotelCode) {
-                                    //console.log(`Skipping invalid hotel at index ${i}`);
                                     continue;
                                 }
                                 const hotelCodeEsc = esc(h.hotelCode);
                                 const dateEsc = esc(h.date);
                                 const roomsDataEsc = esc(h.roomsData);
-                                //console.log(`Submitting hotel ${i + 1}:`, hotelCodeEsc, dateEsc, roomsDataEsc);
                                 await prisma.$queryRawUnsafe(`
                                     EXEC P_STRIP_SUBMIT_HOTEL  ${employeeId}, '${hotelCodeEsc}', '${dateEsc}', '${roomsDataEsc}'
                                 `);
-                                //console.log(`Submitted hotel index ${i}`);
                             } catch (innerErr) {
                                 console.error(`Error submitting hotel at index ${i}:`, innerErr && innerErr.message ? innerErr.message : innerErr);
                                 // Continue with next hotel instead of failing the whole submission
@@ -543,110 +475,8 @@ async function submitTripApplication(employeeId, familyIds, hotels=[]) {
                     };
                 }
 
-                return {
-            success: false,
-            message: 'No parameters provided to submitTripApplication'
-        };
     }   
 }
-
- async function submitTripApplicationV2(employeeId, familyIds, hotels = []) {
-    try {
-        const empCode = String(employeeId).replace(/^:+/, '').trim();
-        const esc = (s) => String(s || '').replace(/'/g, "''");
-        
-        const results = {
-            family: null,
-            hotels: [],
-            final: null
-        };
-        
-        // Step 1: Submit family members
-        if (familyIds) {
-            try {
-                const familyIdsStr = String(familyIds).trim();
-                //console.log(`Calling P_STRIP_SUBMIT_FAMILY with empCode: ${empCode}, familyIds: ${familyIdsStr}`);
-                
-                await prisma.$queryRawUnsafe(`
-                    EXEC P_STRIP_SUBMIT_FAMILY '${esc(empCode)}', '${esc(familyIdsStr)}'
-                `);
-                
-                results.family = { success: true, message: 'Family members submitted successfully' };
-            } catch (error) {
-                console.error('Error in P_STRIP_SUBMIT_FAMILY:', error);
-                return {
-                    success: false,
-                    message: 'Failed to submit family members',
-                    error: error.message,
-                    results
-                };
-            }
-        }
-        
-        // Step 2: Submit all hotels
-        for (const hotel of hotels) {
-            try {
-                const hotelCode = String(hotel.hotelCode || '').trim();
-                const date = String(hotel.date || '').trim();
-                const roomsData = String(hotel.roomsData || '').trim();
-                
-                //console.log(`Calling P_STRIP_SUBMIT_HOTEL with empCode: ${empCode}, hotel: ${hotelCode}, date: ${date}, rooms: ${roomsData}`);
-                
-                await prisma.$queryRawUnsafe(`
-                    EXEC P_STRIP_SUBMIT_HOTEL '${esc(empCode)}', '${esc(hotelCode)}', '${esc(date)}', '${esc(roomsData)}'
-                `);
-                
-                results.hotels.push({ 
-                    success: true, 
-                    hotelCode,
-                    message: 'Hotel booking submitted successfully' 
-                });
-            } catch (error) {
-                console.error('Error in P_STRIP_SUBMIT_HOTEL:', error);
-                return {
-                    success: false,
-                    message: `Failed to submit hotel: ${hotel.hotelCode}`,
-                    error: error.message,
-                    results
-                };
-            }
-        }
-        
-        // Step 3: Final submit
-        try {
-            //console.log(`Calling P_STRIP_SUBMIT with empCode: ${empCode}`);
-            
-            await prisma.$queryRawUnsafe(`
-                EXEC P_STRIP_SUBMIT '${esc(empCode)}'
-            `);
-            
-            results.final = { success: true, message: 'Trip application submitted successfully' };
-        } catch (error) {
-            console.error('Error in P_STRIP_SUBMIT:', error);
-            return {
-                success: false,
-                message: 'Failed to complete final submission',
-                error: error.message,
-                results
-            };
-        }
-        
-        return {
-            success: true,
-            message: 'Complete trip application submitted successfully',
-            results
-        };
-        
-    } catch (error) {
-        console.error('Error in submitTripApplication:', error);
-        return {
-            success: false,
-            message: error.message || 'Failed to submit trip application',
-            error: error
-        };
-    }
-}
-
 
 
 module.exports = {
