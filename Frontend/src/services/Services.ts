@@ -179,7 +179,7 @@ export async function getTransportAllowanceFromServer(employeeID: number, city: 
 
 export async function getEmployeeNameFromServer(employeeID: number, currentLang: string) {
   try {
-    const response = await fetch('http://' + getApiBase() + '/api/employee/' + employeeID);
+    const response = await fetch(`http://${getApiBase()}/api/employee/${employeeID}?lang=${currentLang}`);
     if (!response.ok) {
       throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }

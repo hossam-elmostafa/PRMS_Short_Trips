@@ -204,17 +204,33 @@ async function getCompanionsfromDB(employeeId, lang = 'en') {
 
 async function getEmployeeNamefromDB(employeeId, lang = 'ar') {
     try {
-        // Only use the stored procedure; prefer Arabic field
-        const langBit = lang === 'en' ? 1 : 0;
+        console.log('🗃️ getEmployeeNamefromDB called with:', { employeeId, lang });
+        
+        // FIX: Invert the langBit logic
+        // If the stored procedure returns Arabic when langBit=1 and English when langBit=0:
+        const langBit = lang === 'ar' ? 1 : 0;
+        
+        // OR if it's the opposite, use:
+        // const langBit = lang === 'en' ? 1 : 0;
+        
+        console.log('📊 Using langBit:', langBit, 'for language:', lang);
+        
         const empCode = String(employeeId).replace(/^:+/, '').trim();
+
+        console.log('🔍 Calling stored procedure with:', { langBit, empCode });
 
         const rows = await prisma.$queryRawUnsafe(`
             EXEC P_GET_EMPLOYEE ${langBit}, '${empCode}'
         `);
 
+        console.log('📥 Stored procedure result:', rows);
+
         if (rows && rows.length > 0) {
             const row = rows[0] || {};
             const procName = row.EMPLOYEE_TNAME || row.EMPLOYEE_NAME || '';
+            
+            console.log('📄 Procedure returned name:', procName);
+            
             if (lang !== 'en') {
                 // Prefer Arabic from base table when available
                 const arabicRows = await prisma.$queryRawUnsafe(`
@@ -222,15 +238,24 @@ async function getEmployeeNamefromDB(employeeId, lang = 'ar') {
                     FROM CMN_EMPLOYEE
                     WHERE LTRIM(RTRIM(CAST(EMPLOYEE_CODE AS NVARCHAR(50)))) = LTRIM(RTRIM('${empCode}'))
                 `);
+                
+                console.log('📥 Direct Arabic query result:', arabicRows);
+                
                 const ar = (arabicRows && arabicRows[0] && arabicRows[0].AR_NAME) ? arabicRows[0].AR_NAME : '';
-                if (ar) return ar;
+                if (ar) {
+                    console.log('✅ Returning Arabic name from base table:', ar);
+                    return ar;
+                }
             }
+            
+            console.log('✅ Returning name from procedure:', procName);
             return typeof procName === 'string' ? procName : '';
         }
 
+        console.log('⚠️ No results found');
         return '';
     } catch (error) {
-        console.error('Error calling stored procedure P_GET_EMPLOYEE:', error);
+        console.error('❌ Error calling stored procedure P_GET_EMPLOYEE:', error);
         console.error('Parameters used - employeeId:', employeeId, 'lang:', lang);
         return '';
     }
