@@ -1,0 +1,136 @@
+{
+  "header": {
+    "publicRelations": "إدارة العلاقات العامة",
+    "shortTrips": "رحلات قصيرة",
+    "english": "English"
+  },
+  "employee": {
+    "name": "اسم الموظف",
+    "id": "الرقم الوظيفى"
+  },
+  "companions": {
+    "title": "المرافقون",
+    "max": "الحد الأقصى هو"
+  },
+  "selection": {
+    "title": "إختر المدينة والفندق",
+    "first": "الأول",
+    "second": "الثاني",
+    "third": "الثالث",
+    "fourth": "الرابع",
+    "fifth": "الخامس",
+    "sixth": "السادس",
+    "seventh": "السابع",
+    "eighth": "الثامن",
+    "ninth": "التاسع",
+    "tenth": "العاشر"
+  },
+  "city": {
+    "select": "-- اختر المدينة --"
+  },
+  "hotel": {
+    "select": "اختيار الفندق",
+    "notSelected": "لم يتم اختيار فندق",
+    "selectPopup": "اختر الفندق",
+    "close": "إغلاق",
+    "maxHotels": "الحد الأقصى للفنادق",
+    "available": "المتاح"
+  },
+  "transport": {
+    "allowance": "بدل انتقال",
+    "none": "لايوجد"
+  },
+  "rooms": {
+    "types": "أنواع الغرف والسرير الإضافي",
+    "allowedExtra": "مسموح سرر إضافية",
+    "extraCount": "عدد السرر الإضافية"
+  },
+  "date": {
+    "select": "اختيار التاريخ",
+    "arrival": "تاريخ الوصول",
+    "clickToSelect": "انقر على التاريخ لاختياره.",
+    "prevMonth": "‹ الشهر السابق",
+    "nextMonth": "الشهر التالي ›",
+    "selectButton": "اختيار",
+    "notAvailable": "غير متاح"
+  },
+  "pricing": {
+    "total": "إجمالي تكلفة الرحلة",
+    "employee": "إجمالي تكلفة الموظف",
+    "clickForPrices": "انقر لعرض الأسعار",
+    "selectHotelFirst": "اختر فندق أولاً",
+    "roomType": "نوع الغرفة",
+    "price": "السعر",
+    "extraBedPrice": "سعر السرير الإضافي",
+    "notAvailable": "غير متوفر"
+  },
+  "submit": {
+    "button": "إرسال الطلب ورحلة سعيدة"
+  },
+  "footer": {
+    "company": "First Information & Technology Solutions",
+    "companyAr": "الشركة الأولى لنظم المعلومات والحلول التقنية"
+  },
+  "weekdays": {
+    "sunday": "الأحد",
+    "monday": "الاثنين",
+    "tuesday": "الثلاثاء",
+    "wednesday": "الأربعاء",
+    "thursday": "الخميس",
+    "friday": "الجمعة",
+    "saturday": "السبت"
+  },
+  "months": {
+    "january": "يناير",
+    "february": "فبراير",
+    "march": "مارس",
+    "april": "أبريل",
+    "may": "مايو",
+    "june": "يونيو",
+    "july": "يوليو",
+    "august": "أغسطس",
+    "september": "سبتمبر",
+    "october": "أكتوبر",
+    "november": "نوفمبر",
+    "december": "ديسمبر"
+  },
+  "alerts": {
+    "selectCity": "اختر المدينة أولاً",
+    "maxCompanions": "الحد الأقصى للمرافقين هو"
+  },
+  "validation": {
+    "correctErrors": "الرجاء تصحيح الأخطاء التالية قبل الإرسال:",
+    "employeeIdMissing": "الرقم الوظيفي مفقود أو غير صحيح",
+    "noHotelsSelected": "لم يتم تحديد أي فنادق للرحلة",
+    "hotelEntryInvalid": "إدخال الفندق رقم {{index}} غير صحيح",
+    "hotelCodeEmpty": "إدخال الفندق رقم {{index}} يحتوي على رمز فندق فارغ",
+    "hotelMissingDate": "الفندق {{hotelName}}: يفتقد التاريخ",
+    "hotelEmptyRooms": "الفندق {{hotelName}}: بيانات الغرف فارغة",
+    "hotelRoomsMismatch": "فندق {{hotelName}}: عدد الأسرة المتوقع {{expected}} سرير (موظف + {{familyCount}} من العائلة), ولكن المطلوب {{actual}} سرير",
+    "hotelRoomsSegmentEmpty": "الفندق {{hotelCode}} قطعة بيانات الغرف رقم {{segment}} فارغة"
+  },
+  "errors": {
+    "fetchHotels": "فشل في جلب الفنادق",
+    "fetchHotelsByCity": "فشل في جلب الفنادق حسب المدينة",
+    "fetchHotelRoomPrices": "فشل في جلب أسعار غرف الفندق",
+    "fetchCities": "فشل في جلب المدن",
+    "fetchCompanions": "فشل في جلب المرافقين",
+    "fetchRoomTypes": "فشل في جلب أنواع الغرف",
+    "fetchTransportOptions": "فشل في جلب خيارات النقل",
+    "fetchTransportAllowance": "فشل في جلب بدل الانتقال",
+    "fetchEmployeeName": "فشل في جلب اسم الموظف",
+    "fetchPolicyData": "فشل في جلب بيانات السياسة",
+    "fetchMaxCompanions": "فشل في جلب الحد الأقصى للمرافقين",
+    "httpError": "خطأ في الاتصال! الحالة: {{status}}",
+    "networkError": "خطأ في الشبكة",
+    "submitError": "حدث خطأ في إرسال الطلب"
+  },
+  "success": {
+    "submitTrip": "تم إرسال الطلب بنجاح!"
+  },
+  "loading": {
+    "pleaseWait": "جاري التحميل، الرجاء الانتظار...",
+    "fetchingData": "جاري جلب البيانات...",
+    "submitting": "جاري الإرسال..."
+  }
+}

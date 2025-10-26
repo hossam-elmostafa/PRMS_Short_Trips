@@ -1,4 +1,6 @@
 import { getApiBase } from '../config';
+import i18n from '../i18n/config';
+
 export interface Hotel {
   id: string;
   en: string;
@@ -22,43 +24,38 @@ export interface RoomType {
   factor: number;
 }
 
-
-
-
 export async function getHotelsFromServer() {
   try {
-  console.log('Fetching hotels from server at api base:', getApiBase());
-  const response = await fetch(`http://${getApiBase()}/api/hotels`);
+    console.log('Fetching hotels from server at api base:', getApiBase());
+    const response = await fetch(`http://${getApiBase()}/api/hotels`);
     const hotelResult = await response.json();
     
     if (hotelResult.success) {
-      // Transform the data into the format expected by the app
       const hotels: Record<string, Hotel[]> = hotelResult.data;
-      
-    return hotels;
+      return hotels;
     } else {
-      console.error('Failed to fetch hotels:', hotelResult.message);
+      console.error(i18n.t('errors.fetchHotels'), hotelResult.message);
       return {};
     }
   } catch (error) {
-    console.error('Error fetching hotels:', error);
+    console.error(i18n.t('errors.fetchHotels'), error);
     return {};
   }
 }
 
 export async function getHotelsByCityFromServer(city: string, lang: 'ar' | 'en' = 'ar') {
   try {
-  const response = await fetch(`http://${getApiBase()}/api/hotels/${encodeURIComponent(city)}?lang=${lang}`);
+    const response = await fetch(`http://${getApiBase()}/api/hotels/${encodeURIComponent(city)}?lang=${lang}`);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
-      throw new Error(result.message || 'Failed to fetch hotels by city');
+      throw new Error(result.message || i18n.t('errors.fetchHotelsByCity'));
     }
     return result.data as Hotel[];
   } catch (error) {
-    console.error('Error fetching hotels by city:', error);
+    console.error(i18n.t('errors.fetchHotelsByCity'), error);
     throw error;
   }
 }
@@ -68,152 +65,142 @@ export type HotelRoomPrices = Record<string, number> & { room_price?: number; ex
 
 export async function getHotelRoomPricesFromServer(hotelCode: string, date?: string): Promise<HotelRoomPrices> {
   try {
-    // Always pass date parameter to get date-specific pricing
     const dateParam = date || new Date().toISOString().slice(0, 10);
-  const url = `http://${getApiBase()}/api/hotel/${encodeURIComponent(hotelCode)}/rooms?date=${encodeURIComponent(dateParam)}`;
-
+    const url = `http://${getApiBase()}/api/hotel/${encodeURIComponent(hotelCode)}/rooms?date=${encodeURIComponent(dateParam)}`;
     
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
-      throw new Error(result.message || 'Failed to fetch hotel room prices');
+      throw new Error(result.message || i18n.t('errors.fetchHotelRoomPrices'));
     }
     
-    // Support both map of room type => price and { room_price, extra_bed_price }
     return result.data as HotelRoomPrices;
   } catch (error) {
-    console.error('Error fetching hotel room prices:', error);
+    console.error(i18n.t('errors.fetchHotelRoomPrices'), error);
     return {} as HotelRoomPrices;
   }
 }
 
 export async function getCitiesFromServer(lang: 'ar' | 'en' = 'ar') {
   try {
-  const response = await fetch(`http://${getApiBase()}/api/cities?lang=${lang}`);
+    const response = await fetch(`http://${getApiBase()}/api/cities?lang=${lang}`);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
-      throw new Error(result.message || 'Failed to fetch cities');
+      throw new Error(result.message || i18n.t('errors.fetchCities'));
     }
     return result.data as City[];
   } catch (error) {
-    console.error('Error fetching cities:', error);
+    console.error(i18n.t('errors.fetchCities'), error);
     throw error;
   }
 }
 
 export async function getCompanionsFromServer(employeeID: number) {
   try {
-  const response = await fetch('http://' + getApiBase() + '/api/companions/' + employeeID);
+    const response = await fetch('http://' + getApiBase() + '/api/companions/' + employeeID);
     const result = await response.json();
     if (result.success) {
-      // Transform the data into the format expected by the app
       const COMPANIONS: Companion[] = result.data;
-      
-    return COMPANIONS;
+      return COMPANIONS;
     } else {
-      console.error('Failed to fetch companions:', result.message);
+      console.error(i18n.t('errors.fetchCompanions'), result.message);
       return {};
     }
   } catch (error) {
-    console.error('Error fetching companions:', error);
+    console.error(i18n.t('errors.fetchCompanions'), error);
     return {};
   }
 }
 
-
 export async function getRoomTypesFromServer() {
   try {
-  const response = await fetch('http://' + getApiBase() + '/api/room-types');
+    const response = await fetch('http://' + getApiBase() + '/api/room-types');
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
-      throw new Error(result.message || 'Failed to fetch room types');
+      throw new Error(result.message || i18n.t('errors.fetchRoomTypes'));
     }
-    // Expect an array of room types from API
     return Array.isArray(result.data) ? result.data as RoomType[] : [];
   } catch (error) {
-    console.error('Error fetching room types:', error);
-    throw error; // Re-throw the error to handle it in the component
+    console.error(i18n.t('errors.fetchRoomTypes'), error);
+    throw error;
   }
 }
 
 export async function getTransportOptionsFromServer(employeeID: number) {
   try {
-  const response = await fetch('http://' + getApiBase() + '/api/transport-options/' + employeeID);
+    const response = await fetch('http://' + getApiBase() + '/api/transport-options/' + employeeID);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
-      throw new Error(result.message || 'Failed to fetch transport options');
+      throw new Error(result.message || i18n.t('errors.fetchTransportOptions'));
     }
     return result.data;
   } catch (error) {
-    console.error('Error fetching transport options:', error);
-    throw error; // Re-throw the error to handle it in the component
+    console.error(i18n.t('errors.fetchTransportOptions'), error);
+    throw error;
   }
 }
 
-// Fetch transport allowance using proc EXEC P_GET_STRIP_TRANS_ALLOWANC @lang,@city,@empcode
 export async function getTransportAllowanceFromServer(employeeID: number, city: string, lang: 'ar' | 'en' = 'ar') {
   try {
-  const url = `http://${getApiBase()}/api/transport-allowance/${employeeID}?city=${encodeURIComponent(city)}&lang=${lang}`;
+    const url = `http://${getApiBase()}/api/transport-allowance/${employeeID}?city=${encodeURIComponent(city)}&lang=${lang}`;
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
-      throw new Error(result.message || 'Failed to fetch transport allowance');
+      throw new Error(result.message || i18n.t('errors.fetchTransportAllowance'));
     }
     return result.data as { value: number; currency: string; label: string };
   } catch (error) {
-    console.error('Error fetching transport allowance:', error);
-    return { value: 0, currency: '', label: 'لا يوجد' };
+    console.error(i18n.t('errors.fetchTransportAllowance'), error);
+    return { value: 0, currency: '', label: i18n.t('transport.none') };
   }
 }
 
-
-
 export async function getEmployeeNameFromServer(employeeID: number) {
   try {
-  const response = await fetch('http://' + getApiBase() + '/api/employee/' + employeeID);
+    const response = await fetch('http://' + getApiBase() + '/api/employee/' + employeeID);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
-      throw new Error(result.message || 'Failed to fetch Employee Name ');
+      throw new Error(result.message || i18n.t('errors.fetchEmployeeName'));
     }
     return result.data;
   } catch (error) {
-    console.error('Error fetching Employee Name :', error);
-    throw error; // Re-throw the error to handle it in the component
+    console.error(i18n.t('errors.fetchEmployeeName'), error);
+    throw error;
   }
 }
 
 export async function getPolicyDataFromServer(employeeID: number) {
   try {
-  const response = await fetch(`http://${getApiBase()}/api/policy/${employeeID}`);
+    const response = await fetch(`http://${getApiBase()}/api/policy/${employeeID}`);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
-      throw new Error(result.message || 'Failed to fetch policy data');
+      throw new Error(result.message || i18n.t('errors.fetchPolicyData'));
     }
     return result.data;
   } catch (error) {
-    console.error('Error fetching policy data:', error);
-    throw error; // Re-throw the error to handle it in the component
+    console.error(i18n.t('errors.fetchPolicyData'), error);
+    throw error;
   }
 }
 
@@ -222,8 +209,8 @@ export async function getMaximumNoOfCompanionsFromServer(employeeID: number) {
     const policyData = await getPolicyDataFromServer(employeeID);
     return policyData.maxCompanions || 0;
   } catch (error) {
-    console.error('Error fetching maximum-no-of-companions:', error);
-    throw error; // Re-throw the error to handle it in the component
+    console.error(i18n.t('errors.fetchMaxCompanions'), error);
+    throw error;
   }
 }
 
@@ -266,54 +253,61 @@ export function CalculateRoomsCount(parts: string[] | null | undefined): number 
 export function validateTripData(tripData: {
   employeeId: number | string | null | undefined;
   familyIds: string | null | undefined;
-  hotels: { hotelCode: string;hotelName:string; date: string; roomsData: string }[] | null | undefined;
+  hotels: { hotelCode: string; hotelName: string; date: string; roomsData: string }[] | null | undefined;
 }): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  // employeeId must be present and non-zero (allow string numeric too)
+  // employeeId must be present and non-zero
   const emp = tripData?.employeeId;
   if (emp === null || emp === undefined || emp === '' || Number(emp) === 0 || Number.isNaN(Number(emp))) {
-    errors.push('Employee ID is missing or invalid.');
+    errors.push(i18n.t('validation.employeeIdMissing'));
   }
 
   // hotels must be a non-empty array
   const hotels = Array.isArray(tripData?.hotels) ? tripData!.hotels : [];
   if (!hotels || hotels.length === 0) {
-    errors.push('لم يتم تحديد أي فنادق للرحلة.');
+    errors.push(i18n.t('validation.noHotelsSelected'));
   }
 
-  // familyIds: if present, split by '|' to count companions. empty or whitespace => 0
+  // familyIds: if present, split by '|' to count companions
   const famStr = (tripData?.familyIds ?? '').toString().trim();
   const familyIdsList = famStr === '' ? [] : famStr.split('|').map(s => s.trim()).filter(s => s !== '');
-  const familyCount = familyIdsList.length; // number of family members
+  const familyCount = familyIdsList.length;
 
-  // For each hotel: date must be non-empty; roomsData must be non-empty and contain '|' and have (familyCount + 1) segments
+  // For each hotel: validate date and roomsData
   hotels.forEach((h, idx) => {    
     if (!h) {
-      errors.push(`Hotel entry #${idx + 1} is invalid.`);
+      errors.push(i18n.t('validation.hotelEntryInvalid', { index: idx + 1 }));
       return;
     }
     if (!h.hotelCode || h.hotelCode.toString().trim() === '') {
-      errors.push(`Hotel entry #${idx + 1} has empty hotelCode.`);
+      errors.push(i18n.t('validation.hotelCodeEmpty', { index: idx + 1 }));
     }
-    //console.log('Validating hotel date dsdsd: ',  h.date);
     if (!h.date || h.date.toString().trim() === '' || h.date === 'INVALID DATE') {
-      errors.push(`الفندق ${h.hotelName || '<unknown>'}: يفتقد التاريخ.`);
+      errors.push(i18n.t('validation.hotelMissingDate', { hotelName: h.hotelName || '<unknown>' }));
     }
     const rooms = (h.roomsData ?? '').toString();
     if (!rooms || rooms.trim() === '') {
-      errors.push(`الفندق ${h.hotelName || '<unknown>'}: بيانات الغرف فارغة. `);
+      errors.push(i18n.t('validation.hotelEmptyRooms', { hotelName: h.hotelName || '<unknown>' }));
     } else {
       const parts = rooms.split('|').map(s => s.trim());
       const RoomsCount = CalculateRoomsCount(parts);
       const expected = familyCount + 1; // employee + family members
       if (RoomsCount !== expected) {
-        errors.push(`فندق ${h.hotelName || '<unknown>'}: عدد الأسرة المتوقع ${expected} سرير   (موظف + ${familyCount} من العائلة), ولكن المطلوب ${RoomsCount} سرير.`);
+        errors.push(i18n.t('validation.hotelRoomsMismatch', { 
+          hotelName: h.hotelName || '<unknown>',
+          expected: expected,
+          familyCount: familyCount,
+          actual: RoomsCount
+        }));
       }
       // ensure no segment is empty
       parts.forEach((p, pi) => {
         if (p === '') {
-          errors.push(`Hotel ${h.hotelCode || '<unknown>'} roomsData segment #${pi + 1} is empty.`);
+          errors.push(i18n.t('validation.hotelRoomsSegmentEmpty', { 
+            hotelCode: h.hotelCode || '<unknown>',
+            segment: pi + 1
+          }));
         }
       });
     }
@@ -322,7 +316,7 @@ export function validateTripData(tripData: {
   return { valid: errors.length === 0, errors };
 }
 
-export async function submitTripFromServer(employeeID: number, familyIds: string, hotels: { hotelCode: string; hotelName:string; date: string; roomsData: string; }[]) {
+export async function submitTripFromServer(employeeID: number, familyIds: string, hotels: { hotelCode: string; hotelName: string; date: string; roomsData: string; }[]) {
   // Ensure hotels is an array and filter out entries without a valid hotelCode
   const validHotels = Array.isArray(hotels)
     ? hotels.filter(h => h && typeof h.hotelCode === 'string' && h.hotelCode.trim() !== '')
@@ -333,18 +327,18 @@ export async function submitTripFromServer(employeeID: number, familyIds: string
     familyIds: familyIds,
     hotels: validHotels
   };
+  
   // Validate trip data before sending
   const validation = validateTripData(tripData);
   if (!validation.valid) {
-    const msg = 'الرجاء تصحيح الأخطاء التالية قبل الإرسال:\n' + validation.errors.join('\n');
-    // show user-friendly alert and also log
+    const msg = i18n.t('validation.correctErrors') + '\n' + validation.errors.join('\n');
     alert(msg);
     console.error('Trip data validation failed:', validation.errors);
     return;
   }
 
   try {
-  const res = await fetch('http://' + getApiBase() + '/api/submit', {
+    const res = await fetch('http://' + getApiBase() + '/api/submit', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -354,13 +348,13 @@ export async function submitTripFromServer(employeeID: number, familyIds: string
 
     const data = await res.json();
     if (res.ok) {
-      alert('تم إرسال الطلب بنجاح!');
+      alert(i18n.t('success.submitTrip'));
     } else {
-      alert('حدث خطأ في إرسال الطلب');
+      alert(i18n.t('errors.submitError'));
       console.error('Error:', data);
     }
   } catch (err) {
-    console.error('Error:', err);
-  } finally {
+    console.error(i18n.t('errors.networkError'), err);
+    alert(i18n.t('errors.submitError'));
   }
-    };
+}

@@ -1,0 +1,136 @@
+{
+  "header": {
+    "publicRelations": "Public Relations Department",
+    "shortTrips": "Short Trips",
+    "english": "العربية"
+  },
+  "employee": {
+    "name": "Employee Name",
+    "id": "Employee ID"
+  },
+  "companions": {
+    "title": "Companions",
+    "max": "Maximum is"
+  },
+  "selection": {
+    "title": "Select City and Hotel",
+    "first": "First",
+    "second": "Second",
+    "third": "Third",
+    "fourth": "Fourth",
+    "fifth": "Fifth",
+    "sixth": "Sixth",
+    "seventh": "Seventh",
+    "eighth": "Eighth",
+    "ninth": "Ninth",
+    "tenth": "Tenth"
+  },
+  "city": {
+    "select": "-- Select City --"
+  },
+  "hotel": {
+    "select": "Select Hotel",
+    "notSelected": "No hotel selected",
+    "selectPopup": "Choose Hotel",
+    "close": "Close",
+    "maxHotels": "Maximum Hotels",
+    "available": "Available"
+  },
+  "transport": {
+    "allowance": "Travel Allowance",
+    "none": "None"
+  },
+  "rooms": {
+    "types": "Room Types and Extra Beds",
+    "allowedExtra": "Allowed Extra Beds",
+    "extraCount": "Extra Beds Count"
+  },
+  "date": {
+    "select": "Select Date",
+    "arrival": "Arrival Date",
+    "clickToSelect": "Click on date to select.",
+    "prevMonth": "‹ Previous Month",
+    "nextMonth": "Next Month ›",
+    "selectButton": "Select",
+    "notAvailable": "Not Available"
+  },
+  "pricing": {
+    "total": "Total Trip Cost",
+    "employee": "Total Employee Cost",
+    "clickForPrices": "Click to view prices",
+    "selectHotelFirst": "Select hotel first",
+    "roomType": "Room Type",
+    "price": "Price",
+    "extraBedPrice": "Extra Bed Price",
+    "notAvailable": "Not Available"
+  },
+  "submit": {
+    "button": "Submit Request & Happy Journey"
+  },
+  "footer": {
+    "company": "First Information & Technology Solutions",
+    "companyAr": "First Company for Information Systems and Technical Solutions"
+  },
+  "weekdays": {
+    "sunday": "Sunday",
+    "monday": "Monday",
+    "tuesday": "Tuesday",
+    "wednesday": "Wednesday",
+    "thursday": "Thursday",
+    "friday": "Friday",
+    "saturday": "Saturday"
+  },
+  "months": {
+    "january": "January",
+    "february": "February",
+    "march": "March",
+    "april": "April",
+    "may": "May",
+    "june": "June",
+    "july": "July",
+    "august": "August",
+    "september": "September",
+    "october": "October",
+    "november": "November",
+    "december": "December"
+  },
+  "alerts": {
+    "selectCity": "Select city first",
+    "maxCompanions": "Maximum companions is"
+  },
+  "validation": {
+    "correctErrors": "Please correct the following errors before submitting:",
+    "employeeIdMissing": "Employee ID is missing or invalid",
+    "noHotelsSelected": "No hotels have been selected for the trip",
+    "hotelEntryInvalid": "Hotel entry #{{index}} is invalid",
+    "hotelCodeEmpty": "Hotel entry #{{index}} has empty hotel code",
+    "hotelMissingDate": "Hotel {{hotelName}}: missing date",
+    "hotelEmptyRooms": "Hotel {{hotelName}}: room data is empty",
+    "hotelRoomsMismatch": "Hotel {{hotelName}}: Expected {{expected}} beds (employee + {{familyCount}} family members), but requested {{actual}} beds",
+    "hotelRoomsSegmentEmpty": "Hotel {{hotelCode}} room data segment #{{segment}} is empty"
+  },
+  "errors": {
+    "fetchHotels": "Failed to fetch hotels",
+    "fetchHotelsByCity": "Failed to fetch hotels by city",
+    "fetchHotelRoomPrices": "Failed to fetch hotel room prices",
+    "fetchCities": "Failed to fetch cities",
+    "fetchCompanions": "Failed to fetch companions",
+    "fetchRoomTypes": "Failed to fetch room types",
+    "fetchTransportOptions": "Failed to fetch transport options",
+    "fetchTransportAllowance": "Failed to fetch transport allowance",
+    "fetchEmployeeName": "Failed to fetch employee name",
+    "fetchPolicyData": "Failed to fetch policy data",
+    "fetchMaxCompanions": "Failed to fetch maximum companions",
+    "httpError": "HTTP error! status: {{status}}",
+    "networkError": "Network error",
+    "submitError": "An error occurred while submitting the request"
+  },
+  "success": {
+    "submitTrip": "Request submitted successfully!"
+  },
+  "loading": {
+    "pleaseWait": "Loading, please wait...",
+    "fetchingData": "Fetching data...",
+    "submitting": "Submitting..."
+  }
+}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   getCompanionsFromServer,
   getHotelsFromServer,
@@ -14,10 +15,6 @@ import {
   getPolicyDataFromServer,
   submitTripFromServer
 } from './services/Services';
-
-
-
-
 
 interface ColumnState {
   selectedCity: string;
@@ -38,6 +35,9 @@ type RoomPricing = { ROOM_TYPE: string; ROOM_PRICE: number };
 type PricingPayload = RoomPricing[] | (Record<string, number> & { room_price?: number; extra_bed_price?: number });
 
 function App({ employeeID }: AppProps) {
+  const { t, i18n } = useTranslation();
+  const isRTL = i18n.language === 'ar';
+
   const [ROOM_TYPES, setROOM_TYPES] = useState<RoomType[]>([]);
   const [HOTELS, setHOTELS] = useState<Record<string, Hotel[]>>({});
   const [selectedCompanions, setSelectedCompanions] = useState<string[]>([]);
@@ -51,7 +51,7 @@ function App({ employeeID }: AppProps) {
   const [policyEndDate, setPolicyEndDate] = useState<string | null>(null);
   const [empContribution, setEmpContribution] = useState<number>(0);
   const [hotelPricingCache, setHotelPricingCache] = useState<Record<string, PricingPayload>>({});
-  
+
   useEffect(() => {
     const fetchInitialData = async () => {
       const [hotelsData, companionsData, roomTypesData, , employeeName, policyData] = await Promise.all([
@@ -64,13 +64,13 @@ function App({ employeeID }: AppProps) {
       ]);
 
       setHOTELS(hotelsData);
-      
+
       if (Array.isArray(companionsData)) {
         setCOMPANIONS(companionsData as Companion[]);
       } else {
         setCOMPANIONS((companionsData as { companions?: Companion[] })?.companions ?? []);
       }
-      
+
       setROOM_TYPES(Array.isArray(roomTypesData) ? roomTypesData : []);
       setEmployeeName(employeeName)
       setMaximumNoOfCompanions(policyData.maxCompanions || 0)
@@ -92,7 +92,7 @@ function App({ employeeID }: AppProps) {
   });
 
   const [columns, setColumns] = useState<Record<number, ColumnState>>({});
-  
+
   // Force re-render when pricing cache or empContribution changes
   useEffect(() => {
     // Trigger re-render by updating a dummy value
@@ -101,28 +101,31 @@ function App({ employeeID }: AppProps) {
     }, 100);
     return () => clearTimeout(timer);
   }, [hotelPricingCache, empContribution]);
-  
+
   useEffect(() => {
-    const hotelCount = maximumNoOfHotels > 0 ? maximumNoOfHotels : 3;
+    // const hotelCount = maximumNoOfHotels > 0 ? maximumNoOfHotels : 3;
+      if (maximumNoOfHotels === 0) return; // Don't create columns if policy data not loaded yet
+
     const newColumns: Record<number, ColumnState> = {};
-    for (let i = 1; i <= hotelCount; i++) {
-      newColumns[i] = { 
-        selectedCity: '', 
-        selectedHotel: null, 
-        travelAllowance: 'لايوجد', 
-        arrivalDate: '', 
-        roomCounts: {}, 
-        extraBedCounts: {}, 
-        maxExtraBeds: {} 
+  for (let i = 1; i <= maximumNoOfHotels; i++) {  // ← Use maximumNoOfHotels directly
+
+      newColumns[i] = {
+        selectedCity: '',
+        selectedHotel: null,
+        travelAllowance: t('transport.none'),
+        arrivalDate: '',
+        roomCounts: {},
+        extraBedCounts: {},
+        maxExtraBeds: {}
       };
     }
     setColumns(newColumns);
-  }, [maximumNoOfHotels]);
+  }, [maximumNoOfHotels, t]);
 
   const handleCompanionChange = (value: string, checked: boolean) => {
     if (checked) {
       if (selectedCompanions.length >= maximumNoOfCompanions) {
-        alert(`الحد الأقصى للمرافقين هو ${maximumNoOfCompanions}`);
+        alert(`${t('alerts.maxCompanions')} ${maximumNoOfCompanions}`);
         return;
       }
       setSelectedCompanions([...selectedCompanions, value]);
@@ -137,7 +140,7 @@ function App({ employeeID }: AppProps) {
       [col]: {
         ...prev[col],
         selectedCity: city,
-        travelAllowance: 'لايوجد'
+        travelAllowance: t('transport.none')
       }
     }));
 
@@ -152,7 +155,7 @@ function App({ employeeID }: AppProps) {
             ...prev,
             [col]: {
               ...prev[col],
-              travelAllowance: allowance?.label || 'لايوجد'
+              travelAllowance: allowance?.label || t('transport.none')
             }
           }));
         } catch (e) {
@@ -165,7 +168,7 @@ function App({ employeeID }: AppProps) {
   const openHotelPopup = async (col: number) => {
     const city = columns[col].selectedCity;
     if (!city) {
-      alert('اختر المدينة أولاً');
+      alert(t('alerts.selectCity'));
       return;
     }
     try {
@@ -204,15 +207,12 @@ function App({ employeeID }: AppProps) {
         maxExtraBeds: maxBeds
       }
     }));
-    
+
     setShowHotelPopup(false);
 
     // Then fetch pricing for this hotel
     try {
       const pricing = await getHotelRoomPricesFromServer(hotel.id);
-      if (Array.isArray(pricing)) {
-      }
-      
       setHotelPricingCache(prev => {
         const updated = { ...prev, [hotel.id]: pricing };
         return updated;
@@ -224,7 +224,7 @@ function App({ employeeID }: AppProps) {
 
   const openCalendar = (col: number) => {
     setCalendarColumn(col);
-    
+
     if (policyStartDate) {
       const startDate = new Date(policyStartDate);
       setCalendarYear(startDate.getFullYear());
@@ -234,7 +234,7 @@ function App({ employeeID }: AppProps) {
       setCalendarYear(now.getFullYear());
       setCalendarMonth(now.getMonth());
     }
-    
+
     setShowCalendar(true);
   };
 
@@ -292,7 +292,7 @@ function App({ employeeID }: AppProps) {
       const dateStr = yyyy+'-'+mm+'-'+dd;
       cacheKey = `${hotelId}_${dateStr}`;
     }
-    
+
     const hotelPricing = hotelPricingCache[cacheKey];
     if (hotelPricing) {
       // Try specific room type price first
@@ -314,20 +314,26 @@ function App({ employeeID }: AppProps) {
   };
 
   const monthName = (y: number, m: number) => {
-    const ar = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
-    return `${ar[m]} ${y}`;
+    const monthKeys = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+    return `${t(`months.${monthKeys[m]}`)} ${y}`;
   };
 
   const weekdayFull = (idx: number) => {
-    const ar = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
-    return ar[idx];
+    const dayKeys = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    return t(`weekdays.${dayKeys[idx]}`);
+  };
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'ar' ? 'en' : 'ar';
+    i18n.changeLanguage(newLang);
   };
 
   const renderCalendar = () => {
     const first = new Date(calendarYear, calendarMonth, 1);
     const start = first.getDay();
     const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
-    const headers = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+    const dayKeys = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    const headers = dayKeys.map(key => t(`weekdays.${key}`));
 
     const days: (number | null)[] = [];
     for (let i = 0; i < start; i++) {
@@ -350,27 +356,27 @@ function App({ employeeID }: AppProps) {
               return <div key={i} className="border rounded p-2 bg-gray-50"></div>;
             }
             const dateObj = new Date(calendarYear, calendarMonth, d);
-            
+
             const selectedHotel = calendarColumn !== null && columns[calendarColumn].selectedHotel;
-            const priceText = selectedHotel ? 'انقر لعرض الأسعار' : 'اختر فندق أولاً';
+            const priceText = selectedHotel ? t('pricing.clickForPrices') : t('pricing.selectHotelFirst');
 
             const isWithinPolicyRange = () => {
               if (!policyStartDate || !policyEndDate) return true;
-              
+
               const policyStartDateObj = new Date(policyStartDate);
               const policyEndDateObj = new Date(policyEndDate);
-              
+
               policyStartDateObj.setHours(0, 0, 0, 0);
               policyEndDateObj.setHours(23, 59, 59, 999);
               dateObj.setHours(0, 0, 0, 0);
-              
+
               const isValid = dateObj >= policyStartDateObj && dateObj <= policyEndDateObj;
               return isValid;
             };
 
             const isDateValid = isWithinPolicyRange();
-            const buttonClass = isDateValid 
-              ? "w-full text-sm p-1 border rounded hover:bg-blue-50" 
+            const buttonClass = isDateValid
+              ? "w-full text-sm p-1 border rounded hover:bg-blue-50"
               : "w-full text-sm p-1 border rounded bg-gray-100 text-gray-400 cursor-not-allowed";
 
             return (
@@ -389,7 +395,7 @@ function App({ employeeID }: AppProps) {
                     onClick={isDateValid ? () => selectDate(dateObj) : undefined}
                     disabled={!isDateValid}
                   >
-                    {isDateValid ? 'اختيار' : 'غير متاح'}
+                    {isDateValid ? t('date.selectButton') : t('date.notAvailable')}
                   </button>
                 </div>
               </div>
@@ -401,7 +407,6 @@ function App({ employeeID }: AppProps) {
   };
 
   const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
-    //console.log('Showing tooltip for date:', dateObj);
     const yyyy = dateObj.getFullYear();
     const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
     const dd = String(dateObj.getDate()).padStart(2, "0");
@@ -410,7 +415,7 @@ function App({ employeeID }: AppProps) {
     const hotelId = calendarColumn !== null && columns[calendarColumn].selectedHotel
       ? columns[calendarColumn].selectedHotel!.id
       : null;
-    
+
     let typesToShow = ROOM_TYPES;
     if (calendarColumn !== null) {
       const hasRooms = ROOM_TYPES.filter(rt => (columns[calendarColumn].roomCounts[rt.key] || 0) > 0);
@@ -419,15 +424,15 @@ function App({ employeeID }: AppProps) {
 
     let html = `<div style="font-weight:700;margin-bottom:6px">${weekdayFull(dateObj.getDay())} — ${localDateStr}</div>`;
     html += `<table style="width:100%;font-size:13px;margin-bottom:6px"><thead><tr>
-      <th style="padding:2px 8px">نوع الغرفة</th>
-      <th style="padding:2px 8px">السعر</th>
+      <th style="padding:2px 8px">${t('pricing.roomType')}</th>
+      <th style="padding:2px 8px">${t('pricing.price')}</th>
     </tr></thead><tbody>`;
 
     if (hotelId) {
       // Fetch fresh pricing data for this hotel and date if not cached
       const dateStr = yyyy+'-'+mm+'-'+dd;
       const cacheKey = `${hotelId}_${dateStr}`;
-      
+
       if (!hotelPricingCache[cacheKey]) {
         try {
           const pricing = await getHotelRoomPricesFromServer(hotelId, dateStr);
@@ -445,7 +450,7 @@ function App({ employeeID }: AppProps) {
         </tr>`;
       });
     } else {
-      html += `<tr><td colspan="2" style="padding:2px 8px;text-align:center">اختر فندق أولاً</td></tr>`;
+      html += `<tr><td colspan="2" style="padding:2px 8px;text-align:center">${t('pricing.selectHotelFirst')}</td></tr>`;
     }
 
     html += `</tbody></table>`;
@@ -457,9 +462,9 @@ function App({ employeeID }: AppProps) {
         extraBedPrice = hotelPricing.extra_bed_price;
       }
       if (extraBedPrice > 0) {
-        html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">سعر السرير الإضافي: EGP ${extraBedPrice}</div>`;
+        html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">${t('pricing.extraBedPrice')}: EGP ${extraBedPrice}</div>`;
       } else {
-        html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">سعر السرير الإضافي: غير متوفر</div>`;
+        html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">${t('pricing.extraBedPrice')}: ${t('pricing.notAvailable')}</div>`;
       }
     }
 
@@ -467,39 +472,34 @@ function App({ employeeID }: AppProps) {
   };
 
   const getArabicOrdinal = (num: number): string => {
-    const ordinals = [
-      'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 
-      'السابع', 'الثامن', 'التاسع', 'العاشر', 'الحادي عشر', 'الثاني عشر',
-      'الثالث عشر', 'الرابع عشر', 'الخامس عشر', 'السادس عشر', 'السابع عشر',
-      'الثامن عشر', 'التاسع عشر', 'العشرون'
-    ];
-    return ordinals[num - 1] || `ال${num}`;
+    const ordinalKeys = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
+    return t(`selection.${ordinalKeys[num - 1]}`) || `${num}`;
   };
 
   const renderColumn = (col: number) => {
     const colData = columns[col];
-    
+
     // Force recalculation on every render to ensure fresh empContribution value
     let total = 0;
     if (colData.selectedHotel && colData.arrivalDate) {
-            const dateObj = new Date(colData.arrivalDate);
+      const dateObj = new Date(colData.arrivalDate);
 
       ROOM_TYPES.forEach(rt => {
         const count = colData.roomCounts[rt.key] || 0;
         if (count > 0) {
           const price = priceFor(colData.selectedHotel!.id, rt.key, dateObj);
           total += price * count;
-        } 
+        }
       });
-    } 
-    
+    }
+
     const contributionPercent = empContribution > 0 ? empContribution : 60;
     const employee = (total * contributionPercent) / 100;
-    
+
     return (
       <section key={col} className="bg-white p-6 rounded-2xl shadow-lg">
         <h2 className="text-xl font-bold mb-3">
-          الإختيار {getArabicOrdinal(col)}: إختر المدينة والفندق
+          {t('selection.title')} {getArabicOrdinal(col)}
         </h2>
 
         <select
@@ -507,7 +507,7 @@ function App({ employeeID }: AppProps) {
           value={colData.selectedCity}
           onChange={(e) => handleCityChange(col, e.target.value)}
         >
-          <option value="">-- اختر المدينة --</option>
+          <option value="">{t('city.select')}</option>
           {Object.keys(HOTELS).map(city => (
             <option key={city} value={city}>{city}</option>
           ))}
@@ -518,14 +518,14 @@ function App({ employeeID }: AppProps) {
             className="bg-indigo-600 text-white px-6 py-2 rounded-lg"
             onClick={() => openHotelPopup(col)}
           >
-            اختيار الفندق
+            {t('hotel.select')}
           </button>
-          <span style={{ color: '#16a34a', fontWeight: '700', fontSize: '14px' }}>بدل انتقال</span>
+          <span style={{ color: '#16a34a', fontWeight: '700', fontSize: '14px' }}>{t('transport.allowance')}</span>
           <input
             type="text"
             readOnly
             value={colData.travelAllowance ?? ''}
-            placeholder="لايوجد"
+            placeholder={t('transport.none')}
             style={{
               width: '84px',
               padding: '6px 8px',
@@ -548,14 +548,14 @@ function App({ employeeID }: AppProps) {
               style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }}
               className="mb-2"
             />
-            <div className="mb-2 text-lg font-semibold text-blue-700">{colData.selectedHotel.en}</div> {/* HSM I don`t know why "en" contains arabic data */}
+            <div className="mb-2 text-lg font-semibold text-blue-700">{colData.selectedHotel.en}</div>
           </>
         )}
         {!colData.selectedHotel && (
-          <div className="mb-2 text-lg font-semibold text-blue-700">لم يتم اختيار فندق</div>
+          <div className="mb-2 text-lg font-semibold text-blue-700">{t('hotel.notSelected')}</div>
         )}
 
-        <label className="block font-semibold mb-1">أنواع الغرف والسرير الإضافي</label>
+        <label className="block font-semibold mb-1">{t('rooms.types')}</label>
         <div>
           {ROOM_TYPES.map(rt => {
             const maxBeds = colData.maxExtraBeds[rt.key] ?? 0;
@@ -571,9 +571,8 @@ function App({ employeeID }: AppProps) {
                   value={roomCount}
                   onChange={(e) => updateRoomCount(col, rt.key, parseInt(e.target.value) || 0)}
                   style={{ width: '40px', textAlign: 'center', background: '#fff', border: '1px solid #bbb', marginRight: '6px' }}
-                  title="عدد الغرف"
                 />
-                <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>مسموح سرر إضافية</span>
+                <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>{t('rooms.allowedExtra')}</span>
                 <input
                   type="number"
                   min="0"
@@ -581,16 +580,14 @@ function App({ employeeID }: AppProps) {
                   value={maxBeds}
                   readOnly
                   style={{ width: '32px', textAlign: 'center', background: '#eee', border: '1px solid #bbb', marginRight: '6px' }}
-                  title="أقصى عدد أسرة إضافية"
                 />
-                <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>عدد السرر الإضافية</span>
+                <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>{t('rooms.extraCount')}</span>
                 <input
                   type="number"
                   min="0"
                   value={reqBeds}
                   onChange={(e) => updateExtraBedCount(col, rt.key, parseInt(e.target.value) || 0)}
                   style={{ width: '32px', textAlign: 'center', background: '#fff', border: '1px solid #bbb', marginRight: '6px' }}
-                  title="عدد الأسرة المطلوبة"
                 />
               </div>
             );
@@ -601,10 +598,10 @@ function App({ employeeID }: AppProps) {
           className="bg-indigo-600 text-white px-10 py-2 rounded-lg mt-3"
           onClick={() => openCalendar(col)}
         >
-          اختيار التاريخ
+          {t('date.select')}
         </button>
 
-        <label className="block font-semibold mb-1 mt-2">تاريخ الوصول</label>
+        <label className="block font-semibold mb-1 mt-2">{t('date.arrival')}</label>
         <input
           readOnly
           value={colData.arrivalDate}
@@ -615,8 +612,8 @@ function App({ employeeID }: AppProps) {
         {total > 0 && (
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px', borderRadius: '8px' }} className="mt-4">
             <div className="font-semibold">
-              إجمالي تكلفة الرحلة: EGP {total.toFixed(2)}<br />
-              إجمالي تكلفة الموظف: ({empContribution > 0 ? empContribution : 60}%) EGP {employee.toFixed(2)}
+              {t('pricing.total')}: EGP {total.toFixed(2)}<br />
+              {t('pricing.employee')}: ({empContribution > 0 ? empContribution : 60}%) EGP {employee.toFixed(2)}
             </div>
           </div>
         )}
@@ -625,24 +622,21 @@ function App({ employeeID }: AppProps) {
   };
 
   function getSelectedHotelsData(): { hotelCode: string; hotelName:string; date: string; roomsData: string; }[] {
-    
-
     const getHotelIdByColumn = (columnNum:number) => columns[columnNum]?.selectedHotel?.id;
     const getRoomCountsByColumn = (columnNum:number) => columns[columnNum]?.roomCounts;
     const getArrivalDate = (columnNum:number) => columns[columnNum]?.arrivalDate;
 
-  const res=[];
-  for (const col in columns) {
-    var colhotelCode = getHotelIdByColumn(Number(col));
-    var colHotelName = columns[Number(col)]?.selectedHotel?.en; //HSM I don`t know why "en" contains arabic data    
-    var colRoomsData = getRoomCountsByColumn(Number(col));
-    // var arrivalDateObj = new Date(getArrivalDate(Number(col)));
-    const date = new Date(getArrivalDate(Number(col)));
-    var coldateFormatted = date.toLocaleDateString('en-GB', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric'
-}).replace(/ /g, ' ').toUpperCase();
+    const res=[];
+    for (const col in columns) {
+      var colhotelCode = getHotelIdByColumn(Number(col));
+      var colHotelName = columns[Number(col)]?.selectedHotel?.en;
+      var colRoomsData = getRoomCountsByColumn(Number(col));
+      const date = new Date(getArrivalDate(Number(col)));
+      var coldateFormatted = date.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }).replace(/ /g, ' ').toUpperCase();
 
       res.push({
         hotelCode: colhotelCode??'',
@@ -650,42 +644,44 @@ function App({ employeeID }: AppProps) {
         date: coldateFormatted,
         roomsData: Object.entries(colRoomsData).map(([key, count]) => `${key},${count},0`).join('|')
       });
-      }
-return res;
-
+    }
+    return res;
   }
 
   function getCompanionsFormated(): string {
     const result = selectedCompanions
   .map(item => item.split('|').pop()) // extract last part after '|'
-  .join('|');  
-  return result;
-}
+      .join('|');
+    return result;
+  }
 
   return (
-    <div className="bg-gray-100 min-h-screen" dir="rtl" lang="ar" style={{ fontSize: '16px' }}>
+    <div className="bg-gray-100 min-h-screen" dir={isRTL ? 'rtl' : 'ltr'} lang={i18n.language} style={{ fontSize: '16px' }}>
       <header className="bg-white shadow p-4 mb-4">
         <div className="max-w-7xl mx-auto flex items-start justify-between relative">
           <div className="absolute left-1/2 transform -translate-x-1/2">
             <img src="/Logo.png" width="300" height="200" alt="Logo" className="object-contain mx-auto" />
           </div>
 
-          <div className="text-right ml-auto">
+          <div className={`${isRTL ? 'text-right ml-auto' : 'text-left mr-auto'}`}>
             <div style={{ display: 'inline-block', textAlign: 'center' }}>
               <div className="text-1.5xl font-extrabold pb-1"
                    style={{ color: '#0F4C9B', borderBottom: '4px solid #0F4C9B', fontFamily: "'GE Hili', sans-serif" }}>
-                إدارة العلاقات العامة
+                {t('header.publicRelations')}
               </div>
               <div className="text-1.5xl font-extrabold mt-3"
                    style={{ color: '#0F4C9B', fontFamily: "'GE Hili', sans-serif" }}>
-                رحلات قصيرة
+                {t('header.shortTrips')}
               </div>
             </div>
           </div>
 
           <div>
-            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg">
-              English
+            <button
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+              onClick={toggleLanguage}
+            >
+              {t('header.english')}
             </button>
           </div>
         </div>
@@ -693,13 +689,13 @@ return res;
 
       <main className="w-full px-4 pb-12">
         <div className="mt-6 mb-2 flex justify-center text-3xl font-bold gap-[300px]">
-          <span>اسم الموظف: {employeeName}</span>
-          <span>الرقم الوظيفى: {employeeID}</span>
+          <span>{t('employee.name')}: {employeeName}</span>
+          <span>{t('employee.id')}: {employeeID}</span>
         </div>
 
         <div className="mt-4 mb-8">
           <section className="bg-white p-6 rounded-2xl shadow-lg">
-            <label className="block font-semibold mb-2">المرافقون — الحد الأقصى هو {maximumNoOfCompanions}</label>
+            <label className="block font-semibold mb-2">{t('companions.title')} — {t('companions.max')} {maximumNoOfCompanions}</label>
             <div className="grid grid-cols-4 gap-2">
               {COMPANIONS.slice(0, 12).map((c, i) => {
                 const companionValue = `${c.rel}|${c.name}|${c.RELID}`;
@@ -724,9 +720,9 @@ return res;
         </div>
 
         <div className="flex justify-center mt-8 mb-1">
-          <button onClick={function() { 
+          <button onClick={function() {
             submitTripFromServer(employeeID, getCompanionsFormated(),getSelectedHotelsData())}} className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
-            إرسال الطلب ورحلة سعيدة
+            {t('submit.button')}
           </button>
         </div>
       </main>
@@ -735,20 +731,22 @@ return res;
         <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{ background: 'rgba(0,0,0,0.45)' }}>
           <div className="bg-white rounded-2xl p-4 w-full max-w-2xl shadow-lg">
             <div className="flex justify-between mb-3">
-              <div className="font-bold text-lg">اختر الفندق</div>
+              <div className="font-bold text-lg">{t('hotel.selectPopup')}</div>
               <button
                 className="px-4 py-2 bg-red-600 text-white rounded"
                 onClick={() => setShowHotelPopup(false)}
               >
-                إغلاق
+                {t('hotel.close')}
               </button>
             </div>
             <div className="mb-3 text-sm text-gray-600">
-              الحد الأقصى للفنادق: {maximumNoOfHotels} | المتاح: {HOTELS[columns[currentColumn].selectedCity]?.length || 0}
+              {t('hotel.maxHotels')}: {maximumNoOfHotels} | {t('hotel.available')}: {HOTELS[columns[currentColumn].selectedCity]?.length || 0}
             </div>
             <div className="grid grid-cols-1 gap-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
               {HOTELS[columns[currentColumn].selectedCity]
-                ?.slice(0, maximumNoOfHotels > 0 ? maximumNoOfHotels : undefined)
+                // ?.slice(0, maximumNoOfHotels > 0 ? maximumNoOfHotels : undefined)
+                  // ?.slice(0, maximumNoOfHotels || undefined)  // ← Simplified version
+
                 .map(h => (
                 <button
                   key={h.id}
@@ -786,7 +784,7 @@ return res;
                     setCalendarYear(y);
                   }}
                 >
-                  ‹ الشهر السابق
+                  {t('date.prevMonth')}
                 </button>
                 <button
                   className="px-3 py-2 border rounded"
@@ -798,7 +796,7 @@ return res;
                     setCalendarYear(y);
                   }}
                 >
-                  الشهر التالي ›
+                  {t('date.nextMonth')}
                 </button>
                 <button
                   className="px-4 py-2 bg-red-600 text-white rounded"
@@ -807,14 +805,14 @@ return res;
                     setTooltip({ show: false, x: 0, y: 0, content: '' });
                   }}
                 >
-                  إغلاق
+                  {t('hotel.close')}
                 </button>
               </div>
             </div>
             <div style={{ overflowY: 'auto', maxHeight: '500px' }}>
               {renderCalendar()}
             </div>
-            <div className="mt-3 text-sm text-gray-600">انقر على التاريخ لاختياره.</div>
+            <div className="mt-3 text-sm text-gray-600">{t('date.clickToSelect')}</div>
           </div>
         </div>
       )}
@@ -845,8 +843,8 @@ return res;
         <div className="max-w-6xl mx-auto flex items-center justify-center gap-4">
           <img src="/First.jpeg" alt="First logo" className="w-16 h-16 object-contain" />
           <div>
-            <div className="text-lg font-bold">First Information &amp; Technology Solutions</div>
-            <div className="text-sm text-gray-600">الشركة الأولى لنظم المعلومات والحلول التقنية</div>
+            <div className="text-lg font-bold">{t('footer.company')}</div>
+            <div className="text-sm text-gray-600">{t('footer.companyAr')}</div>
           </div>
         </div>
       </footer>
