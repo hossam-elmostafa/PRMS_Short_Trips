@@ -175,7 +175,7 @@ async function getCitiesFromDB(lang = 'ar') {
 async function getCompanionsfromDB(employeeId, lang = 'en') {
     try {
         // Convert lang to bit: 'en' = 1, others = 0
-        const langBit = lang === 'en' ? 1 : 0;
+        const langBit = lang === 'ar' ? 1 : 0;
         const empCode = String(employeeId).replace(/^:+/, '').trim();
         
         // Call stored procedure using table variable to capture results

@@ -6,7 +6,9 @@ const companionService = require('../services/companionService');
 router.get('/companions/:employeeId', async (req, res) => {
   try {
     const { employeeId } = req.params;
-    const { lang } = req.query; // Get language from query parameter
+    const lang = req.query.lang || 'ar'; // Get language from query
+    
+    console.log('🌐 API Route - Language received:', lang); // ADD THIS
     
     const companions = await companionService.getCompanions(employeeId, lang);
 
@@ -14,6 +16,7 @@ router.get('/companions/:employeeId', async (req, res) => {
       return res.status(404).json({ success: false, message: 'companion not found' });
     }
 
+    console.log('📤 Sending companions:', companions); // ADD THIS
     res.json({ success: true, data: companions });
   } catch (error) {
     console.error('Error in companions route:', error);

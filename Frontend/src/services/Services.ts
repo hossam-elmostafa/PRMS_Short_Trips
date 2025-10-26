@@ -101,23 +101,30 @@ export async function getCitiesFromServer(lang: 'ar' | 'en' = 'ar') {
   }
 }
 
-export async function getCompanionsFromServer(employeeID: number) {
+export async function getCompanionsFromServer(employeeID: number, lang?: 'ar' | 'en') {
   try {
-    const response = await fetch('http://' + getApiBase() + '/api/companions/' + employeeID);
+    const currentLang = lang || i18n.language as 'ar' | 'en';
+    const url = `http://${getApiBase()}/api/companions/${employeeID}?lang=${currentLang}`;
+    
+    console.log('🔗 Fetching companions from:', url); // ADD THIS
+    
+    const response = await fetch(url);
     const result = await response.json();
+    
+    console.log('📥 Received companions:', result); // ADD THIS
+    
     if (result.success) {
       const COMPANIONS: Companion[] = result.data;
       return COMPANIONS;
     } else {
       console.error(i18n.t('errors.fetchCompanions'), result.message);
-      return {};
+      return [];
     }
   } catch (error) {
     console.error(i18n.t('errors.fetchCompanions'), error);
-    return {};
+    return [];
   }
 }
-
 export async function getRoomTypesFromServer() {
   try {
     const response = await fetch('http://' + getApiBase() + '/api/room-types');
@@ -170,7 +177,7 @@ export async function getTransportAllowanceFromServer(employeeID: number, city: 
   }
 }
 
-export async function getEmployeeNameFromServer(employeeID: number) {
+export async function getEmployeeNameFromServer(employeeID: number, currentLang: string) {
   try {
     const response = await fetch('http://' + getApiBase() + '/api/employee/' + employeeID);
     if (!response.ok) {

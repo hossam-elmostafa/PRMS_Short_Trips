@@ -54,12 +54,14 @@ function App({ employeeID }: AppProps) {
 
   useEffect(() => {
     const fetchInitialData = async () => {
+      const currentLang = i18n.language as 'ar' | 'en';
+
       const [hotelsData, companionsData, roomTypesData, , employeeName, policyData] = await Promise.all([
         getHotelsFromServer(),
-        getCompanionsFromServer(employeeID),
+      getCompanionsFromServer(employeeID, currentLang), // ← Pass language
         getRoomTypesFromServer(),
         getTransportOptionsFromServer(employeeID),
-        getEmployeeNameFromServer(employeeID),
+      getEmployeeNameFromServer(employeeID, currentLang), // ← Pass language
         getPolicyDataFromServer(employeeID),
       ]);
 
@@ -81,7 +83,7 @@ function App({ employeeID }: AppProps) {
     };
 
     fetchInitialData();
-  }, [employeeID]);
+  }, [employeeID, i18n.language]);
 
   const [currentColumn, setCurrentColumn] = useState<number | null>(null);
   const [calendarColumn, setCalendarColumn] = useState<number | null>(null);

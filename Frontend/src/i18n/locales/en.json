@@ -132,5 +132,25 @@
     "pleaseWait": "Loading, please wait...",
     "fetchingData": "Fetching data...",
     "submitting": "Submitting..."
+    },
+    "relationships": {
+    "WH": "Spouse",
+    "SN": "Son",
+    "D": "Daughter",
+    "F": "Father",
+    "M": "Mother",
+    "B": "Brother",
+    "S": "Sister",
+    "H": "Spouse",
+    "GF": "Grandfather",
+    "GM": "Grandmother",
+    "UN": "Uncle",
+    "AU": "Aunt",
+    "CO": "Cousin",
+    "NI": "Nephew",
+    "NE": "Niece",
+    "SI": "Brother-in-law",
+    "SI2": "Sister-in-law"
   }
+
 }
