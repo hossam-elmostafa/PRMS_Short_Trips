@@ -96,9 +96,13 @@
   },
   "alerts": {
     "selectCity": "Select city first",
-    "maxCompanions": "Maximum companions is"
+    "maxCompanions": "Maximum companions is",
+        "maxCompanionsTitle": "Maximum Companions Reached",
+    "selectCityTitle": "City Not Selected"
+
   },
   "validation": {
+        "correctErrorsTitle": "Validation Errors",
     "correctErrors": "Please correct the following errors before submitting:",
     "employeeIdMissing": "Employee ID is missing or invalid",
     "noHotelsSelected": "No hotels have been selected for the trip",
@@ -110,6 +114,7 @@
     "hotelRoomsSegmentEmpty": "Hotel {{hotelCode}} room data segment #{{segment}} is empty"
   },
   "errors": {
+        "submitErrorTitle": "Submission Failed",
     "fetchHotels": "Failed to fetch hotels",
     "fetchHotelsByCity": "Failed to fetch hotels by city",
     "fetchHotelRoomPrices": "Failed to fetch hotel room prices",
@@ -126,7 +131,9 @@
     "submitError": "An error occurred while submitting the request"
   },
   "success": {
-    "submitTrip": "Request submitted successfully!"
+    "submitTrip": "Request submitted successfully!",
+        "submitTripTitle": "Trip Submitted Successfully"
+
   },
   "loading": {
     "pleaseWait": "Loading, please wait...",

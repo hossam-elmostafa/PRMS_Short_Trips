@@ -106,12 +106,12 @@ export async function getCompanionsFromServer(employeeID: number, lang?: 'ar' | 
     const currentLang = lang || i18n.language as 'ar' | 'en';
     const url = `http://${getApiBase()}/api/companions/${employeeID}?lang=${currentLang}`;
     
-    console.log('🔗 Fetching companions from:', url); // ADD THIS
+    console.log('🔗 Fetching companions from:', url);
     
     const response = await fetch(url);
     const result = await response.json();
     
-    console.log('📥 Received companions:', result); // ADD THIS
+    console.log('📥 Received companions:', result);
     
     if (result.success) {
       const COMPANIONS: Companion[] = result.data;
@@ -125,6 +125,7 @@ export async function getCompanionsFromServer(employeeID: number, lang?: 'ar' | 
     return [];
   }
 }
+
 export async function getRoomTypesFromServer() {
   try {
     const response = await fetch('http://' + getApiBase() + '/api/room-types');
@@ -264,13 +265,11 @@ export function validateTripData(tripData: {
 }): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  // employeeId must be present and non-zero
   const emp = tripData?.employeeId;
   if (emp === null || emp === undefined || emp === '' || Number(emp) === 0 || Number.isNaN(Number(emp))) {
     errors.push(i18n.t('validation.employeeIdMissing'));
   }
 
-  // hotels must be a non-empty array
   const hotels = Array.isArray(tripData?.hotels) ? tripData!.hotels : [];
   if (!hotels || hotels.length === 0) {
     errors.push(i18n.t('validation.noHotelsSelected'));
@@ -281,7 +280,6 @@ export function validateTripData(tripData: {
   const familyIdsList = famStr === '' ? [] : famStr.split('|').map(s => s.trim()).filter(s => s !== '');
   const familyCount = familyIdsList.length;
 
-  // For each hotel: validate date and roomsData
   hotels.forEach((h, idx) => {    
     if (!h) {
       errors.push(i18n.t('validation.hotelEntryInvalid', { index: idx + 1 }));
@@ -299,7 +297,7 @@ export function validateTripData(tripData: {
     } else {
       const parts = rooms.split('|').map(s => s.trim());
       const RoomsCount = CalculateRoomsCount(parts);
-      const expected = familyCount + 1; // employee + family members
+      const expected = familyCount + 1;
       if (RoomsCount !== expected) {
         errors.push(i18n.t('validation.hotelRoomsMismatch', { 
           hotelName: h.hotelName || '<unknown>',
@@ -308,7 +306,6 @@ export function validateTripData(tripData: {
           actual: RoomsCount
         }));
       }
-      // ensure no segment is empty
       parts.forEach((p, pi) => {
         if (p === '') {
           errors.push(i18n.t('validation.hotelRoomsSegmentEmpty', { 
@@ -323,8 +320,12 @@ export function validateTripData(tripData: {
   return { valid: errors.length === 0, errors };
 }
 
-export async function submitTripFromServer(employeeID: number, familyIds: string, hotels: { hotelCode: string; hotelName: string; date: string; roomsData: string; }[]) {
-  // Ensure hotels is an array and filter out entries without a valid hotelCode
+// THIS IS THE KEY CHANGE - The function now returns a Promise with the result object
+export async function submitTripFromServer(
+  employeeID: number, 
+  familyIds: string, 
+  hotels: { hotelCode: string; hotelName: string; date: string; roomsData: string; }[]
+): Promise<{ success: boolean; errors?: string[] }> {
   const validHotels = Array.isArray(hotels)
     ? hotels.filter(h => h && typeof h.hotelCode === 'string' && h.hotelCode.trim() !== '')
     : [];
@@ -338,10 +339,8 @@ export async function submitTripFromServer(employeeID: number, familyIds: string
   // Validate trip data before sending
   const validation = validateTripData(tripData);
   if (!validation.valid) {
-    const msg = i18n.t('validation.correctErrors') + '\n' + validation.errors.join('\n');
-    alert(msg);
     console.error('Trip data validation failed:', validation.errors);
-    return;
+    return { success: false, errors: validation.errors };
   }
 
   try {
@@ -355,13 +354,13 @@ export async function submitTripFromServer(employeeID: number, familyIds: string
 
     const data = await res.json();
     if (res.ok) {
-      alert(i18n.t('success.submitTrip'));
+      return { success: true };
     } else {
-      alert(i18n.t('errors.submitError'));
       console.error('Error:', data);
+      return { success: false, errors: [data.message || i18n.t('errors.submitError')] };
     }
   } catch (err) {
     console.error(i18n.t('errors.networkError'), err);
-    alert(i18n.t('errors.submitError'));
+    return { success: false, errors: [i18n.t('errors.networkError')] };
   }
 }

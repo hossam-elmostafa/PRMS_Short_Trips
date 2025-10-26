@@ -96,9 +96,13 @@
   },
   "alerts": {
     "selectCity": "اختر المدينة أولاً",
-    "maxCompanions": "الحد الأقصى للمرافقين هو"
+    "maxCompanions": "الحد الأقصى للمرافقين هو",
+        "maxCompanionsTitle": "تم الوصول للحد الأقصى من المرافقين",
+    "selectCityTitle": "لم يتم اختيار المدينة"
+
   },
   "validation": {
+        "correctErrorsTitle": "أخطاء في التحقق",
     "correctErrors": "الرجاء تصحيح الأخطاء التالية قبل الإرسال:",
     "employeeIdMissing": "الرقم الوظيفي مفقود أو غير صحيح",
     "noHotelsSelected": "لم يتم تحديد أي فنادق للرحلة",
@@ -123,10 +127,14 @@
     "fetchMaxCompanions": "فشل في جلب الحد الأقصى للمرافقين",
     "httpError": "خطأ في الاتصال! الحالة: {{status}}",
     "networkError": "خطأ في الشبكة",
-    "submitError": "حدث خطأ في إرسال الطلب"
+    "submitError": "حدث خطأ في إرسال الطلب",
+        "submitErrorTitle": "فشل الإرسال"
+
   },
   "success": {
-    "submitTrip": "تم إرسال الطلب بنجاح!"
+    "submitTrip": "تم إرسال الطلب بنجاح!",
+        "submitTripTitle": "تم إرسال الرحلة بنجاح"
+
   },
   "loading": {
     "pleaseWait": "جاري التحميل، الرجاء الانتظار...",

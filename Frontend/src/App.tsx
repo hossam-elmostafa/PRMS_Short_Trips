@@ -16,6 +16,13 @@ import {
   submitTripFromServer
 } from './services/Services';
 
+interface ToastNotification {
+  id: number;
+  type: 'success' | 'error' | 'warning' | 'info';
+  title: string;
+  message: string;
+}
+
 interface ColumnState {
   selectedCity: string;
   selectedHotel: Hotel | null;
@@ -51,6 +58,28 @@ function App({ employeeID }: AppProps) {
   const [policyEndDate, setPolicyEndDate] = useState<string | null>(null);
   const [empContribution, setEmpContribution] = useState<number>(0);
   const [hotelPricingCache, setHotelPricingCache] = useState<Record<string, PricingPayload>>({});
+  const [toasts, setToasts] = useState<ToastNotification[]>([]);
+  const [exitingToasts, setExitingToasts] = useState<number[]>([]); // Add this line
+
+
+ const showToast = (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => {
+  const id = Date.now();
+  setToasts(prev => [...prev, { id, type, title, message }]);
+  setTimeout(() => {
+    dismissToast(id); // Change this line to use dismissToast instead
+  }, 5000);
+};
+const dismissToast = (id: number) => {
+  // Add to exiting toasts to trigger exit animation
+  setExitingToasts(prev => [...prev, id]);
+  
+  // Remove from toasts array after animation completes (400ms matches the CSS animation)
+  setTimeout(() => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+    setExitingToasts(prev => prev.filter(toastId => toastId !== id));
+  }, 400);
+};
+
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -58,10 +87,10 @@ function App({ employeeID }: AppProps) {
 
       const [hotelsData, companionsData, roomTypesData, , employeeName, policyData] = await Promise.all([
         getHotelsFromServer(),
-      getCompanionsFromServer(employeeID, currentLang), // ← Pass language
+        getCompanionsFromServer(employeeID, currentLang),
         getRoomTypesFromServer(),
         getTransportOptionsFromServer(employeeID),
-      getEmployeeNameFromServer(employeeID, currentLang), // ← Pass language
+        getEmployeeNameFromServer(employeeID, currentLang),
         getPolicyDataFromServer(employeeID),
       ]);
 
@@ -105,12 +134,10 @@ function App({ employeeID }: AppProps) {
   }, [hotelPricingCache, empContribution]);
 
   useEffect(() => {
-    // const hotelCount = maximumNoOfHotels > 0 ? maximumNoOfHotels : 3;
-      if (maximumNoOfHotels === 0) return; // Don't create columns if policy data not loaded yet
+    if (maximumNoOfHotels === 0) return;
 
     const newColumns: Record<number, ColumnState> = {};
-  for (let i = 1; i <= maximumNoOfHotels; i++) {  // ← Use maximumNoOfHotels directly
-
+    for (let i = 1; i <= maximumNoOfHotels; i++) {
       newColumns[i] = {
         selectedCity: '',
         selectedHotel: null,
@@ -127,7 +154,7 @@ function App({ employeeID }: AppProps) {
   const handleCompanionChange = (value: string, checked: boolean) => {
     if (checked) {
       if (selectedCompanions.length >= maximumNoOfCompanions) {
-        alert(`${t('alerts.maxCompanions')} ${maximumNoOfCompanions}`);
+        showToast('warning', t('alerts.maxCompanionsTitle'), `${t('alerts.maxCompanions')} ${maximumNoOfCompanions}`);
         return;
       }
       setSelectedCompanions([...selectedCompanions, value]);
@@ -149,7 +176,8 @@ function App({ employeeID }: AppProps) {
     if (city) {
       (async () => {
         try {
-          const hotels = await getHotelsByCityFromServer(city, 'ar');
+          // Fetch hotels with 'en' language to ensure we get English names
+          const hotels = await getHotelsByCityFromServer(city, 'en');
           setHOTELS(prev => ({ ...prev, [city]: hotels }));
 
           const allowance = await getTransportAllowanceFromServer(employeeID, city, 'en');
@@ -170,11 +198,12 @@ function App({ employeeID }: AppProps) {
   const openHotelPopup = async (col: number) => {
     const city = columns[col].selectedCity;
     if (!city) {
-      alert(t('alerts.selectCity'));
+      showToast('warning', t('alerts.selectCityTitle'), t('alerts.selectCity'));
       return;
     }
     try {
-      const hotels = await getHotelsByCityFromServer(city, 'ar');
+      // Fetch hotels with 'en' language to ensure we get English names
+      const hotels = await getHotelsByCityFromServer(city, 'en');
       setHOTELS(prev => ({ ...prev, [city]: hotels }));
     } catch (e) {
       console.error('Failed to refresh hotels for city before opening popup', city, e);
@@ -546,11 +575,13 @@ function App({ employeeID }: AppProps) {
           <>
             <img
               src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60"
-              alt={colData.selectedHotel.ar}
+              alt={colData.selectedHotel.en || colData.selectedHotel.ar}
               style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }}
               className="mb-2"
             />
-            <div className="mb-2 text-lg font-semibold text-blue-700">{colData.selectedHotel.en}</div>
+            <div className="mb-2 text-lg font-semibold text-blue-700">
+              {colData.selectedHotel.en || colData.selectedHotel.ar || 'Hotel Selected'}
+            </div>
           </>
         )}
         {!colData.selectedHotel && (
@@ -624,27 +655,33 @@ function App({ employeeID }: AppProps) {
   };
 
   function getSelectedHotelsData(): { hotelCode: string; hotelName:string; date: string; roomsData: string; }[] {
-    const getHotelIdByColumn = (columnNum:number) => columns[columnNum]?.selectedHotel?.id;
-    const getRoomCountsByColumn = (columnNum:number) => columns[columnNum]?.roomCounts;
-    const getArrivalDate = (columnNum:number) => columns[columnNum]?.arrivalDate;
-
     const res=[];
     for (const col in columns) {
-      var colhotelCode = getHotelIdByColumn(Number(col));
-      var colHotelName = columns[Number(col)]?.selectedHotel?.en;
-      var colRoomsData = getRoomCountsByColumn(Number(col));
-      const date = new Date(getArrivalDate(Number(col)));
-      var coldateFormatted = date.toLocaleDateString('en-GB', {
+      const columnData = columns[Number(col)];
+      const selectedHotel = columnData?.selectedHotel;
+      
+      // Debug: Log the hotel object to see what we have
+      console.log('🏨 Selected Hotel Object:', selectedHotel);
+      console.log('🏨 Hotel EN name:', selectedHotel?.en);
+      console.log('🏨 Hotel AR name:', selectedHotel?.ar);
+      
+      // Use English name, fallback to Arabic if English not available
+      const hotelName = selectedHotel?.en || selectedHotel?.ar || '';
+      
+      console.log('🏨 Final Hotel Name:', hotelName);
+      
+      const date = new Date(columnData?.arrivalDate);
+      const dateFormatted = date.toLocaleDateString('en-GB', {
         day: '2-digit',
         month: 'short',
         year: 'numeric'
       }).replace(/ /g, ' ').toUpperCase();
 
       res.push({
-        hotelCode: colhotelCode??'',
-        hotelName: colHotelName??'',
-        date: coldateFormatted,
-        roomsData: Object.entries(colRoomsData).map(([key, count]) => `${key},${count},0`).join('|')
+        hotelCode: selectedHotel?.id ?? '',
+        hotelName: hotelName,
+        date: dateFormatted,
+        roomsData: Object.entries(columnData?.roomCounts || {}).map(([key, count]) => `${key},${count},0`).join('|')
       });
     }
     return res;
@@ -652,7 +689,7 @@ function App({ employeeID }: AppProps) {
 
   function getCompanionsFormated(): string {
     const result = selectedCompanions
-  .map(item => item.split('|').pop()) // extract last part after '|'
+      .map(item => item.split('|').pop())
       .join('|');
     return result;
   }
@@ -722,8 +759,16 @@ function App({ employeeID }: AppProps) {
         </div>
 
         <div className="flex justify-center mt-8 mb-1">
-          <button onClick={function() {
-            submitTripFromServer(employeeID, getCompanionsFormated(),getSelectedHotelsData())}} className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
+          <button onClick={async function() {
+            const result = await submitTripFromServer(employeeID, getCompanionsFormated(), getSelectedHotelsData());
+            if (result.success) {
+              showToast('success', t('success.submitTripTitle'), t('success.submitTrip'));
+            } else if (result.errors && result.errors.length > 0) {
+              showToast('error', t('validation.correctErrorsTitle'), result.errors.join('\n'));
+            } else {
+              showToast('error', t('errors.submitErrorTitle'), t('errors.submitError'));
+            }
+          }} className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
             {t('submit.button')}
           </button>
         </div>
@@ -746,23 +791,20 @@ function App({ employeeID }: AppProps) {
             </div>
             <div className="grid grid-cols-1 gap-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
               {HOTELS[columns[currentColumn].selectedCity]
-                // ?.slice(0, maximumNoOfHotels > 0 ? maximumNoOfHotels : undefined)
-                  // ?.slice(0, maximumNoOfHotels || undefined)  // ← Simplified version
-
                 .map(h => (
                 <button
                   key={h.id}
-                  className="block w-full text-right p-3 border rounded mb-2 hover:bg-blue-50"
+                  className="block w-full text-left p-3 border rounded mb-2 hover:bg-blue-50"
                   onClick={() => selectHotel(h)}
                 >
                   <img
                     src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60"
-                    alt={h.ar}
+                    alt={h.en || h.ar}
                     style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }}
                     className="mb-2"
                   />
-                  <strong>{h.ar}</strong><br />
-                  <span className="text-sm text-gray-600">{h.en}</span>
+                  <strong className="text-lg">{h.en || h.ar}</strong><br />
+                  <span className="text-sm text-gray-600">{h.ar || h.en}</span>
                 </button>
               ))}
             </div>
@@ -850,6 +892,293 @@ function App({ employeeID }: AppProps) {
           </div>
         </div>
       </footer>
+
+{/* Toast Notifications */}
+      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3" style={{ maxWidth: '380px' }}>
+        {toasts.map((toast) => {
+          const isExiting = exitingToasts.includes(toast.id);
+          const styles = {
+            success: {
+              mainColor: '#10b981',
+              lightBg: '#f0fdf4',
+              darkText: '#065f46',
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              )
+            },
+            error: {
+              mainColor: '#ef4444',
+              lightBg: '#fef2f2',
+              darkText: '#991b1b',
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+              )
+            },
+            warning: {
+              mainColor: '#f59e0b',
+              lightBg: '#fffbeb',
+              darkText: '#92400e',
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              )
+            },
+            info: {
+              mainColor: '#3b82f6',
+              lightBg: '#eff6ff',
+              darkText: '#1e40af',
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+              )
+            }
+          };
+          
+          const style = styles[toast.type];
+          
+          return (
+            <div
+              key={toast.id}
+              style={{
+                background: '#ffffff',
+                borderRadius: '12px',
+                boxShadow: isExiting 
+                  ? '0 4px 16px rgba(0, 0, 0, 0.06)' 
+                  : '0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08)',
+                minWidth: '340px',
+                maxWidth: '380px',
+                animation: isExiting 
+                  ? 'toastSlideOut 0.4s cubic-bezier(0.4, 0, 1, 1) forwards' 
+                  : 'toastSlideIn 0.5s cubic-bezier(0.34, 1.15, 0.64, 1) forwards',
+                position: 'relative',
+                overflow: 'hidden',
+                border: '1px solid rgba(0, 0, 0, 0.06)',
+                transform: isExiting ? 'translateX(0)' : 'translateX(120%)',
+                opacity: isExiting ? 1 : 0,
+                transition: isExiting ? 'box-shadow 0.3s ease' : 'none'
+              }}
+            >
+              {/* Colored accent bar on left */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: '4px',
+                  background: style.mainColor,
+                  animation: isExiting ? 'none' : 'accentPulse 0.6s ease-out'
+                }}
+              />
+              
+              <div className="flex items-start gap-3" style={{ padding: '16px 16px 16px 20px' }}>
+                {/* Icon */}
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    background: style.lightBg,
+                    color: style.mainColor,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    border: `1.5px solid ${style.mainColor}20`,
+                    animation: isExiting ? 'none' : 'iconBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                  }}
+                >
+                  {style.icon}
+                </div>
+                
+                {/* Content */}
+                <div className="flex-1 min-w-0" style={{ paddingTop: '2px' }}>
+                  <div 
+                    style={{ 
+                      fontSize: '14.5px', 
+                      lineHeight: '1.4',
+                      fontWeight: '600',
+                      color: '#111827',
+                      marginBottom: '4px',
+                      letterSpacing: '-0.01em',
+                      animation: isExiting ? 'none' : 'fadeInUp 0.5s ease-out 0.1s backwards'
+                    }}
+                  >
+                    {toast.title}
+                  </div>
+                  <div 
+                    style={{ 
+                      fontSize: '13.5px', 
+                      lineHeight: '1.5',
+                      whiteSpace: 'pre-line',
+                      wordBreak: 'break-word',
+                      color: '#6b7280',
+                      letterSpacing: '-0.005em',
+                      animation: isExiting ? 'none' : 'fadeInUp 0.5s ease-out 0.2s backwards'
+                    }}
+                  >
+                    {toast.message}
+                  </div>
+                </div>
+                
+                {/* Close button */}
+                <button
+                  onClick={() => dismissToast(toast.id)}
+                  className="flex-shrink-0 transition-all duration-150"
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#9ca3af',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    marginTop: '2px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#f3f4f6';
+                    e.currentTarget.style.color = '#4b5563';
+                    e.currentTarget.style.transform = 'rotate(90deg)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = '#9ca3af';
+                    e.currentTarget.style.transform = 'rotate(0deg)';
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+              
+              {/* Progress bar at bottom */}
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '3px',
+                  background: `${style.mainColor}15`,
+                  overflow: 'hidden'
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    background: style.mainColor,
+                    animation: isExiting ? 'none' : 'toastProgress 5s linear',
+                    transformOrigin: 'left',
+                    width: isExiting ? '0%' : '100%'
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <style>{`
+        @keyframes toastSlideIn {
+          0% {
+            transform: translateX(120%) scale(0.9);
+            opacity: 0;
+          }
+          60% {
+            transform: translateX(-8px) scale(1);
+            opacity: 1;
+          }
+          80% {
+            transform: translateX(4px) scale(1);
+          }
+          100% {
+            transform: translateX(0) scale(1);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes toastSlideOut {
+          0% {
+            transform: translateX(0) scale(1);
+            opacity: 1;
+          }
+          100% {
+            transform: translateX(120%) scale(0.9);
+            opacity: 0;
+          }
+        }
+        
+        @keyframes toastProgress {
+          from {
+            width: 100%;
+          }
+          to {
+            width: 0%;
+          }
+        }
+        
+        @keyframes iconBounce {
+          0% {
+            transform: scale(0) rotate(-180deg);
+            opacity: 0;
+          }
+          50% {
+            transform: scale(1.15) rotate(10deg);
+          }
+          70% {
+            transform: scale(0.95) rotate(-5deg);
+          }
+          100% {
+            transform: scale(1) rotate(0deg);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes accentPulse {
+          0% {
+            transform: scaleY(0);
+            opacity: 0;
+          }
+          50% {
+            transform: scaleY(1.1);
+            opacity: 1;
+          }
+          100% {
+            transform: scaleY(1);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }
