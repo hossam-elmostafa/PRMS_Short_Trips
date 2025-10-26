@@ -163,37 +163,43 @@ const dismissToast = (id: number) => {
     }
   };
 
-  const handleCityChange = (col: number, city: string) => {
-    setColumns(prev => ({
-      ...prev,
-      [col]: {
-        ...prev[col],
-        selectedCity: city,
-        travelAllowance: t('transport.none')
-      }
-    }));
-
-    if (city) {
-      (async () => {
-        try {
-          // Fetch hotels with 'en' language to ensure we get English names
-          const hotels = await getHotelsByCityFromServer(city, 'en');
-          setHOTELS(prev => ({ ...prev, [city]: hotels }));
-
-          const allowance = await getTransportAllowanceFromServer(employeeID, city, 'en');
-          setColumns(prev => ({
-            ...prev,
-            [col]: {
-              ...prev[col],
-              travelAllowance: allowance?.label || t('transport.none')
-            }
-          }));
-        } catch (e) {
-          console.error('Failed to load data for city', city, e);
-        }
-      })();
+const handleCityChange = (col: number, city: string) => {
+  setColumns(prev => ({
+    ...prev,
+    [col]: {
+      ...prev[col],
+      selectedCity: city,
+      selectedHotel: null, // Reset hotel when city changes
+      travelAllowance: t('transport.none'),
+      arrivalDate: '', // Reset arrival date
+      roomCounts: {}, // Reset all room counts
+      extraBedCounts: {}, // Reset all extra bed counts
+      maxExtraBeds: {} // Reset max extra beds
     }
-  };
+  }));
+
+  if (city) {
+    (async () => {
+      try {
+        // Fetch hotels with 'en' language to ensure we get English names
+        const hotels = await getHotelsByCityFromServer(city, 'en');
+        setHOTELS(prev => ({ ...prev, [city]: hotels }));
+
+        const allowance = await getTransportAllowanceFromServer(employeeID, city, 'en');
+        setColumns(prev => ({
+          ...prev,
+          [col]: {
+            ...prev[col],
+            travelAllowance: allowance?.label || t('transport.none')
+          }
+        }));
+      } catch (e) {
+        console.error('Failed to load data for city', city, e);
+      }
+    })();
+  }
+};
+
 
   const openHotelPopup = async (col: number) => {
     const city = columns[col].selectedCity;
