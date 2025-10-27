@@ -637,6 +637,7 @@ const renderCalendar = () => {
             <option key={city} value={city}>{city}</option>
           ))}
         </select>
+  {/* BUG-PR-26-10-2025.3  Transportation Flicker */}
 
         <div className="flex items-center gap-3 mb-3">
           <button
@@ -645,24 +646,27 @@ const renderCalendar = () => {
           >
             {t('hotel.select')}
           </button>
-          <span style={{ color: '#16a34a', fontWeight: '700', fontSize: '14px' }}>{t('transport.allowance')}</span>
-          <input
-            type="text"
-            readOnly
-            value={colData.travelAllowance ?? ''}
-            placeholder={t('transport.none')}
-            style={{
-              width: '84px',
-              padding: '6px 8px',
-              borderRadius: '8px',
-              background: '#ecfdf5',
-              color: '#065f46',
-              border: '1px solid #bbf7d0',
-              textAlign: 'center',
-              fontWeight: '600',
-              cursor: 'not-allowed'
-            }}
-          />
+          {colData.selectedCity && colData.travelAllowance && (
+            <>
+              <span style={{ color: '#16a34a', fontWeight: '700', fontSize: '14px' }}>{t('transport.allowance')}</span>
+              <input
+                type="text"
+                readOnly
+                value={colData.travelAllowance}
+                style={{
+                  width: '84px',
+                  padding: '6px 8px',
+                  borderRadius: '8px',
+                  background: '#ecfdf5',
+                  color: '#065f46',
+                  border: '1px solid #bbf7d0',
+                  textAlign: 'center',
+                  fontWeight: '600',
+                  cursor: 'not-allowed'
+                }}
+              />
+            </>
+          )}
         </div>
 
         {colData.selectedHotel && (
