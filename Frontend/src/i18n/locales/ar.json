@@ -34,7 +34,8 @@
     "selectPopup": "اختر الفندق",
     "close": "إغلاق",
     "maxHotels": "الحد الأقصى للفنادق",
-    "available": "المتاح"
+    "available": "المتاح",
+    "supportedRooms": "أنواع الغرف المدعومة"
   },
   "transport": {
     "allowance": "بدل انتقال",
@@ -43,7 +44,13 @@
   "rooms": {
     "types": "أنواع الغرف والسرير الإضافي",
     "allowedExtra": "مسموح سرر إضافية",
-    "extraCount": "عدد السرر الإضافية"
+    "extraCount": "عدد السرر الإضافية",
+    "notAvailable": "غير متاح",
+    "noPrice": "لا يوجد سعر",
+    "noPricesTitle": "لا توجد أسعار متاحة",
+    "noPricesMessage": "لا توجد أسعار للغرف في هذا التاريخ. يرجى اختيار تاريخ آخر أو فندق آخر.",
+    "selectHotelFirst": "اختر فندق أولاً"
+
   },
   "date": {
     "select": "اختيار التاريخ",

@@ -59,27 +59,23 @@ function App({ employeeID }: AppProps) {
   const [empContribution, setEmpContribution] = useState<number>(0);
   const [hotelPricingCache, setHotelPricingCache] = useState<Record<string, PricingPayload>>({});
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
-  const [exitingToasts, setExitingToasts] = useState<number[]>([]); // Add this line
+  const [exitingToasts, setExitingToasts] = useState<number[]>([]);
 
+  const showToast = (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, type, title, message }]);
+    setTimeout(() => {
+      dismissToast(id);
+    }, 5000);
+  };
 
- const showToast = (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => {
-  const id = Date.now();
-  setToasts(prev => [...prev, { id, type, title, message }]);
-  setTimeout(() => {
-    dismissToast(id); // Change this line to use dismissToast instead
-  }, 5000);
-};
-const dismissToast = (id: number) => {
-  // Add to exiting toasts to trigger exit animation
-  setExitingToasts(prev => [...prev, id]);
-  
-  // Remove from toasts array after animation completes (400ms matches the CSS animation)
-  setTimeout(() => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-    setExitingToasts(prev => prev.filter(toastId => toastId !== id));
-  }, 400);
-};
-
+  const dismissToast = (id: number) => {
+    setExitingToasts(prev => [...prev, id]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(toast => toast.id !== id));
+      setExitingToasts(prev => prev.filter(toastId => toastId !== id));
+    }, 400);
+  };
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -124,9 +120,7 @@ const dismissToast = (id: number) => {
 
   const [columns, setColumns] = useState<Record<number, ColumnState>>({});
 
-  // Force re-render when pricing cache or empContribution changes
   useEffect(() => {
-    // Trigger re-render by updating a dummy value
     const timer = setTimeout(() => {
       setColumns(prev => ({ ...prev }));
     }, 100);
@@ -163,43 +157,41 @@ const dismissToast = (id: number) => {
     }
   };
 
-const handleCityChange = (col: number, city: string) => {
-  setColumns(prev => ({
-    ...prev,
-    [col]: {
-      ...prev[col],
-      selectedCity: city,
-      selectedHotel: null, // Reset hotel when city changes
-      travelAllowance: t('transport.none'),
-      arrivalDate: '', // Reset arrival date
-      roomCounts: {}, // Reset all room counts
-      extraBedCounts: {}, // Reset all extra bed counts
-      maxExtraBeds: {} // Reset max extra beds
-    }
-  }));
-
-  if (city) {
-    (async () => {
-      try {
-        // Fetch hotels with 'en' language to ensure we get English names
-        const hotels = await getHotelsByCityFromServer(city, 'en');
-        setHOTELS(prev => ({ ...prev, [city]: hotels }));
-
-        const allowance = await getTransportAllowanceFromServer(employeeID, city, 'en');
-        setColumns(prev => ({
-          ...prev,
-          [col]: {
-            ...prev[col],
-            travelAllowance: allowance?.label || t('transport.none')
-          }
-        }));
-      } catch (e) {
-        console.error('Failed to load data for city', city, e);
+  const handleCityChange = (col: number, city: string) => {
+    setColumns(prev => ({
+      ...prev,
+      [col]: {
+        ...prev[col],
+        selectedCity: city,
+        selectedHotel: null,
+        travelAllowance: t('transport.none'),
+        arrivalDate: '',
+        roomCounts: {},
+        extraBedCounts: {},
+        maxExtraBeds: {}
       }
-    })();
-  }
-};
+    }));
 
+    if (city) {
+      (async () => {
+        try {
+          const hotels = await getHotelsByCityFromServer(city, 'en');
+          setHOTELS(prev => ({ ...prev, [city]: hotels }));
+
+          const allowance = await getTransportAllowanceFromServer(employeeID, city, 'en');
+          setColumns(prev => ({
+            ...prev,
+            [col]: {
+              ...prev[col],
+              travelAllowance: allowance?.label || t('transport.none')
+            }
+          }));
+        } catch (e) {
+          console.error('Failed to load data for city', city, e);
+        }
+      })();
+    }
+  };
 
   const openHotelPopup = async (col: number) => {
     const city = columns[col].selectedCity;
@@ -208,7 +200,6 @@ const handleCityChange = (col: number, city: string) => {
       return;
     }
     try {
-      // Fetch hotels with 'en' language to ensure we get English names
       const hotels = await getHotelsByCityFromServer(city, 'en');
       setHOTELS(prev => ({ ...prev, [city]: hotels }));
     } catch (e) {
@@ -227,38 +218,73 @@ const handleCityChange = (col: number, city: string) => {
     setShowHotelPopup(true);
   };
 
-  const selectHotel = async (hotel: Hotel) => {
-    if (currentColumn === null) return;
+const selectHotel = async (hotel: Hotel) => {
+  if (currentColumn === null) return;
 
-    const maxBeds: Record<string, number> = {};
-    ROOM_TYPES.forEach(rt => {
-      maxBeds[rt.key] = Math.floor(Math.random() * 3);
+  const maxBeds: Record<string, number> = {};
+  const resetRoomCounts: Record<string, number> = {};
+  const resetExtraBeds: Record<string, number> = {};
+  
+  // Get the supported room types as an array
+  const supportedRoomTypes = hotel.supportedRoomTypes 
+    ? hotel.supportedRoomTypes.split(',').map(t => t.trim())
+    : [];
+  
+  // Check if hotel has ANY supported room types
+  const hasSupportedRoomTypes = supportedRoomTypes.length > 0;
+  
+  ROOM_TYPES.forEach(rt => {
+    maxBeds[rt.key] = Math.floor(Math.random() * 3);
+    
+    // Check if room type is supported AND hotel has room types configured
+    const isSupported = hasSupportedRoomTypes && supportedRoomTypes.includes(rt.key);
+    
+    if (isSupported) {
+      // Keep existing counts for supported room types
+      resetRoomCounts[rt.key] = columns[currentColumn].roomCounts[rt.key] || 0;
+      resetExtraBeds[rt.key] = columns[currentColumn].extraBedCounts[rt.key] || 0;
+    } else {
+      // Not supported OR hotel has no room types - set to 0
+      resetRoomCounts[rt.key] = 0;
+      resetExtraBeds[rt.key] = 0;
+    }
+  });
+
+  setColumns(prev => ({
+    ...prev,
+    [currentColumn]: {
+      ...prev[currentColumn],
+      selectedHotel: hotel,
+      maxExtraBeds: maxBeds,
+      roomCounts: resetRoomCounts,
+      extraBedCounts: resetExtraBeds
+    }
+  }));
+
+  setShowHotelPopup(false);
+
+  try {
+    const pricing = await getHotelRoomPricesFromServer(hotel.id);
+    setHotelPricingCache(prev => {
+      const updated = { ...prev, [hotel.id]: pricing };
+      return updated;
     });
 
-    // First update the columns with the selected hotel
-    setColumns(prev => ({
-      ...prev,
-      [currentColumn]: {
-        ...prev[currentColumn],
-        selectedHotel: hotel,
-        maxExtraBeds: maxBeds
-      }
-    }));
-
-    setShowHotelPopup(false);
-
-    // Then fetch pricing for this hotel
-    try {
-      const pricing = await getHotelRoomPricesFromServer(hotel.id);
-      setHotelPricingCache(prev => {
-        const updated = { ...prev, [hotel.id]: pricing };
-        return updated;
-      });
-    } catch (e) {
-      console.error('Failed to load room prices for hotel', hotel.id, e);
+    // Show appropriate message based on room type availability
+    if (!hasSupportedRoomTypes) {
+      showToast('warning', t('hotel.selected'), t('hotel.noRoomTypes'));
+    } else {
+      const supportedCount = supportedRoomTypes.length;
+      showToast('info', t('hotel.selected'), `${t('hotel.supportedRooms')}: ${supportedCount}`);
     }
-  };
+    
+  } catch (e) {
+    console.error('Failed to load room prices for hotel', hotel.id, e);
+    showToast('warning', t('rooms.noPricesTitle'), t('rooms.NotAvailable'));
+  }
+};
 
+  
   const openCalendar = (col: number) => {
     setCalendarColumn(col);
 
@@ -275,24 +301,71 @@ const handleCityChange = (col: number, city: string) => {
     setShowCalendar(true);
   };
 
-  const selectDate = (dateObj: Date) => {
-    if (calendarColumn === null) return;
-    const yyyy = dateObj.getFullYear();
-    const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
-    const dd = String(dateObj.getDate()).padStart(2, "0");
-    const dateStr = yyyy+'-'+mm+'-'+dd;
-    setColumns(prev => ({
+const selectDate = (dateObj: Date) => {
+  if (calendarColumn === null) return;
+  const yyyy = dateObj.getFullYear();
+  const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const dd = String(dateObj.getDate()).padStart(2, "0");
+  const dateStr = yyyy+'-'+mm+'-'+dd;
+  
+  setColumns(prev => {
+    const updatedColumn = {
+      ...prev[calendarColumn],
+      arrivalDate: dateStr
+    };
+    
+    const resetRoomCounts: Record<string, number> = {};
+    const resetExtraBeds: Record<string, number> = {};
+    
+    const selectedHotel = prev[calendarColumn].selectedHotel;
+    
+    if (selectedHotel) {
+      const supportedRoomTypes = selectedHotel.supportedRoomTypes 
+        ? selectedHotel.supportedRoomTypes.split(',').map(t => t.trim())
+        : [];
+      
+      const hasSupportedRoomTypes = supportedRoomTypes.length > 0;
+      
+      ROOM_TYPES.forEach(rt => {
+        const price = priceFor(selectedHotel.id, rt.key, dateObj);
+        
+        // Check if room type is supported AND hotel has room types
+        const isSupported = hasSupportedRoomTypes && supportedRoomTypes.includes(rt.key);
+        
+        // If hotel has no room types OR room type not supported OR price invalid, set to 0
+        if (!hasSupportedRoomTypes || !isSupported || price === null || price === 0) {
+          resetRoomCounts[rt.key] = 0;
+          resetExtraBeds[rt.key] = 0;
+        } else {
+          // Keep existing counts for valid room types
+          resetRoomCounts[rt.key] = prev[calendarColumn].roomCounts[rt.key] || 0;
+          resetExtraBeds[rt.key] = prev[calendarColumn].extraBedCounts[rt.key] || 0;
+        }
+      });
+    } else {
+      // No hotel selected, reset all counts
+      ROOM_TYPES.forEach(rt => {
+        resetRoomCounts[rt.key] = 0;
+        resetExtraBeds[rt.key] = 0;
+      });
+    }
+    
+    updatedColumn.roomCounts = resetRoomCounts;
+    updatedColumn.extraBedCounts = resetExtraBeds;
+    
+    return {
       ...prev,
-      [calendarColumn]: {
-        ...prev[calendarColumn],
-        arrivalDate: dateStr
-      }
-    }));
-    setShowCalendar(false);
-    setTooltip({ show: false, x: 0, y: 0, content: '' });
-  };
+      [calendarColumn]: updatedColumn
+    };
+  });
+  
+  setShowCalendar(false);
+  setTooltip({ show: false, x: 0, y: 0, content: '' });
+};
 
-  const updateRoomCount = (col: number, roomKey: string, value: number) => {
+
+
+const updateRoomCount = (col: number, roomKey: string, value: number) => {
     const val = Math.max(0, value);
     setColumns(prev => {
       const updated = {
@@ -302,7 +375,6 @@ const handleCityChange = (col: number, city: string) => {
           roomCounts: { ...prev[col].roomCounts, [roomKey]: val }
         }
       };
-      // Force re-render by returning new object reference
       return { ...updated };
     });
   };
@@ -319,37 +391,34 @@ const handleCityChange = (col: number, city: string) => {
     }));
   };
 
-  const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): number => {
-    let cacheKey = hotelId;
-    // If date is provided, use date-specific cache key
-    if (dateObj) {
-      const yyyy = dateObj.getFullYear();
-      const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
-      const dd = String(dateObj.getDate()).padStart(2, "0");
-      const dateStr = yyyy+'-'+mm+'-'+dd;
-      cacheKey = `${hotelId}_${dateStr}`;
+const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): number | null => {
+  let cacheKey = hotelId;
+  if (dateObj) {
+    const yyyy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const dd = String(dateObj.getDate()).padStart(2, "0");
+    const dateStr = yyyy+'-'+mm+'-'+dd;
+    cacheKey = `${hotelId}_${dateStr}`;
+  }
+
+  const hotelPricing = hotelPricingCache[cacheKey];
+  if (!hotelPricing) {
+    return null; // No pricing data available
+  }
+
+  if (Array.isArray(hotelPricing)) {
+    const foundRoom = hotelPricing.find(room => room.ROOM_TYPE === roomTypeKey);
+    if (foundRoom && typeof foundRoom.ROOM_PRICE === 'number') {
+      return foundRoom.ROOM_PRICE as number;
     }
-
-    const hotelPricing = hotelPricingCache[cacheKey];
-    if (hotelPricing) {
-      // Try specific room type price first
-
-      // If the cached pricing is an array, search for the matching room type
-      if (Array.isArray(hotelPricing)) {
-        const foundRoom = hotelPricing.find(room => room.ROOM_TYPE === roomTypeKey);
-        if (foundRoom && typeof foundRoom.ROOM_PRICE === 'number') {
-          return foundRoom.ROOM_PRICE as number;
-        }
-      } else {
-        // Otherwise the cached pricing is an object with generic prices
-        if (typeof hotelPricing.room_price === 'number') {
-          return hotelPricing.room_price;
-        }
-      }
+    return null; // Room type not found in pricing
+  } else {
+    if (typeof hotelPricing.room_price === 'number') {
+      return hotelPricing.room_price;
     }
-    return 0;
-  };
-
+  }
+  return null;
+};
   const monthName = (y: number, m: number) => {
     const monthKeys = ['january','february','march','april','may','june','july','august','september','october','november','december'];
     return `${t(`months.${monthKeys[m]}`)} ${y}`;
@@ -365,7 +434,87 @@ const handleCityChange = (col: number, city: string) => {
     i18n.changeLanguage(newLang);
   };
 
-  const renderCalendar = () => {
+const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
+  const yyyy = dateObj.getFullYear();
+  const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const dd = String(dateObj.getDate()).padStart(2, "0");
+  const localDateStr = `${yyyy}-${mm}-${dd}`;
+
+  const hotelId = calendarColumn !== null && columns[calendarColumn].selectedHotel
+    ? columns[calendarColumn].selectedHotel!.id
+    : null;
+
+  // If no hotel selected, don't show tooltip
+  if (!hotelId) {
+    setTooltip({ show: false, x: 0, y: 0, content: '' });
+    return;
+  }
+
+  // Fetch fresh pricing data for this hotel and date if not cached
+  const dateStr = yyyy+'-'+mm+'-'+dd;
+  const cacheKey = `${hotelId}_${dateStr}`;
+
+  if (!hotelPricingCache[cacheKey]) {
+    try {
+      const pricing = await getHotelRoomPricesFromServer(hotelId, dateStr);
+      setHotelPricingCache(prev => ({ ...prev, [cacheKey]: pricing }));
+    } catch (error) {
+      console.error('Failed to fetch pricing for tooltip:', error);
+      setTooltip({ show: false, x: 0, y: 0, content: '' });
+      return;
+    }
+  }
+
+  // Filter room types to only show those with valid non-zero prices
+  const roomTypesWithPrices = ROOM_TYPES.filter(rt => {
+    const price = priceFor(hotelId, rt.key, dateObj);
+    return price !== null && price > 0;
+  });
+
+  // Also check extra bed price
+  const hotelPricing = hotelPricingCache[cacheKey];
+  let extraBedPrice = 0;
+  if (hotelPricing && !Array.isArray(hotelPricing) && typeof hotelPricing.extra_bed_price === 'number') {
+    extraBedPrice = hotelPricing.extra_bed_price;
+  }
+
+  // If no room types have prices and no extra bed price, don't show tooltip
+  if (roomTypesWithPrices.length === 0 && extraBedPrice === 0) {
+    setTooltip({ show: false, x: 0, y: 0, content: '' });
+    return;
+  }
+
+  // Build tooltip HTML only for room types with valid non-zero prices
+  let html = `<div style="font-weight:700;margin-bottom:6px">${weekdayFull(dateObj.getDay())} — ${localDateStr}</div>`;
+  
+  if (roomTypesWithPrices.length > 0) {
+    html += `<table style="width:100%;font-size:13px;margin-bottom:6px"><thead><tr>
+      <th style="padding:2px 8px">${t('pricing.roomType')}</th>
+      <th style="padding:2px 8px">${t('pricing.price')}</th>
+    </tr></thead><tbody>`;
+
+    roomTypesWithPrices.forEach(rt => {
+      const price = priceFor(hotelId, rt.key, dateObj);
+      // Price is guaranteed to be non-null here due to the filter above
+      html += `<tr>
+        <td style="padding:2px 8px">${rt.ar}</td>
+        <td style="padding:2px 8px;text-align:left">EGP ${price}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table>`;
+  }
+
+  if (extraBedPrice > 0) {
+    html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">${t('pricing.extraBedPrice')}: EGP ${extraBedPrice}</div>`;
+  } else if (roomTypesWithPrices.length > 0) {
+    html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">${t('pricing.extraBedPrice')}: ${t('pricing.notAvailable')}</div>`;
+  }
+
+  setTooltip({ show: true, x: e.clientX, y: e.clientY, content: html });
+};
+
+const renderCalendar = () => {
     const first = new Date(calendarYear, calendarMonth, 1);
     const start = first.getDay();
     const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
@@ -443,71 +592,6 @@ const handleCityChange = (col: number, city: string) => {
     );
   };
 
-  const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
-    const yyyy = dateObj.getFullYear();
-    const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
-    const dd = String(dateObj.getDate()).padStart(2, "0");
-    const localDateStr = `${yyyy}-${mm}-${dd}`;
-
-    const hotelId = calendarColumn !== null && columns[calendarColumn].selectedHotel
-      ? columns[calendarColumn].selectedHotel!.id
-      : null;
-
-    let typesToShow = ROOM_TYPES;
-    if (calendarColumn !== null) {
-      const hasRooms = ROOM_TYPES.filter(rt => (columns[calendarColumn].roomCounts[rt.key] || 0) > 0);
-      if (hasRooms.length > 0) typesToShow = hasRooms;
-    }
-
-    let html = `<div style="font-weight:700;margin-bottom:6px">${weekdayFull(dateObj.getDay())} — ${localDateStr}</div>`;
-    html += `<table style="width:100%;font-size:13px;margin-bottom:6px"><thead><tr>
-      <th style="padding:2px 8px">${t('pricing.roomType')}</th>
-      <th style="padding:2px 8px">${t('pricing.price')}</th>
-    </tr></thead><tbody>`;
-
-    if (hotelId) {
-      // Fetch fresh pricing data for this hotel and date if not cached
-      const dateStr = yyyy+'-'+mm+'-'+dd;
-      const cacheKey = `${hotelId}_${dateStr}`;
-
-      if (!hotelPricingCache[cacheKey]) {
-        try {
-          const pricing = await getHotelRoomPricesFromServer(hotelId, dateStr);
-          setHotelPricingCache(prev => ({ ...prev, [cacheKey]: pricing }));
-        } catch (error) {
-          console.error('Failed to fetch pricing for tooltip:', error);
-        }
-      }
-
-      typesToShow.forEach(rt => {
-        const price = priceFor(hotelId, rt.key, dateObj);
-        html += `<tr>
-          <td style="padding:2px 8px">${rt.ar}</td>
-          <td style="padding:2px 8px;text-align:left">EGP ${price}</td>
-        </tr>`;
-      });
-    } else {
-      html += `<tr><td colspan="2" style="padding:2px 8px;text-align:center">${t('pricing.selectHotelFirst')}</td></tr>`;
-    }
-
-    html += `</tbody></table>`;
-
-    if (hotelId) {
-      let extraBedPrice = 0;
-      const hotelPricing = hotelPricingCache[hotelId];
-      if (hotelPricing && !Array.isArray(hotelPricing) && typeof hotelPricing.extra_bed_price === 'number') {
-        extraBedPrice = hotelPricing.extra_bed_price;
-      }
-      if (extraBedPrice > 0) {
-        html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">${t('pricing.extraBedPrice')}: EGP ${extraBedPrice}</div>`;
-      } else {
-        html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">${t('pricing.extraBedPrice')}: ${t('pricing.notAvailable')}</div>`;
-      }
-    }
-
-    setTooltip({ show: true, x: e.clientX, y: e.clientY, content: html });
-  };
-
   const getArabicOrdinal = (num: number): string => {
     const ordinalKeys = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
     return t(`selection.${ordinalKeys[num - 1]}`) || `${num}`;
@@ -516,17 +600,25 @@ const handleCityChange = (col: number, city: string) => {
   const renderColumn = (col: number) => {
     const colData = columns[col];
 
-    // Force recalculation on every render to ensure fresh empContribution value
     let total = 0;
+    let hasAnyPrice = false;
+    
     if (colData.selectedHotel && colData.arrivalDate) {
       const dateObj = new Date(colData.arrivalDate);
 
       ROOM_TYPES.forEach(rt => {
         const count = colData.roomCounts[rt.key] || 0;
-        if (count > 0) {
-          const price = priceFor(colData.selectedHotel!.id, rt.key, dateObj);
-          total += price * count;
-        }
+        const price = priceFor(colData.selectedHotel!.id, rt.key, dateObj);
+        
+    // Check if any room type has a valid non-zero price
+    if (price !== null && price > 0) {
+      hasAnyPrice = true;
+    }
+        
+    // Only add to total if price is valid and count > 0
+    if (count > 0 && price !== null && price > 0) {
+      total += price * count;
+    }
       });
     }
 
@@ -595,42 +687,145 @@ const handleCityChange = (col: number, city: string) => {
         )}
 
         <label className="block font-semibold mb-1">{t('rooms.types')}</label>
-        <div>
-          {ROOM_TYPES.map(rt => {
-            const maxBeds = colData.maxExtraBeds[rt.key] ?? 0;
-            const roomCount = colData.roomCounts[rt.key] ?? 0;
-            const reqBeds = colData.extraBedCounts[rt.key] ?? 0;
-
-            return (
-              <div key={rt.key} className="flex items-center gap-2 mb-2" style={{ flexWrap: 'nowrap' }}>
-                <span style={{ width: '110px' }}>{rt.ar}</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={roomCount}
-                  onChange={(e) => updateRoomCount(col, rt.key, parseInt(e.target.value) || 0)}
-                  style={{ width: '40px', textAlign: 'center', background: '#fff', border: '1px solid #bbb', marginRight: '6px' }}
-                />
-                <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>{t('rooms.allowedExtra')}</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="2"
-                  value={maxBeds}
-                  readOnly
-                  style={{ width: '32px', textAlign: 'center', background: '#eee', border: '1px solid #bbb', marginRight: '6px' }}
-                />
-                <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>{t('rooms.extraCount')}</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={reqBeds}
-                  onChange={(e) => updateExtraBedCount(col, rt.key, parseInt(e.target.value) || 0)}
-                  style={{ width: '32px', textAlign: 'center', background: '#fff', border: '1px solid #bbb', marginRight: '6px' }}
-                />
+        
+        {/* Show warning if hotel and date selected but no prices available */}
+        {colData.selectedHotel && colData.arrivalDate && !hasAnyPrice && (
+          <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+              <div>
+                <div className="font-semibold text-yellow-800 text-sm">{t('rooms.noPricesTitle')}</div>
+                <div className="text-yellow-700 text-xs mt-1">{t('rooms.noPricesMessage')}</div>
               </div>
-            );
-          })}
+            </div>
+          </div>
+        )}
+        
+        <div>
+{ROOM_TYPES.map(rt => {
+  const maxBeds = colData.maxExtraBeds[rt.key] ?? 0;
+  const roomCount = colData.roomCounts[rt.key] ?? 0;
+  const reqBeds = colData.extraBedCounts[rt.key] ?? 0;
+  
+  // Check if this room type is supported by the selected hotel
+  const supportedRoomTypes = colData.selectedHotel?.supportedRoomTypes 
+    ? colData.selectedHotel.supportedRoomTypes.split(',').map(t => t.trim())
+    : [];
+  
+  const hasSupportedRoomTypes = supportedRoomTypes.length > 0;
+  const isSupported = hasSupportedRoomTypes && supportedRoomTypes.includes(rt.key);
+  
+  // Check pricing for this room type (only if date is selected)
+  let priceValue: number | null = null;
+  let hasValidPrice = true; // Assume valid until we check with date
+  
+  if (colData.selectedHotel && colData.arrivalDate) {
+    const dateObj = new Date(colData.arrivalDate);
+    priceValue = priceFor(colData.selectedHotel.id, rt.key, dateObj);
+    hasValidPrice = priceValue !== null && priceValue > 0;
+  }
+  
+  // Room type is enabled if:
+  // - Hotel is selected AND hotel has room types configured
+  // - AND room type is supported by hotel
+  // - AND (no date selected OR date selected with valid price)
+  const isEnabled = colData.selectedHotel && 
+                    hasSupportedRoomTypes &&
+                    isSupported && 
+                    (!colData.arrivalDate || hasValidPrice);
+  
+  let disabledReason = '';
+  if (!colData.selectedHotel) {
+    disabledReason = t('rooms.selectHotelFirst');
+  } else if (!hasSupportedRoomTypes) {
+    disabledReason = t('rooms.hotelNoRoomTypes');
+  } else if (!isSupported) {
+    disabledReason = t('rooms.notAvailable');
+  } else if (colData.arrivalDate && !hasValidPrice) {
+    if (priceValue === 0) {
+      disabledReason = t('rooms.priceZero');
+    } else {
+      disabledReason = t('rooms.noPrice');
+    }
+  }
+
+  return (
+    <div 
+      key={rt.key} 
+      className="flex items-center gap-2 mb-2" 
+      style={{ 
+        flexWrap: 'nowrap',
+        opacity: isEnabled ? 1 : 0.6,
+        pointerEvents: isEnabled ? 'auto' : 'none'
+      }}
+    >
+      <span style={{ width: '110px' }}>
+        {rt.ar}
+        {disabledReason && (
+          <span className="text-xs text-red-500 ml-1">
+            ({disabledReason})
+          </span>
+        )}
+      </span>
+      <input
+        type="number"
+        min="0"
+        value={roomCount}
+        onChange={(e) => updateRoomCount(col, rt.key, parseInt(e.target.value) || 0)}
+        disabled={!isEnabled}
+        style={{ 
+          width: '40px', 
+          textAlign: 'center', 
+          background: isEnabled ? '#fff' : '#f3f4f6', 
+          border: isEnabled ? '1px solid #d1d5db' : '1px solid #e5e7eb', 
+          marginRight: '6px',
+          cursor: isEnabled ? 'text' : 'not-allowed'
+        }}
+      />
+      <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>
+        {t('rooms.allowedExtra')}
+      </span>
+      <input
+        type="number"
+        min="0"
+        max="2"
+        value={maxBeds}
+        readOnly
+        disabled={!isEnabled}
+        style={{ 
+          width: '32px', 
+          textAlign: 'center', 
+          background: '#f3f4f6', 
+          border: '1px solid #e5e7eb', 
+          marginRight: '6px',
+          cursor: 'not-allowed'
+        }}
+      />
+      <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>
+        {t('rooms.extraCount')}
+      </span>
+      <input
+        type="number"
+        min="0"
+        value={reqBeds}
+        onChange={(e) => updateExtraBedCount(col, rt.key, parseInt(e.target.value) || 0)}
+        disabled={!isEnabled}
+        style={{ 
+          width: '32px', 
+          textAlign: 'center', 
+          background: isEnabled ? '#fff' : '#f3f4f6', 
+          border: isEnabled ? '1px solid #d1d5db' : '1px solid #e5e7eb', 
+          marginRight: '6px',
+          cursor: isEnabled ? 'text' : 'not-allowed'
+        }}
+      />
+    </div>
+  );
+})}
         </div>
 
         <button
@@ -666,15 +861,7 @@ const handleCityChange = (col: number, city: string) => {
       const columnData = columns[Number(col)];
       const selectedHotel = columnData?.selectedHotel;
       
-      // Debug: Log the hotel object to see what we have
-      console.log('🏨 Selected Hotel Object:', selectedHotel);
-      console.log('🏨 Hotel EN name:', selectedHotel?.en);
-      console.log('🏨 Hotel AR name:', selectedHotel?.ar);
-      
-      // Use English name, fallback to Arabic if English not available
       const hotelName = selectedHotel?.en || selectedHotel?.ar || '';
-      
-      console.log('🏨 Final Hotel Name:', hotelName);
       
       const date = new Date(columnData?.arrivalDate);
       const dateFormatted = date.toLocaleDateString('en-GB', {
@@ -899,7 +1086,7 @@ const handleCityChange = (col: number, city: string) => {
         </div>
       </footer>
 
-{/* Toast Notifications */}
+      {/* Toast Notifications */}
       <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3" style={{ maxWidth: '380px' }}>
         {toasts.map((toast) => {
           const isExiting = exitingToasts.includes(toast.id);
@@ -977,7 +1164,6 @@ const handleCityChange = (col: number, city: string) => {
                 transition: isExiting ? 'box-shadow 0.3s ease' : 'none'
               }}
             >
-              {/* Colored accent bar on left */}
               <div
                 style={{
                   position: 'absolute',
@@ -991,7 +1177,6 @@ const handleCityChange = (col: number, city: string) => {
               />
               
               <div className="flex items-start gap-3" style={{ padding: '16px 16px 16px 20px' }}>
-                {/* Icon */}
                 <div
                   style={{
                     width: '40px',
@@ -1010,7 +1195,6 @@ const handleCityChange = (col: number, city: string) => {
                   {style.icon}
                 </div>
                 
-                {/* Content */}
                 <div className="flex-1 min-w-0" style={{ paddingTop: '2px' }}>
                   <div 
                     style={{ 
@@ -1040,7 +1224,6 @@ const handleCityChange = (col: number, city: string) => {
                   </div>
                 </div>
                 
-                {/* Close button */}
                 <button
                   onClick={() => dismissToast(toast.id)}
                   className="flex-shrink-0 transition-all duration-150"
@@ -1076,7 +1259,6 @@ const handleCityChange = (col: number, city: string) => {
                 </button>
               </div>
               
-              {/* Progress bar at bottom */}
               <div
                 style={{
                   position: 'absolute',

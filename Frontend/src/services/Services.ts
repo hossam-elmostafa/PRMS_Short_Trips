@@ -5,6 +5,8 @@ export interface Hotel {
   id: string;
   en: string;
   ar: string;
+  supportedRoomTypes?: string; // Add this field - e.g., "S,D,T"
+
 }
 
 export interface Companion {
@@ -22,6 +24,16 @@ export interface RoomType {
   key: string;
   ar: string;
   factor: number;
+}
+
+// Helper function to check if a room type is supported by a hotel
+export function isRoomTypeSupported(hotel: Hotel | null, roomTypeKey: string): boolean {
+  if (!hotel || !hotel.supportedRoomTypes) {
+    return true; // If no restrictions specified, allow all
+  }
+  
+  const supportedTypes = hotel.supportedRoomTypes.split(',').map(t => t.trim());
+  return supportedTypes.includes(roomTypeKey);
 }
 
 export async function getHotelsFromServer() {
@@ -42,7 +54,6 @@ export async function getHotelsFromServer() {
     return {};
   }
 }
-
 export async function getHotelsByCityFromServer(city: string, lang: 'ar' | 'en' = 'ar') {
   try {
     const response = await fetch(`http://${getApiBase()}/api/hotels/${encodeURIComponent(city)}?lang=${lang}`);
@@ -59,6 +70,7 @@ export async function getHotelsByCityFromServer(city: string, lang: 'ar' | 'en' 
     throw error;
   }
 }
+
 
 // Fetch actual room prices for a hotel
 export type HotelRoomPrices = Record<string, number> & { room_price?: number; extra_bed_price?: number };

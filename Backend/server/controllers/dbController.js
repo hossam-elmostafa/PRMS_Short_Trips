@@ -1,8 +1,6 @@
 require('dotenv').config();
 const prisma = require('../lib/prisma');
 
-
-
 async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
     try {
         let cityInput = String(city).trim();
@@ -18,7 +16,6 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
         };
 
         // Normalize city: accept either code (e.g., "ALEX") or localized name (e.g., "الإسكندرية")
-        // If input looks like a Latin code, use it; otherwise resolve via P_GET_STRIP_CITIES
         let cityCode = cityInput;
         const looksLikeCode = /^[A-Z]{2,6}$/.test(cityInput);
         if (!looksLikeCode) {
@@ -39,8 +36,6 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
                 if (match && match.code) {
                     cityCode = String(match.code).trim().toUpperCase();
                 }
-                try { 
-                } catch (_) {}
             } catch (_) {
                 // ignore and fallback to original input
             }
@@ -63,7 +58,7 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
             INSERT INTO @Results
             EXEC P_GET_STRIP_HOTEL ${bit}, N'${city}';
 
-            SELECT HOTEL_CODE, HOTEL_NAME FROM @Results;
+            SELECT HOTEL_CODE, HOTEL_NAME, HOTEL_ROOM_TYPES FROM @Results;
         `);
 
         // First try with resolved code; then, if needed, retry with original city name
@@ -77,13 +72,28 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
 
         const arByCode = new Map();
         const enByCode = new Map();
+        const roomTypesByCode = new Map();
+        
         (rowsAr || []).forEach(r => {
             const code = String(r.HOTEL_CODE || '').trim();
-            if (code) arByCode.set(code, String(r.HOTEL_NAME || '').trim());
+            if (code) {
+                arByCode.set(code, String(r.HOTEL_NAME || '').trim());
+                // Store room types from the procedure result
+                if (r.HOTEL_ROOM_TYPES) {
+                    roomTypesByCode.set(code, String(r.HOTEL_ROOM_TYPES).trim());
+                }
+            }
         });
+        
         (rowsEn || []).forEach(r => {
             const code = String(r.HOTEL_CODE || '').trim();
-            if (code) enByCode.set(code, String(r.HOTEL_NAME || '').trim());
+            if (code) {
+                enByCode.set(code, String(r.HOTEL_NAME || '').trim());
+                // Store room types if not already set from Arabic query
+                if (r.HOTEL_ROOM_TYPES && !roomTypesByCode.has(code)) {
+                    roomTypesByCode.set(code, String(r.HOTEL_ROOM_TYPES).trim());
+                }
+            }
         });
 
         const allCodes = Array.from(new Set([
@@ -95,13 +105,16 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
             const arName = arByCode.get(code) || '';
             const enName = enByCode.get(code) || arName || '';
             const id = code || `${cityCode}-${index + 1}`;
-            return { id, ar: arName, en: enName };
+            const supportedRoomTypes = roomTypesByCode.get(code) || 'S,D,T'; // Default to all if not specified
+            
+            return { 
+                id, 
+                ar: arName, 
+                en: enName,
+                supportedRoomTypes // Add supported room types
+            };
         });
 
-        // Temporary log to verify counts and names during debugging
-        try {  
-
-        } catch (_) {}
         return mapped;
     } catch (error) {
         console.error('Error calling stored procedure P_GET_STRIP_HOTEL:', error);
@@ -125,11 +138,10 @@ async function getHotelsFromDB(lang = 'ar') {
         `);
         const hotelsByCity = {};
         (rows || []).forEach(r => {
-            //console.log(r);
             const code = String(r.HOTEL_CODE || '').trim();
             if (!code) return;
-            const en = String(r.HOTEL_EN_NAME || '') .trim();
-            const ar = String(r.HOTEL_AR_NAME || r.HOTEL_EN_NAME || '') .trim();
+            const en = String(r.HOTEL_EN_NAME || '').trim();
+            const ar = String(r.HOTEL_AR_NAME || r.HOTEL_EN_NAME || '').trim();
             const cityRaw = String(r.CITY_NAME || 'Unknown').trim();
             const cityKey = cityRaw || 'غير محدد';
 
@@ -149,6 +161,7 @@ async function getHotelsFromDB(lang = 'ar') {
         }
     }
 }
+
 async function getCitiesFromDB(lang = 'ar') {
     try {
         const langBit = lang === 'en' ? 1 : 0;
@@ -206,12 +219,7 @@ async function getEmployeeNamefromDB(employeeId, lang = 'ar') {
     try {
         console.log('🗃️ getEmployeeNamefromDB called with:', { employeeId, lang });
         
-        // FIX: Invert the langBit logic
-        // If the stored procedure returns Arabic when langBit=1 and English when langBit=0:
         const langBit = lang === 'ar' ? 1 : 0;
-        
-        // OR if it's the opposite, use:
-        // const langBit = lang === 'en' ? 1 : 0;
         
         console.log('📊 Using langBit:', langBit, 'for language:', lang);
         
@@ -345,31 +353,52 @@ async function getTransportAllowancefromDB(employeeId, lang = 'en', city = 'ALEX
   
 // Retrieve actual room prices for a hotel from P_GET_STRIP_HOTEL_ROOMS @hotelCode, @date
 async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
-
     try {
         const code = String(hotelCode || '').trim().replace(/'/g, "''");
         
-        // Try with date parameter first, then without if it fails
-        let rows;
-        
-        
         try {
             // Try with date parameter first
-            rows = await prisma.$queryRawUnsafe(`SELECT * FROM GetHotelRoomPrices(N'${code}') where PRICE_DATE =N'${date}'`);
-             const result = rows
-            console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, result);
-             return result;
+            const rows = await prisma.$queryRawUnsafe(`
+                SELECT * 
+                FROM GetHotelRoomPrices(N'${code}') 
+                WHERE PRICE_DATE = N'${date}'
+            `);
+            console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, rows);
+            return rows;
         } catch (error) {
             // Fallback to without date parameter
-          
+            console.error('Error fetching hotel room prices with date:', error);
             return [];
         }
-        
-
-} catch (error) {
+    } catch (error) {
         console.error('Error calling stored procedure P_GET_STRIP_HOTEL_ROOMS:', error);
         console.error('Parameters used - hotelCode:', hotelCode, 'date:', date);
         return [];
+    }
+}
+
+// Get supported room types for a specific hotel
+async function getHotelRoomTypesFromDB(hotelCode) {
+    try {
+        const code = String(hotelCode || '').trim().replace(/'/g, "''");
+        
+        const rows = await prisma.$queryRawUnsafe(`
+            SELECT DISTINCT ROOM_TYPE 
+            FROM GetHotelRoomPrices(N'${code}')
+            WHERE ROOM_TYPE IS NOT NULL AND ROOM_TYPE != ''
+        `);
+        
+        // Return comma-separated room types (e.g., "S,D,T")
+        const roomTypes = (rows || [])
+            .map(r => String(r.ROOM_TYPE || '').trim())
+            .filter(rt => rt !== '')
+            .join(',');
+            
+        return roomTypes;
+    } catch (error) {
+        console.error('Error fetching hotel room types:', error);
+        console.error('Parameters used - hotelCode:', hotelCode);
+        return 'S,D,T'; // Default to all room types if query fails
     }
 }
 
@@ -379,6 +408,7 @@ async function getPolicyDataFromDB(employeeId) {
         const rows = await prisma.$queryRawUnsafe(`
             EXEC P_GET_STRIP_POLICY '${empCode}'
         `);
+        
         if (rows && rows.length > 0) {
             const row = rows[0];
             
@@ -501,7 +531,6 @@ async function submitTripApplication(employeeId, familyIds, hotels=[]) {
     }   
 }
 
-
 module.exports = {
     getCompanionsfromDB,
     getTransportAllowancefromDB,
@@ -511,6 +540,7 @@ module.exports = {
     getHotelsByCityFromDB,
     getCitiesFromDB,
     getHotelRoomsPricingFromDB,
+    getHotelRoomTypesFromDB,
     submitTripApplication,
     getHotelsFromDB
 };
