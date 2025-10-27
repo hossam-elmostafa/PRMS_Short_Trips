@@ -441,7 +441,8 @@ async function getEmployeeInfoFromDB(employeeId, lang = 'ar') {
 }
 
 async function submitTripApplication(employeeId, familyIds, hotels=[]) {
-    if (employeeId && familyIds && hotels && hotels.length > 0  )
+    let results = [];
+    if (employeeId  && hotels && hotels.length > 0  )
     {
                 try {
                     await prisma.$executeRawUnsafe(
@@ -449,12 +450,10 @@ async function submitTripApplication(employeeId, familyIds, hotels=[]) {
                     );
                     await prisma.$queryRawUnsafe(`EXEC P_STRIP_SUBMIT_CLEAR_HOTEL ${employeeId}`);
                 
-                    
                     await prisma.$queryRawUnsafe(`
                         EXEC P_STRIP_SUBMIT_FAMILY ${employeeId},'${familyIds}'
                     `);                    
                         
-                    
                     // Submit each hotel provided in the hotels array. Escape single quotes to avoid SQL errors.
                     const esc = (s) => String(s || '').replace(/'/g, "''");
                     if (Array.isArray(hotels) && hotels.length > 0) {
@@ -479,12 +478,11 @@ async function submitTripApplication(employeeId, familyIds, hotels=[]) {
                     } else {
                         //console.log('No hotels to submit');
                     }
-
                     await prisma.$queryRawUnsafe(`
                         EXEC P_STRIP_SUBMIT  ${employeeId}
                     `);
                     
-
+                        console.log('Trip application submitted successfully for employeeId:', employeeId);
                     return {
                         success: true,
                         message: 'Messagge from submitTripApplication',
