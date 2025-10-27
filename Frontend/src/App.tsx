@@ -273,11 +273,7 @@ const selectHotel = async (hotel: Hotel) => {
     // Show appropriate message based on room type availability
     if (!hasSupportedRoomTypes) {
       showToast('warning', t('hotel.selected'), t('hotel.noRoomTypes'));
-    } else {
-      const supportedCount = supportedRoomTypes.length;
-      showToast('info', t('hotel.selected'), `${t('hotel.supportedRooms')}: ${supportedCount}`);
     }
-    
   } catch (e) {
     console.error('Failed to load room prices for hotel', hotel.id, e);
     showToast('warning', t('rooms.noPricesTitle'), t('rooms.NotAvailable'));
@@ -765,11 +761,6 @@ const renderCalendar = () => {
     >
       <span style={{ width: '110px' }}>
         {rt.ar}
-        {disabledReason && (
-          <span className="text-xs text-red-500 ml-1">
-            ({disabledReason})
-          </span>
-        )}
       </span>
       <input
         type="number"
@@ -978,9 +969,6 @@ const renderCalendar = () => {
               >
                 {t('hotel.close')}
               </button>
-            </div>
-            <div className="mb-3 text-sm text-gray-600">
-              {t('hotel.maxHotels')}: {maximumNoOfHotels} | {t('hotel.available')}: {HOTELS[columns[currentColumn].selectedCity]?.length || 0}
             </div>
             <div className="grid grid-cols-1 gap-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
               {HOTELS[columns[currentColumn].selectedCity]
