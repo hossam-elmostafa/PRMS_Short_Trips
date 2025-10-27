@@ -38,7 +38,7 @@ interface AppProps {
 }
 
 // Define types for hotel pricing cache
-type RoomPricing = { ROOM_TYPE: string; ROOM_PRICE: number };
+type RoomPricing = { ROOM_TYPE: string; ROOM_PRICE: number ,EXTRA_BED_PRICE: string };
 type PricingPayload = RoomPricing[] | (Record<string, number> & { room_price?: number; extra_bed_price?: number });
 
 function App({ employeeID }: AppProps) {
@@ -329,7 +329,7 @@ const selectDate = (dateObj: Date) => {
         const isSupported = hasSupportedRoomTypes && supportedRoomTypes.includes(rt.key);
         
         // If hotel has no room types OR room type not supported OR price invalid, set to 0
-        if (!hasSupportedRoomTypes || !isSupported || price === null || price === 0) {
+        if (!hasSupportedRoomTypes || !isSupported || price.room_price === null || price.room_price === 0) {
           resetRoomCounts[rt.key] = 0;
           resetExtraBeds[rt.key] = 0;
         } else {
@@ -387,7 +387,8 @@ const updateRoomCount = (col: number, roomKey: string, value: number) => {
     }));
   };
 
-const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): { room_price: number | null, extra_bed_price: number | null } => {
+//BUG-PR-26-10-2025.5 changed return to object instead of number to contain extra bed price
+  const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): { room_price: number | null, extra_bed_price: string | null } => {
   let cacheKey = hotelId;
   if (dateObj) {
     const yyyy = dateObj.getFullYear();
@@ -404,14 +405,17 @@ const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): { room_
 
   if (Array.isArray(hotelPricing)) {
     const foundRoom = hotelPricing.find(room => room.ROOM_TYPE === roomTypeKey);
+
+    //console.log('priceFor foundRoom:', foundRoom,typeof foundRoom?.EXTRA_BED_PRICE   );
+    //console.log(`typeof foundRoom.ROOM_EXTRABED_PRICE : ${foundRoom?.EXTRA_BED_PRICE}`, typeof foundRoom?.EXTRA_BED_PRICE  );
     return {
       room_price: foundRoom && typeof foundRoom.ROOM_PRICE === 'number' ? foundRoom.ROOM_PRICE : null,
-      extra_bed_price: null
+      extra_bed_price: foundRoom && typeof foundRoom.EXTRA_BED_PRICE === 'string' ? foundRoom.EXTRA_BED_PRICE : null,      
     };
   } else {
     return {
       room_price: typeof hotelPricing.room_price === 'number' ? hotelPricing.room_price : null,
-      extra_bed_price: typeof hotelPricing.extra_bed_price === 'number' ? hotelPricing.extra_bed_price : null
+      extra_bed_price: typeof hotelPricing.extra_bed_price === 'string' ? hotelPricing.extra_bed_price : null
     };
   }
 };
@@ -431,6 +435,7 @@ const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): { room_
   };
 
 const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
+  //console.log('handleTooltipShow')
   const yyyy = dateObj.getFullYear();
   const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
   const dd = String(dateObj.getDate()).padStart(2, "0");
@@ -464,18 +469,18 @@ const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
   // Filter room types to only show those with valid non-zero prices
   const roomTypesWithPrices = ROOM_TYPES.filter(rt => {
     const price = priceFor(hotelId, rt.key, dateObj);
-    return price !== null && price > 0;
+    return price.room_price !== null && price.room_price > 0;
   });
 
   // Also check extra bed price
   const hotelPricing = hotelPricingCache[cacheKey];
-  let extraBedPrice = 0;
+  let extraBedPrice = "0";
   if (hotelPricing && !Array.isArray(hotelPricing) && typeof hotelPricing.extra_bed_price === 'number') {
-    extraBedPrice = hotelPricing.extra_bed_price;
+    extraBedPrice = '"' + hotelPricing.extra_bed_price +'"';
   }
 
   // If no room types have prices and no extra bed price, don't show tooltip
-  if (roomTypesWithPrices.length === 0 && extraBedPrice === 0) {
+  if (roomTypesWithPrices.length === 0 && extraBedPrice === "0") {
     setTooltip({ show: false, x: 0, y: 0, content: '' });
     return;
   }
@@ -488,21 +493,29 @@ const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
       <th style="padding:2px 8px">${t('pricing.roomType')}</th>
       <th style="padding:2px 8px">${t('pricing.price')}</th>
     </tr></thead><tbody>`;
-
+    
     roomTypesWithPrices.forEach(rt => {
       const price = priceFor(hotelId, rt.key, dateObj);
+      //console.log('price for hotelId:', hotelId, ':rt.key', rt.key);
+      //console.log('extraBedPrice price for', rt.key, ':', extraBedPrice , price);
+      if (extraBedPrice=="0") //BUG-PR-26-10-2025.5 changed type to string
+        extraBedPrice=price.extra_bed_price || "0";
       // Price is guaranteed to be non-null here due to the filter above
       html += `<tr>
         <td style="padding:2px 8px">${rt.ar}</td>
-        <td style="padding:2px 8px;text-align:left">EGP ${price}</td>
+        <td style="padding:2px 8px;text-align:left">EGP ${price.room_price}</td>
       </tr>`;
     });
 
     html += `</tbody></table>`;
   }
 
-  if (extraBedPrice > 0) {
-    html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">${t('pricing.extraBedPrice')}: EGP ${extraBedPrice}</div>`;
+  if (extraBedPrice != "0") {
+    //BUG-PR-26-10-2025.5 Fixing extra bed price display in tooltip
+    if(/%/.test(extraBedPrice))
+        html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">${t('pricing.extraBedPrice')}: ${extraBedPrice}</div>`;
+      else
+        html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">${t('pricing.extraBedPrice')}: EGP ${extraBedPrice}</div>`;
   } else if (roomTypesWithPrices.length > 0) {
     html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">${t('pricing.extraBedPrice')}: ${t('pricing.notAvailable')}</div>`;
   }
@@ -716,7 +729,7 @@ const renderCalendar = () => {
   const isSupported = hasSupportedRoomTypes && supportedRoomTypes.includes(rt.key);
   
   // Check pricing for this room type (only if date is selected)
-  let priceData = { room_price: null as number | null, extra_bed_price: null as number | null };
+  let priceData = { room_price: null as number | null, extra_bed_price: null as string | null };
   let hasValidPrice = true; // Assume valid until we check with date
   
   if (colData.selectedHotel && colData.arrivalDate) {
@@ -733,7 +746,8 @@ const renderCalendar = () => {
                     hasSupportedRoomTypes &&
                     isSupported && 
                     (!colData.arrivalDate || hasValidPrice);
-  
+
+//{ room_price: number | null, extra_bed_price: string | null } => {                    
   let disabledReason = '';
   if (!colData.selectedHotel) {
     disabledReason = t('rooms.selectHotelFirst');
@@ -742,7 +756,7 @@ const renderCalendar = () => {
   } else if (!isSupported) {
     disabledReason = t('rooms.notAvailable');
   } else if (colData.arrivalDate && !hasValidPrice) {
-    if (priceValue === 0) {
+    if (priceData.room_price === 0) {
       disabledReason = t('rooms.priceZero');
     } else {
       disabledReason = t('rooms.noPrice');
@@ -851,6 +865,7 @@ const renderCalendar = () => {
     const res=[];
     for (const col in columns) {
       const columnData = columns[Number(col)];
+      console.log(columnData);
       const selectedHotel = columnData?.selectedHotel;
       
       const hotelName = selectedHotel?.en || selectedHotel?.ar || '';
@@ -866,9 +881,12 @@ const renderCalendar = () => {
         hotelCode: selectedHotel?.id ?? '',
         hotelName: hotelName,
         date: dateFormatted,
-        roomsData: Object.entries(columnData?.roomCounts || {}).map(([key, count]) => `${key},${count},0`).join('|')
+        // BUG-PR-AZ-26-10-2025.6 add ${columnData?.extraBedCounts[key]
+        //BUG-PR-AZ-23-10-2025.4
+        roomsData: Object.entries(columnData?.roomCounts || {}).map(([key, count]) => `${key},${count},${columnData?.extraBedCounts[key]}`).join('|')
       });
     }
+    console.log('getSelectedHotelsData:', res);
     return res;
   }
 

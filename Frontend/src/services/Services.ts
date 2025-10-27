@@ -38,7 +38,7 @@ export function isRoomTypeSupported(hotel: Hotel | null, roomTypeKey: string): b
 
 export async function getHotelsFromServer() {
   try {
-    console.log('Fetching hotels from server at api base:', getApiBase());
+    //console.log('Fetching hotels from server at api base:', getApiBase());
     const response = await fetch(`http://${getApiBase()}/api/hotels`);
     const hotelResult = await response.json();
     
@@ -118,12 +118,12 @@ export async function getCompanionsFromServer(employeeID: number, lang?: 'ar' | 
     const currentLang = lang || i18n.language as 'ar' | 'en';
     const url = `http://${getApiBase()}/api/companions/${employeeID}?lang=${currentLang}`;
     
-    console.log('🔗 Fetching companions from:', url);
+    //console.log('🔗 Fetching companions from:', url);
     
     const response = await fetch(url);
     const result = await response.json();
     
-    console.log('📥 Received companions:', result);
+    //console.log('📥 Received companions:', result);
     
     if (result.success) {
       const COMPANIONS: Companion[] = result.data;
@@ -248,7 +248,9 @@ export async function getMaximumNoOfCompanionsFromServer(employeeID: number) {
  */
 export async function getHotelRoomBedCountsFromServer(hotelCode: string): Promise<Record<string, number>> {
   try {
+    
     const response = await fetch(`http://${getApiBase()}/api/hotel/${encodeURIComponent(hotelCode)}/beds`);
+    
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -268,13 +270,14 @@ export async function CalculateRoomsCount(hotelCode:string, parts: string[] | nu
   if (!Array.isArray(parts) || parts.length === 0) return 0;
   //const capMap: Record<string, number> = { S: 1, D: 2, T: 3, FR: 4 ,FS:5,j:6};
   const capMap: Record<string, number> = await getHotelRoomBedCountsFromServer(hotelCode) as unknown as Record<string, number>;
-  console.log('Using capMap for hotel',hotelCode, ':', capMap);
-  let total = 0;
+  //console.log('Using capMap for hotel',hotelCode, ':', capMap);
 
-  parts.forEach(segment => {
-    if (!segment || typeof segment !== 'string') return;
+  // Process all segments in parallel and sum the results
+  const calculations = parts.map(async segment => {
+    //console.log('Processing segment:', segment);
+    if (!segment || typeof segment !== 'string') return 0;
     const tokens = segment.split(',').map(t => t.trim()).filter(t => t !== '');
-    if (tokens.length === 0) return;
+    if (tokens.length === 0) return 0;
 
     const type = (tokens[0] || '').toUpperCase();
     const roomsCount = tokens.length > 1 ? Number(tokens[1]) : 0;
@@ -284,74 +287,100 @@ export async function CalculateRoomsCount(hotelCode:string, parts: string[] | nu
     const rc = Number.isFinite(roomsCount) ? roomsCount : 0;
     const ex = Number.isFinite(extras) ? extras : 0;
 
-    total += cap * rc + ex;
+    return cap * rc + ex;
   });
 
-  return total;
+  // Wait for all calculations to complete and sum the results
+  const results = await Promise.all(calculations);
+  return results.reduce((sum, value) => sum + value, 0);
 }
 
 // Validate tripData structure before sending to server
-export function validateTripData(tripData: {
+export async function validateTripData(tripData: {
   employeeId: number | string | null | undefined;
   familyIds: string | null | undefined;
   hotels: { hotelCode: string; hotelName: string; date: string; roomsData: string }[] | null | undefined;
-}): { valid: boolean; errors: string[] } {
+}): Promise<{ valid: boolean; errors: string[]; }> {
   const errors: string[] = [];
-
+  //console.log ('Validating trip data:', tripData);
   const emp = tripData?.employeeId;
   if (emp === null || emp === undefined || emp === '' || Number(emp) === 0 || Number.isNaN(Number(emp))) {
     errors.push(i18n.t('validation.employeeIdMissing'));
   }
-
+  
   const hotels = Array.isArray(tripData?.hotels) ? tripData!.hotels : [];
   if (!hotels || hotels.length === 0) {
     errors.push(i18n.t('validation.noHotelsSelected'));
   }
-
+  
   // familyIds: if present, split by '|' to count companions
   const famStr = (tripData?.familyIds ?? '').toString().trim();
   const familyIdsList = famStr === '' ? [] : famStr.split('|').map(s => s.trim()).filter(s => s !== '');
   const familyCount = familyIdsList.length;
 
-  // For each hotel: date must be non-empty; roomsData must be non-empty and contain '|' and have (familyCount + 1) segments
-  hotels.forEach(async (h, idx) => {    
+  // Process all hotels in parallel and wait for all validations to complete
+  const hotelValidations = hotels.map(async (h, idx) => {    
+    const hotelErrors: string[] = [];
+    
     if (!h) {
-      errors.push(i18n.t('validation.hotelEntryInvalid', { index: idx + 1 }));
-      return;
+      hotelErrors.push(i18n.t('validation.hotelEntryInvalid', { index: idx + 1 }));      
     }
+    
     if (!h.hotelCode || h.hotelCode.toString().trim() === '') {
-      errors.push(i18n.t('validation.hotelCodeEmpty', { index: idx + 1 }));
+      hotelErrors.push(i18n.t('validation.hotelCodeEmpty', { index: idx + 1 }));
     }
+    
     if (!h.date || h.date.toString().trim() === '' || h.date === 'INVALID DATE') {
-      errors.push(i18n.t('validation.hotelMissingDate', { hotelName: h.hotelName || '<unknown>' }));
+      hotelErrors.push(i18n.t('validation.hotelMissingDate', { hotelName: h.hotelName || '<unknown>' }));
     }
+    //console.log('Validating rooms for hotel:', h.hotelName, 'with roomsData:', h.roomsData);
     const rooms = (h.roomsData ?? '').toString();
     if (!rooms || rooms.trim() === '') {
-      errors.push(i18n.t('validation.hotelEmptyRooms', { hotelName: h.hotelName || '<unknown>' }));
+      hotelErrors.push(i18n.t('validation.hotelEmptyRooms', { hotelName: h.hotelName || '<unknown>' }));
     } else {
       const parts = rooms.split('|').map(s => s.trim());
-      const RoomsCount = await CalculateRoomsCount(h.hotelCode,parts);
+      
+      const RoomsCount = await CalculateRoomsCount(h.hotelCode, parts);
+      
       const expected = familyCount + 1; // employee + family members
+      
+      
       if (RoomsCount !== expected) {
-        errors.push(i18n.t('validation.hotelRoomsMismatch', { 
+        
+        hotelErrors.push(i18n.t('validation.hotelRoomsMismatch', { 
           hotelName: h.hotelName || '<unknown>',
           expected: expected,
           familyCount: familyCount,
           actual: RoomsCount
         }));
       }
-      parts.forEach((p, pi) => {
+      
+      
+      
+      parts?.forEach((p, pi) => {
+        
         if (p === '') {
-          errors.push(i18n.t('validation.hotelRoomsSegmentEmpty', { 
+          hotelErrors.push(i18n.t('validation.hotelRoomsSegmentEmpty', { 
             hotelCode: h.hotelCode || '<unknown>',
             segment: pi + 1
           }));
         }
       });
     }
+    return hotelErrors;
   });
 
-  return { valid: errors.length === 0, errors };
+  // Wait for all hotel validations to complete
+  const hotelErrors = await Promise.all(hotelValidations);
+  
+  // Combine all errors
+  errors.push(...hotelErrors.flat());
+
+  // Return the final validation result
+  const errLength = errors.length;
+  
+  return { valid: errLength === 0, errors };
+  
 }
 
 // THIS IS THE KEY CHANGE - The function now returns a Promise with the result object
@@ -371,8 +400,8 @@ export async function submitTripFromServer(
   };
   
   // Validate trip data before sending
-  const validation = validateTripData(tripData);
-  console.log('Trip data validation result:', validation);
+  
+  const validation = await validateTripData(tripData);
   if (!validation.valid) {
     console.error('Trip data validation failed:', validation.errors);
     return { success: false, errors: validation.errors };
