@@ -145,6 +145,16 @@ function App({ employeeID }: AppProps) {
     setColumns(newColumns);
   }, [maximumNoOfHotels, t]);
 
+useEffect(() => {
+  if (showCalendar && calendarColumn !== null) {
+    const selectedHotel = columns[calendarColumn]?.selectedHotel;
+    if (selectedHotel) {
+      batchLoadMonthPricing(selectedHotel.id, calendarYear, calendarMonth);
+    }
+  }
+}, [calendarYear, calendarMonth, showCalendar, calendarColumn]);
+
+  
   const handleCompanionChange = (value: string, checked: boolean) => {
     if (checked) {
       if (selectedCompanions.length >= maximumNoOfCompanions) {
@@ -156,6 +166,8 @@ function App({ employeeID }: AppProps) {
       setSelectedCompanions(selectedCompanions.filter(c => c !== value));
     }
   };
+
+  
 
   const handleCityChange = (col: number, city: string) => {
     setColumns(prev => ({
@@ -279,23 +291,65 @@ const selectHotel = async (hotel: Hotel) => {
     showToast('warning', t('rooms.noPricesTitle'), t('rooms.NotAvailable'));
   }
 };
+// ADD THIS NEW FUNCTION - Batch load pricing for entire month to prevent flicker
+const batchLoadMonthPricing = async (hotelId: string, year: number, month: number) => {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const pricingPromises = [];
+  
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const cacheKey = `${hotelId}_${dateStr}`;
+    
+    // Only fetch if not already cached
+    if (!hotelPricingCache[cacheKey]) {
+      pricingPromises.push(
+        getHotelRoomPricesFromServer(hotelId, dateStr)
+          .then(pricing => ({ cacheKey, pricing }))
+          .catch(() => null)
+      );
+    }
+  }
+  
+  const results = await Promise.all(pricingPromises);
+  const newCache: Record<string, PricingPayload> = {};
+  
+  results.forEach(result => {
+    if (result) {
+      newCache[result.cacheKey] = result.pricing;
+    }
+  });
+  
+  if (Object.keys(newCache).length > 0) {
+    setHotelPricingCache(prev => ({ ...prev, ...newCache }));
+  }
+};
 
   
-  const openCalendar = (col: number) => {
-    setCalendarColumn(col);
+const openCalendar = async (col: number) => {  // ADD async here
+  setCalendarColumn(col);
 
-    if (policyStartDate) {
-      const startDate = new Date(policyStartDate);
-      setCalendarYear(startDate.getFullYear());
-      setCalendarMonth(startDate.getMonth());
-    } else {
-      const now = new Date();
-      setCalendarYear(now.getFullYear());
-      setCalendarMonth(now.getMonth());
-    }
+  if (policyStartDate) {
+    const startDate = new Date(policyStartDate);
+    setCalendarYear(startDate.getFullYear());
+    setCalendarMonth(startDate.getMonth());
+  } else {
+    const now = new Date();
+    setCalendarYear(now.getFullYear());
+    setCalendarMonth(now.getMonth());
+  }
 
-    setShowCalendar(true);
-  };
+  setShowCalendar(true);
+  
+  // ADD THIS - Pre-load pricing data for the entire month when calendar opens
+  const selectedHotel = columns[col].selectedHotel;
+  if (selectedHotel) {
+    const yearToLoad = policyStartDate ? new Date(policyStartDate).getFullYear() : new Date().getFullYear();
+    const monthToLoad = policyStartDate ? new Date(policyStartDate).getMonth() : new Date().getMonth();
+    
+    // Load pricing in background without blocking calendar display
+    batchLoadMonthPricing(selectedHotel.id, yearToLoad, monthToLoad);
+  }
+};
 
 const selectDate = (dateObj: Date) => {
   if (calendarColumn === null) return;
@@ -456,14 +510,14 @@ const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
   const cacheKey = `${hotelId}_${dateStr}`;
 
   if (!hotelPricingCache[cacheKey]) {
-    try {
-      const pricing = await getHotelRoomPricesFromServer(hotelId, dateStr);
-      setHotelPricingCache(prev => ({ ...prev, [cacheKey]: pricing }));
-    } catch (error) {
-      console.error('Failed to fetch pricing for tooltip:', error);
-      setTooltip({ show: false, x: 0, y: 0, content: '' });
-      return;
-    }
+        setTooltip({ 
+      show: true, 
+      x: e.clientX, 
+      y: e.clientY, 
+      content: '<div style="text-align:center;padding:8px;">Loading prices...</div>' 
+    });
+    return;
+  
   }
 
   // Filter room types to only show those with valid non-zero prices
@@ -650,6 +704,7 @@ const renderCalendar = () => {
             <option key={city} value={city}>{city}</option>
           ))}
         </select>
+  {/* BUG-PR-26-10-2025.3  Transportation Flicker */}
 
         <div className="flex items-center gap-3 mb-3">
           <button
@@ -658,24 +713,27 @@ const renderCalendar = () => {
           >
             {t('hotel.select')}
           </button>
-          <span style={{ color: '#16a34a', fontWeight: '700', fontSize: '14px' }}>{t('transport.allowance')}</span>
-          <input
-            type="text"
-            readOnly
-            value={colData.travelAllowance ?? ''}
-            placeholder={t('transport.none')}
-            style={{
-              width: '84px',
-              padding: '6px 8px',
-              borderRadius: '8px',
-              background: '#ecfdf5',
-              color: '#065f46',
-              border: '1px solid #bbf7d0',
-              textAlign: 'center',
-              fontWeight: '600',
-              cursor: 'not-allowed'
-            }}
-          />
+          {colData.selectedCity && colData.travelAllowance && (
+            <>
+              <span style={{ color: '#16a34a', fontWeight: '700', fontSize: '14px' }}>{t('transport.allowance')}</span>
+              <input
+                type="text"
+                readOnly
+                value={colData.travelAllowance}
+                style={{
+                  width: '84px',
+                  padding: '6px 8px',
+                  borderRadius: '8px',
+                  background: '#ecfdf5',
+                  color: '#065f46',
+                  border: '1px solid #bbf7d0',
+                  textAlign: 'center',
+                  fontWeight: '600',
+                  cursor: 'not-allowed'
+                }}
+              />
+            </>
+          )}
         </div>
 
         {colData.selectedHotel && (
