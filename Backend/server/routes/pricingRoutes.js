@@ -25,6 +25,7 @@ router.post('/submit', async(req, res) => {
   //           { hotelCode: 'EG-ALX-003', date: '17 NOV 2025', roomsData: 'S,3,1' }
   //       ];
   const { employeeId, familyIds, hotels } = req.body;
+  //console.log('Received trip submission:', { employeeId, familyIds, hotels });
 
         // Validate required fields
         if (!employeeId) {

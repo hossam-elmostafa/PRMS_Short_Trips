@@ -70,8 +70,9 @@ export async function getHotelRoomPricesFromServer(hotelCode: string, date?: str
   try {
     // Always pass date parameter to get date-specific pricing
     const dateParam = date || new Date().toISOString().slice(0, 10);
+    console.log(`Fetching room prices for hotel ${hotelCode} on date ${dateParam}`);
   const url = `http://${getApiBase()}/api/hotel/${encodeURIComponent(hotelCode)}/rooms?date=${encodeURIComponent(dateParam)}`;
-
+    console.log('Request URL:', url);
     
     const response = await fetch(url);
     if (!response.ok) {
@@ -228,6 +229,7 @@ export async function getMaximumNoOfCompanionsFromServer(employeeID: number) {
 }
 
 /**
+ * RQ-PR-26-10-2025.4
  * Calculate total expected persons from rooms parts array.
  * Each part is expected in the format: TYPE,roomsCount,extras
  * where TYPE is 'S'|'D'|'T' (single/double/triple) and
@@ -238,9 +240,29 @@ export async function getMaximumNoOfCompanionsFromServer(employeeID: number) {
  *  'T,2,2' => 3*2 + 2 = 8
  *  ['S,2,1','T,1,2'] => (1*2+1) + (3*1+2) = 8
  */
-export function CalculateRoomsCount(parts: string[] | null | undefined): number {
+export async function getHotelRoomBedCountsFromServer(hotelCode: string): Promise<Record<string, number>> {
+  try {
+    const response = await fetch(`http://${getApiBase()}/api/hotel/${encodeURIComponent(hotelCode)}/beds`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to fetch hotel room bed counts');
+    }
+    return result.data as Record<string, number>;
+  } catch (error) {
+    console.error('Error fetching hotel room bed counts:', error);
+    // Return default values if the server request fails
+    return { S: 1, D: 2, T: 3, FR: 4, FS: 5, J: 6 };
+  }
+}
+
+export async function CalculateRoomsCount(hotelCode:string, parts: string[] | null | undefined): Promise<number> {
   if (!Array.isArray(parts) || parts.length === 0) return 0;
-  const capMap: Record<string, number> = { S: 1, D: 2, T: 3 };
+  //const capMap: Record<string, number> = { S: 1, D: 2, T: 3, FR: 4 ,FS:5,j:6};
+  const capMap: Record<string, number> = await getHotelRoomBedCountsFromServer(hotelCode) as unknown as Record<string, number>;
+  console.log('Using capMap for hotel',hotelCode, ':', capMap);
   let total = 0;
 
   parts.forEach(segment => {
@@ -288,7 +310,7 @@ export function validateTripData(tripData: {
   const familyCount = familyIdsList.length; // number of family members
 
   // For each hotel: date must be non-empty; roomsData must be non-empty and contain '|' and have (familyCount + 1) segments
-  hotels.forEach((h, idx) => {    
+  hotels.forEach(async (h, idx) => {    
     if (!h) {
       errors.push(`Hotel entry #${idx + 1} is invalid.`);
       return;
@@ -305,7 +327,7 @@ export function validateTripData(tripData: {
       errors.push(`الفندق ${h.hotelName || '<unknown>'}: بيانات الغرف فارغة. `);
     } else {
       const parts = rooms.split('|').map(s => s.trim());
-      const RoomsCount = CalculateRoomsCount(parts);
+      const RoomsCount = await CalculateRoomsCount(h.hotelCode,parts);
       const expected = familyCount + 1; // employee + family members
       if (RoomsCount !== expected) {
         errors.push(`فندق ${h.hotelName || '<unknown>'}: عدد الأسرة المتوقع ${expected} سرير   (موظف + ${familyCount} من العائلة), ولكن المطلوب ${RoomsCount} سرير.`);
@@ -335,6 +357,7 @@ export async function submitTripFromServer(employeeID: number, familyIds: string
   };
   // Validate trip data before sending
   const validation = validateTripData(tripData);
+  console.log('Trip data validation result:', validation);
   if (!validation.valid) {
     const msg = 'الرجاء تصحيح الأخطاء التالية قبل الإرسال:\n' + validation.errors.join('\n');
     // show user-friendly alert and also log
@@ -344,6 +367,7 @@ export async function submitTripFromServer(employeeID: number, familyIds: string
   }
 
   try {
+    console.log('Submitting: http://' + getApiBase() + '/api/submit');
   const res = await fetch('http://' + getApiBase() + '/api/submit', {
       method: 'POST',
       headers: {
