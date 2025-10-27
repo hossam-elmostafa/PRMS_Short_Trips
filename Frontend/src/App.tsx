@@ -387,7 +387,7 @@ const updateRoomCount = (col: number, roomKey: string, value: number) => {
     }));
   };
 
-const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): number | null => {
+const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): { room_price: number | null, extra_bed_price: number | null } => {
   let cacheKey = hotelId;
   if (dateObj) {
     const yyyy = dateObj.getFullYear();
@@ -399,21 +399,21 @@ const priceFor = (hotelId: string, roomTypeKey: string, dateObj?: Date): number 
 
   const hotelPricing = hotelPricingCache[cacheKey];
   if (!hotelPricing) {
-    return null; // No pricing data available
+    return { room_price: null, extra_bed_price: null }; // No pricing data available
   }
 
   if (Array.isArray(hotelPricing)) {
     const foundRoom = hotelPricing.find(room => room.ROOM_TYPE === roomTypeKey);
-    if (foundRoom && typeof foundRoom.ROOM_PRICE === 'number') {
-      return foundRoom.ROOM_PRICE as number;
-    }
-    return null; // Room type not found in pricing
+    return {
+      room_price: foundRoom && typeof foundRoom.ROOM_PRICE === 'number' ? foundRoom.ROOM_PRICE : null,
+      extra_bed_price: null
+    };
   } else {
-    if (typeof hotelPricing.room_price === 'number') {
-      return hotelPricing.room_price;
-    }
+    return {
+      room_price: typeof hotelPricing.room_price === 'number' ? hotelPricing.room_price : null,
+      extra_bed_price: typeof hotelPricing.extra_bed_price === 'number' ? hotelPricing.extra_bed_price : null
+    };
   }
-  return null;
 };
   const monthName = (y: number, m: number) => {
     const monthKeys = ['january','february','march','april','may','june','july','august','september','october','november','december'];
@@ -604,16 +604,16 @@ const renderCalendar = () => {
 
       ROOM_TYPES.forEach(rt => {
         const count = colData.roomCounts[rt.key] || 0;
-        const price = priceFor(colData.selectedHotel!.id, rt.key, dateObj);
+        const priceData = priceFor(colData.selectedHotel!.id, rt.key, dateObj);
         
     // Check if any room type has a valid non-zero price
-    if (price !== null && price > 0) {
+    if (priceData.room_price !== null && priceData.room_price > 0) {
       hasAnyPrice = true;
     }
         
     // Only add to total if price is valid and count > 0
-    if (count > 0 && price !== null && price > 0) {
-      total += price * count;
+    if (count > 0 && priceData.room_price !== null && priceData.room_price > 0) {
+      total += priceData.room_price * count;
     }
       });
     }
@@ -716,13 +716,13 @@ const renderCalendar = () => {
   const isSupported = hasSupportedRoomTypes && supportedRoomTypes.includes(rt.key);
   
   // Check pricing for this room type (only if date is selected)
-  let priceValue: number | null = null;
+  let priceData = { room_price: null as number | null, extra_bed_price: null as number | null };
   let hasValidPrice = true; // Assume valid until we check with date
   
   if (colData.selectedHotel && colData.arrivalDate) {
     const dateObj = new Date(colData.arrivalDate);
-    priceValue = priceFor(colData.selectedHotel.id, rt.key, dateObj);
-    hasValidPrice = priceValue !== null && priceValue > 0;
+    priceData = priceFor(colData.selectedHotel.id, rt.key, dateObj);
+    hasValidPrice = priceData.room_price !== null && priceData.room_price > 0;
   }
   
   // Room type is enabled if:
@@ -837,8 +837,9 @@ const renderCalendar = () => {
         {total > 0 && (
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px', borderRadius: '8px' }} className="mt-4">
             <div className="font-semibold">
-              {t('pricing.total')}: EGP {total.toFixed(2)}<br />
-              {t('pricing.employee')}: ({empContribution > 0 ? empContribution : 60}%) EGP {employee.toFixed(2)}
+              {/* RQ_HSM_PR_27_10_25.01 */}
+              {t('pricing.total')}: EGP {(total * 3).toFixed(2)}<br />
+              {t('pricing.employee')}: ({empContribution > 0 ? empContribution : 60}%) EGP {(employee * 3).toFixed(2)}
             </div>
           </div>
         )}
