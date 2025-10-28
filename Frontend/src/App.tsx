@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   getCompanionsFromServer,
@@ -120,12 +120,9 @@ function App({ employeeID }: AppProps) {
 
   const [columns, setColumns] = useState<Record<number, ColumnState>>({});
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setColumns(prev => ({ ...prev }));
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [hotelPricingCache, empContribution]);
+  // BUG-PR-26-10-2025.3: Removed useEffect that was recreating all columns unnecessarily
+  // when hotelPricingCache or empContribution changed, causing transport allowance flicker
+  // The columns now update naturally when their specific data changes
 
   useEffect(() => {
     if (maximumNoOfHotels === 0) return;
@@ -135,7 +132,8 @@ function App({ employeeID }: AppProps) {
       newColumns[i] = {
         selectedCity: '',
         selectedHotel: null,
-        travelAllowance: t('transport.none'),
+        // BUG-PR-26-10-2025.3: Initialize with empty string to prevent transport allowance flicker
+        travelAllowance: '',
         arrivalDate: '',
         roomCounts: {},
         extraBedCounts: {},
@@ -145,6 +143,48 @@ function App({ employeeID }: AppProps) {
     setColumns(newColumns);
   }, [maximumNoOfHotels, t]);
 
+// BUG-PR-26-10-2025.3: Batch load pricing for entire month to prevent flicker
+// Used useCallback instead of useEffect because:
+// 1. This function is called from multiple places (useEffect and openCalendar)
+// 2. useCallback prevents the function from being recreated on every render
+// 3. This ensures the useEffect dependency array works correctly without infinite loops
+// 4. Moving it here (before the useEffect that uses it) prevents "used before declaration" errors
+const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, month: number) => {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const pricingPromises = [];
+  
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const cacheKey = `${hotelId}_${dateStr}`;
+    
+    // Only fetch if not already cached
+    if (!hotelPricingCache[cacheKey]) {
+      pricingPromises.push(
+        getHotelRoomPricesFromServer(hotelId, dateStr)
+          .then(pricing => ({ cacheKey, pricing }))
+          .catch(() => null)
+      );
+    }
+  }
+  
+  const results = await Promise.all(pricingPromises);
+  const newCache: Record<string, PricingPayload> = {};
+  
+  results.forEach(result => {
+    if (result) {
+      newCache[result.cacheKey] = result.pricing;
+    }
+  });
+  
+  if (Object.keys(newCache).length > 0) {
+    setHotelPricingCache(prev => ({ ...prev, ...newCache }));
+  }
+}, [hotelPricingCache]);
+
+// BUG-PR-26-10-2025.3: useEffect for calendar pricing loading
+// This useEffect calls batchLoadMonthPricing when calendar is shown and month/year changes
+// batchLoadMonthPricing is defined above using useCallback to prevent infinite re-renders
+// and ensure stable function reference for the dependency array
 useEffect(() => {
   if (showCalendar && calendarColumn !== null) {
     const selectedHotel = columns[calendarColumn]?.selectedHotel;
@@ -152,7 +192,7 @@ useEffect(() => {
       batchLoadMonthPricing(selectedHotel.id, calendarYear, calendarMonth);
     }
   }
-}, [calendarYear, calendarMonth, showCalendar, calendarColumn]);
+}, [calendarYear, calendarMonth, showCalendar, calendarColumn, batchLoadMonthPricing, columns]);
 
   
   const handleCompanionChange = (value: string, checked: boolean) => {
@@ -176,7 +216,9 @@ useEffect(() => {
         ...prev[col],
         selectedCity: city,
         selectedHotel: null,
-        travelAllowance: t('transport.none'),
+        // BUG-PR-26-10-2025.3: Set empty string instead of t('transport.none') to prevent flicker
+        // when transport allowance is being loaded from server
+        travelAllowance: '',
         arrivalDate: '',
         roomCounts: {},
         extraBedCounts: {},
@@ -191,15 +233,26 @@ useEffect(() => {
           setHOTELS(prev => ({ ...prev, [city]: hotels }));
 
           const allowance = await getTransportAllowanceFromServer(employeeID, city, 'en');
+          // BUG-PR-26-10-2025.3: Update transport allowance only after successful fetch
+          // to prevent flicker during loading
           setColumns(prev => ({
             ...prev,
             [col]: {
               ...prev[col],
-              travelAllowance: allowance?.label || t('transport.none')
+              travelAllowance: allowance?.label || ''
             }
           }));
         } catch (e) {
           console.error('Failed to load data for city', city, e);
+          // BUG-PR-26-10-2025.3: Set transport allowance to empty string on error
+          // to prevent flicker - the UI will not show the section if empty
+          setColumns(prev => ({
+            ...prev,
+            [col]: {
+              ...prev[col],
+              travelAllowance: ''
+            }
+          }));
         }
       })();
     }
@@ -289,38 +342,6 @@ const selectHotel = async (hotel: Hotel) => {
   } catch (e) {
     console.error('Failed to load room prices for hotel', hotel.id, e);
     showToast('warning', t('rooms.noPricesTitle'), t('rooms.NotAvailable'));
-  }
-};
-// ADD THIS NEW FUNCTION - Batch load pricing for entire month to prevent flicker
-const batchLoadMonthPricing = async (hotelId: string, year: number, month: number) => {
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const pricingPromises = [];
-  
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const cacheKey = `${hotelId}_${dateStr}`;
-    
-    // Only fetch if not already cached
-    if (!hotelPricingCache[cacheKey]) {
-      pricingPromises.push(
-        getHotelRoomPricesFromServer(hotelId, dateStr)
-          .then(pricing => ({ cacheKey, pricing }))
-          .catch(() => null)
-      );
-    }
-  }
-  
-  const results = await Promise.all(pricingPromises);
-  const newCache: Record<string, PricingPayload> = {};
-  
-  results.forEach(result => {
-    if (result) {
-      newCache[result.cacheKey] = result.pricing;
-    }
-  });
-  
-  if (Object.keys(newCache).length > 0) {
-    setHotelPricingCache(prev => ({ ...prev, ...newCache }));
   }
 };
 
@@ -713,6 +734,8 @@ const renderCalendar = () => {
           >
             {t('hotel.select')}
           </button>
+          {/* BUG-PR-26-10-2025.3: Only show transport allowance when both city and allowance are available
+              to prevent flicker during loading */}
           {colData.selectedCity && colData.travelAllowance && (
             <>
               <span style={{ color: '#16a34a', fontWeight: '700', fontSize: '14px' }}>{t('transport.allowance')}</span>
@@ -805,21 +828,7 @@ const renderCalendar = () => {
                     isSupported && 
                     (!colData.arrivalDate || hasValidPrice);
 
-//{ room_price: number | null, extra_bed_price: string | null } => {                    
-  let disabledReason = '';
-  if (!colData.selectedHotel) {
-    disabledReason = t('rooms.selectHotelFirst');
-  } else if (!hasSupportedRoomTypes) {
-    disabledReason = t('rooms.hotelNoRoomTypes');
-  } else if (!isSupported) {
-    disabledReason = t('rooms.notAvailable');
-  } else if (colData.arrivalDate && !hasValidPrice) {
-    if (priceData.room_price === 0) {
-      disabledReason = t('rooms.priceZero');
-    } else {
-      disabledReason = t('rooms.noPrice');
-    }
-  }
+//{ room_price: number | null, extra_bed_price: string | null } => {
 
   return (
     <div 
