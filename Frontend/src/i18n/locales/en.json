@@ -49,8 +49,25 @@
     "noPrice": "No Price",
     "noPricesTitle": "No Prices Available",
     "noPricesMessage": "There are no room prices available for this date. Please select a different date or hotel.",
-    "selectHotelFirst": "Select hotel first"
-
+    "selectHotelFirst": "Select hotel first",
+    "_comment_roomTypes": "BUG-AZ-PR-29-10-2025.1: Fixed by AG - Added English translations for all room types to fix display in English mode",
+    "roomTypes": {
+      "S": "Single Room",
+      "D": "Double Room", 
+      "T": "Triple Room",
+      "Q": "Quad Room",
+      "F": "Family Room",
+      "FR": "Family Room",
+      "FM": "Family Room",
+      "FAM": "Family Room",
+      "FS": "Family Suite",
+      "SU": "Suite",
+      "AS": "Attached Suite",
+      "AN": "Annex Suite",
+      "J": "Junior Suite",
+      "PS": "Presidential Suite",
+      "DS": "Deluxe Suite"
+    }
   },
   "date": {
     "select": "Select Date",

@@ -36,10 +36,13 @@ export function isRoomTypeSupported(hotel: Hotel | null, roomTypeKey: string): b
   return supportedTypes.includes(roomTypeKey);
 }
 
-export async function getHotelsFromServer() {
+// BUG-AZ-PR-29-10-2025.1: Fixed by AG - Added language parameter to hotels API call
+// Issue: Hotels API was not receiving language parameter, always returning Arabic city names
+// Solution: Pass language parameter in query string
+export async function getHotelsFromServer(lang: 'ar' | 'en' = 'ar') {
   try {
     //console.log('Fetching hotels from server at api base:', getApiBase());
-    const response = await fetch(`http://${getApiBase()}/api/hotels`);
+    const response = await fetch(`http://${getApiBase()}/api/hotels?lang=${lang}`);
     const hotelResult = await response.json();
     
     if (hotelResult.success) {
@@ -52,6 +55,32 @@ export async function getHotelsFromServer() {
   } catch (error) {
     console.error(i18n.t('errors.fetchHotels'), error);
     return {};
+  }
+}
+
+// BUG-AZ-PR-29-10-2025.1: Fixed by AG - Added City interface and getCitiesFromServer function
+// Issue: Cities were coming as objects but frontend expected strings, causing React errors
+// Solution: Created City interface with code and name properties
+export interface City {
+  code: string;
+  name: string;
+}
+
+// BUG-AZ-PR-29-10-2025.1: Fetch cities from dedicated API endpoint with language support
+export async function getCitiesFromServer(lang: 'ar' | 'en' = 'ar') {
+  try {
+    const response = await fetch(`http://${getApiBase()}/api/cities?lang=${lang}`);
+    if (!response.ok) {
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
+    }
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || i18n.t('errors.fetchCities'));
+    }
+    return result.data as City[];
+  } catch (error) {
+    console.error(i18n.t('errors.fetchCities'), error);
+    return [];
   }
 }
 export async function getHotelsByCityFromServer(city: string, lang: 'ar' | 'en' = 'ar') {
@@ -96,22 +125,6 @@ export async function getHotelRoomPricesFromServer(hotelCode: string, date?: str
   }
 }
 
-export async function getCitiesFromServer(lang: 'ar' | 'en' = 'ar') {
-  try {
-    const response = await fetch(`http://${getApiBase()}/api/cities?lang=${lang}`);
-    if (!response.ok) {
-      throw new Error(i18n.t('errors.httpError', { status: response.status }));
-    }
-    const result = await response.json();
-    if (!result.success) {
-      throw new Error(result.message || i18n.t('errors.fetchCities'));
-    }
-    return result.data as City[];
-  } catch (error) {
-    console.error(i18n.t('errors.fetchCities'), error);
-    throw error;
-  }
-}
 
 export async function getCompanionsFromServer(employeeID: number, lang?: 'ar' | 'en') {
   try {

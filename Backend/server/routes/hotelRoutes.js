@@ -15,14 +15,23 @@ router.get('/hotels/:city', async (req, res) => {
   }
 });
 
+// BUG-AZ-PR-29-10-2025.1: Fixed by AG - Added language parameter support for hotels endpoint
+// Issue: In English mode, cities were showing in Arabic instead of English
+// Solution: Extract lang from query params and pass to getAllHotels function
 router.get('/hotels', async(req, res) => {
-  const hotels = await hotelService.getAllHotels();
+  try {
+    const { lang } = req.query; // optional: 'ar' | 'en'
+    const hotels = await hotelService.getAllHotels(lang || 'ar');
 
-  if (hotels.length === 0) {
-    return res.status(404).json({ success: false, message: 'Hotel not found' });
+    if (!hotels || Object.keys(hotels).length === 0) {
+      return res.status(404).json({ success: false, message: 'Hotel not found' });
+    }
+
+    res.json({ success: true, data: hotels });
+  } catch (error) {
+    console.error('Error in hotels route:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
-
-  res.json({ success: true, data: hotels });
 });
 
 router.get('/cities', async (req, res) => {

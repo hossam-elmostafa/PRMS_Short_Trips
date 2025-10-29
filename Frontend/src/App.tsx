@@ -8,9 +8,11 @@ import {
   getRoomTypesFromServer,
   getTransportOptionsFromServer,
   getTransportAllowanceFromServer,
+  getCitiesFromServer,
   Hotel,
   Companion,
   RoomType,
+  City,
   getEmployeeNameFromServer,
   getPolicyDataFromServer,
   submitTripFromServer
@@ -47,6 +49,10 @@ function App({ employeeID }: AppProps) {
 
   const [ROOM_TYPES, setROOM_TYPES] = useState<RoomType[]>([]);
   const [HOTELS, setHOTELS] = useState<Record<string, Hotel[]>>({});
+  // BUG-AZ-PR-29-10-2025.1: Fixed by AG - Added separate CITIES state to store localized city names
+  // Issue: Cities were embedded in HOTELS object keys in Arabic only
+  // Solution: Fetch cities separately from /api/cities endpoint with language support
+  const [CITIES, setCITIES] = useState<City[]>([]);
   const [selectedCompanions, setSelectedCompanions] = useState<string[]>([]);
   const [showHotelPopup, setShowHotelPopup] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -81,8 +87,9 @@ function App({ employeeID }: AppProps) {
     const fetchInitialData = async () => {
       const currentLang = i18n.language as 'ar' | 'en';
 
-      const [hotelsData, companionsData, roomTypesData, , employeeName, policyData] = await Promise.all([
-        getHotelsFromServer(),
+      const [hotelsData, citiesData, companionsData, roomTypesData, , employeeName, policyData] = await Promise.all([
+        getHotelsFromServer(currentLang),
+        getCitiesFromServer(currentLang),
         getCompanionsFromServer(employeeID, currentLang),
         getRoomTypesFromServer(),
         getTransportOptionsFromServer(employeeID),
@@ -91,6 +98,7 @@ function App({ employeeID }: AppProps) {
       ]);
 
       setHOTELS(hotelsData);
+      setCITIES(citiesData);
 
       if (Array.isArray(companionsData)) {
         setCOMPANIONS(companionsData as Companion[]);
@@ -229,10 +237,10 @@ useEffect(() => {
     if (city) {
       (async () => {
         try {
-          const hotels = await getHotelsByCityFromServer(city, 'en');
+          const hotels = await getHotelsByCityFromServer(city, i18n.language as 'ar' | 'en');
           setHOTELS(prev => ({ ...prev, [city]: hotels }));
 
-          const allowance = await getTransportAllowanceFromServer(employeeID, city, 'en');
+          const allowance = await getTransportAllowanceFromServer(employeeID, city, i18n.language as 'ar' | 'en');
           // BUG-PR-26-10-2025.3: Update transport allowance only after successful fetch
           // to prevent flicker during loading
           setColumns(prev => ({
@@ -265,7 +273,7 @@ useEffect(() => {
       return;
     }
     try {
-      const hotels = await getHotelsByCityFromServer(city, 'en');
+      const hotels = await getHotelsByCityFromServer(city, i18n.language as 'ar' | 'en');
       setHOTELS(prev => ({ ...prev, [city]: hotels }));
     } catch (e) {
       console.error('Failed to refresh hotels for city before opening popup', city, e);
@@ -577,7 +585,7 @@ const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
         extraBedPrice=price.extra_bed_price || "0";
       // Price is guaranteed to be non-null here due to the filter above
       html += `<tr>
-        <td style="padding:2px 8px">${rt.ar}</td>
+        <td style="padding:2px 8px">${getRoomTypeName(rt)}</td>
         <td style="padding:2px 8px;text-align:left">EGP ${price.room_price}</td>
       </tr>`;
     });
@@ -681,6 +689,20 @@ const renderCalendar = () => {
     return t(`selection.${ordinalKeys[num - 1]}`) || `${num}`;
   };
 
+  // BUG-AZ-PR-29-10-2025.1: Fixed by AG - Added helper to get localized room type names
+  // Issue: Room types were always showing in Arabic from database
+  // Solution: Check i18n translations first, fallback to Arabic if translation not found
+  const getRoomTypeName = (roomType: RoomType): string => {
+    // Try to get translation first, fallback to Arabic name
+    const translatedName = t(`rooms.roomTypes.${roomType.key}`);
+    if (translatedName && translatedName !== `rooms.roomTypes.${roomType.key}`) {
+      return translatedName;
+    }
+    // Log missing translations for debugging
+    console.log(`Missing translation for room type key: ${roomType.key}, ar: ${roomType.ar}`);
+    return roomType.ar; // Fallback to Arabic name
+  };
+
   const renderColumn = (col: number) => {
     const colData = columns[col];
 
@@ -721,8 +743,9 @@ const renderCalendar = () => {
           onChange={(e) => handleCityChange(col, e.target.value)}
         >
           <option value="">{t('city.select')}</option>
-          {Object.keys(HOTELS).map(city => (
-            <option key={city} value={city}>{city}</option>
+          {/* BUG-AZ-PR-29-10-2025.1: Fixed by AG - Use city.code as key and city.name for display */}
+          {CITIES.map(city => (
+            <option key={city.code} value={city.name}>{city.name}</option>
           ))}
         </select>
   {/* BUG-PR-26-10-2025.3  Transportation Flicker */}
@@ -841,7 +864,7 @@ const renderCalendar = () => {
       }}
     >
       <span style={{ width: '110px' }}>
-        {rt.ar}
+        {getRoomTypeName(rt)}
       </span>
       <input
         type="number"
