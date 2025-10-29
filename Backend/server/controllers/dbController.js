@@ -3,6 +3,7 @@ const prisma = require('../lib/prisma');
 
 async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
     try {
+        //console.log(10);
         let cityInput = String(city).trim();
 
         const normalizeArabic = (s) => {
@@ -14,6 +15,7 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
                 .replace(/\s+/g, ' ')
                 .trim();
         };
+        //console.log(20);
 
         // Normalize city: accept either code (e.g., "ALEX") or localized name (e.g., "الإسكندرية")
         let cityCode = cityInput;
@@ -40,31 +42,34 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
                 // ignore and fallback to original input
             }
         }
-
+        //console.log(30);
         // Execute proc directly; map flexible column names
         const esc = (s) => String(s).replace(/'/g, "''");
         const cityCodeEsc = esc(cityCode);
         const cityNameEsc = esc(cityInput);
-
+        //console.log(1);
         // Fetch Arabic and English names, then merge on HOTEL_CODE to deliver both ar/en
+        
         const queryFor = async (bit, city) => prisma.$queryRawUnsafe(`
             DECLARE @Results TABLE (
                 HOTEL_CODE NVARCHAR(100),
                 HOTEL_NAME NVARCHAR(400),
-                HOTEL_PIC VARBINARY(MAX),
-                HOTEL_ROOM_TYPES NVARCHAR(MAX)
+                HOTEL_PIC VARCHAR(300),
+                HOTEL_ROOM_TYPES NVARCHAR(MAX),
+				HOTEL_BEDS_COUNTS NVARCHAR(MAX),
+				HOTEL_EXTRA_BEDS_COUNTS NVARCHAR(MAX)
             );
 
             INSERT INTO @Results
             EXEC P_GET_STRIP_HOTEL ${bit}, N'${city}';
 
-            SELECT HOTEL_CODE, HOTEL_NAME, HOTEL_ROOM_TYPES FROM @Results;
+            SELECT HOTEL_CODE, HOTEL_NAME, HOTEL_ROOM_TYPES,HOTEL_EXTRA_BEDS_COUNTS FROM @Results;
         `);
 
         // First try with resolved code; then, if needed, retry with original city name
         let rowsAr = await queryFor(0, cityCodeEsc);
         let rowsEn = await queryFor(1, cityCodeEsc);
-
+            //console.log(cityCodeEsc);
         if ((!rowsAr || rowsAr.length === 0) && (!rowsEn || rowsEn.length === 0)) {
             rowsAr = await queryFor(0, cityNameEsc);
             rowsEn = await queryFor(1, cityNameEsc);
@@ -73,6 +78,7 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
         const arByCode = new Map();
         const enByCode = new Map();
         const roomTypesByCode = new Map();
+        const roomExtraBeds = new Map();
         
         (rowsAr || []).forEach(r => {
             const code = String(r.HOTEL_CODE || '').trim();
@@ -80,7 +86,13 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
                 arByCode.set(code, String(r.HOTEL_NAME || '').trim());
                 // Store room types from the procedure result
                 if (r.HOTEL_ROOM_TYPES) {
+                    //console.log('Adding room types for', code, r.HOTEL_ROOM_TYPES);
                     roomTypesByCode.set(code, String(r.HOTEL_ROOM_TYPES).trim());
+                }
+                //console.log(r);
+                if (r.HOTEL_EXTRA_BEDS_COUNTS) {
+                    //console.log('Adding extra beds for', code, r.HOTEL_EXTRA_BEDS_COUNTS);
+                    roomExtraBeds.set(code, String(r.HOTEL_EXTRA_BEDS_COUNTS).trim());
                 }
             }
         });
@@ -92,6 +104,9 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
                 // Store room types if not already set from Arabic query
                 if (r.HOTEL_ROOM_TYPES && !roomTypesByCode.has(code)) {
                     roomTypesByCode.set(code, String(r.HOTEL_ROOM_TYPES).trim());
+                }
+                if (r.HOTEL_EXTRA_BEDS_COUNTS && !roomExtraBeds.has(code)) {
+                    roomExtraBeds.set(code, String(r.HOTEL_EXTRA_BEDS_COUNTS).trim());
                 }
             }
         });
@@ -106,12 +121,14 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
             const enName = enByCode.get(code) || arName || '';
             const id = code || `${cityCode}-${index + 1}`;
             const supportedRoomTypes = roomTypesByCode.get(code) || 'S,D,T'; // Default to all if not specified
+            const supportedRoomExtraBeds = roomExtraBeds.get(code) || 'S:0,D:0,T:0'; // Default to all if not specified
             
             return { 
                 id, 
                 ar: arName, 
                 en: enName,
-                supportedRoomTypes // Add supported room types
+                supportedRoomTypes, // Add supported room types
+                supportedRoomExtraBeds
             };
         });
 
@@ -204,6 +221,18 @@ async function getCompanionsfromDB(employeeId, lang = 'en') {
             
             SELECT EMPFAMILY_RelativeID AS RELID ,EMPFAMILY_RELTYPE AS rel,EMPFAMILY_NAME AS name FROM @Results
         `);
+        console.log(`
+            DECLARE @Results TABLE (
+                EMPFAMILY_RelativeID VARCHAR(50),
+                EMPFAMILY_RELTYPE VARCHAR(10),
+                EMPFAMILY_NAME VARCHAR(100)
+            )
+            
+            INSERT INTO @Results
+            EXEC P_GET_STRIP_EMP_FAMILY ${langBit}, '${empCode}'
+            
+            SELECT EMPFAMILY_RelativeID AS RELID ,EMPFAMILY_RELTYPE AS rel,EMPFAMILY_NAME AS name FROM @Results
+        `);
         
         return result;
         
@@ -217,27 +246,27 @@ async function getCompanionsfromDB(employeeId, lang = 'en') {
 
 async function getEmployeeNamefromDB(employeeId, lang = 'ar') {
     try {
-        console.log('🗃️ getEmployeeNamefromDB called with:', { employeeId, lang });
+        //console.log('🗃️ getEmployeeNamefromDB called with:', { employeeId, lang });
         
         const langBit = lang === 'ar' ? 1 : 0;
         
-        console.log('📊 Using langBit:', langBit, 'for language:', lang);
+        //console.log('📊 Using langBit:', langBit, 'for language:', lang);
         
         const empCode = String(employeeId).replace(/^:+/, '').trim();
 
-        console.log('🔍 Calling stored procedure with:', { langBit, empCode });
+        //console.log('🔍 Calling stored procedure with:', { langBit, empCode });
 
         const rows = await prisma.$queryRawUnsafe(`
             EXEC P_GET_EMPLOYEE ${langBit}, '${empCode}'
         `);
 
-        console.log('📥 Stored procedure result:', rows);
+        //console.log('📥 Stored procedure result:', rows);
 
         if (rows && rows.length > 0) {
             const row = rows[0] || {};
             const procName = row.EMPLOYEE_TNAME || row.EMPLOYEE_NAME || '';
             
-            console.log('📄 Procedure returned name:', procName);
+            //console.log('📄 Procedure returned name:', procName);
             
             if (lang !== 'en') {
                 // Prefer Arabic from base table when available
@@ -247,20 +276,20 @@ async function getEmployeeNamefromDB(employeeId, lang = 'ar') {
                     WHERE LTRIM(RTRIM(CAST(EMPLOYEE_CODE AS NVARCHAR(50)))) = LTRIM(RTRIM('${empCode}'))
                 `);
                 
-                console.log('📥 Direct Arabic query result:', arabicRows);
+                //console.log('📥 Direct Arabic query result:', arabicRows);
                 
                 const ar = (arabicRows && arabicRows[0] && arabicRows[0].AR_NAME) ? arabicRows[0].AR_NAME : '';
                 if (ar) {
-                    console.log('✅ Returning Arabic name from base table:', ar);
+                    //console.log('✅ Returning Arabic name from base table:', ar);
                     return ar;
                 }
             }
             
-            console.log('✅ Returning name from procedure:', procName);
+            //console.log('✅ Returning name from procedure:', procName);
             return typeof procName === 'string' ? procName : '';
         }
 
-        console.log('⚠️ No results found');
+        //console.log('⚠️ No results found');
         return '';
     } catch (error) {
         console.error('❌ Error calling stored procedure P_GET_EMPLOYEE:', error);
@@ -340,14 +369,14 @@ async function getTransportAllowancefromDB(employeeId, lang = 'en', city = 'ALEX
                 const curr = numWithCurr[2] || '';
                 return { value: n, currency: curr, label };
             }
-            return { value: 0, currency: '', label: label || 'لا يوجد' };
+            return { value: 0, currency: '', label: label || '' };
         }
 
-        return { value: 0, currency: '', label: 'لا يوجد' };
+        return { value: 0, currency: '', label: '' };
     } catch (error) {
         console.error('Error calling stored procedure P_GET_STRIP_TRANS_ALLOWANC:', error);
         console.error('Parameters used - employeeId:', employeeId, 'lang:', lang, 'city:', city);
-        return { value: 0, currency: '', label: 'لا يوجد' };
+        return { value: 0, currency: '', label: '' };
     }
 }
   
@@ -358,12 +387,13 @@ async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
         
         try {
             // Try with date parameter first
-            const rows = await prisma.$queryRawUnsafe(`
-                SELECT * 
-                FROM GetHotelRoomPrices(N'${code}') 
-                WHERE PRICE_DATE = N'${date}'
-            `);
-            console.log(`P_GET_STRIP_HOTEL_ROOMS with date result:`, rows);
+            // const rows = await prisma.$queryRawUnsafe(`
+            //     SELECT * 
+            //     FROM GetHotelRoomPrices(N'${code}') 
+            //     WHERE PRICE_DATE = N'${date}'
+            // `);
+            console.log(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}',N'${date}'`);
+            const rows = await prisma.$queryRawUnsafe(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}',N'${date}'`);
             return rows;
         } catch (error) {
             // Fallback to without date parameter
@@ -531,6 +561,55 @@ async function submitTripApplication(employeeId, familyIds, hotels=[]) {
     }   
 }
 
+async function getSecretKeyValues(secret) {
+    try {
+        // First get the value from the temp table
+        const secretResult = await prisma.$queryRawUnsafe(`
+            SELECT [value] FROM tempdb..##SecretKeyValue WHERE [key] = N'${String(secret).replace(/'/g, "''")}';
+        `);
+            console.log('Secret key query result:', secretResult[0]);
+        if (!secretResult || secretResult.length === 0 || !secretResult[0].value) {
+            console.error('No value found for secret key:', secret);
+            return null;
+        }
+
+        // Now pass this value to P_GET_EMPLOYEE_CODE_BY_ID
+        const employeeResult = await prisma.$queryRawUnsafe(`
+            DECLARE @Results TABLE (
+                EMPLOYEE_CODE NVARCHAR(50),
+                EMPLOYEE_NAME NVARCHAR(50)
+            );
+            
+            INSERT INTO @Results
+            EXEC P_GET_EMPLOYEE_CODE_BY_ID 1, ${secretResult[0].value};
+            
+            SELECT EMPLOYEE_CODE FROM @Results;
+        `);
+            console.log(`
+            DECLARE @Results TABLE (
+                EMPLOYEE_CODE NVARCHAR(50),
+                EMPLOYEE_NAME NVARCHAR(50)
+            );
+            
+            INSERT INTO @Results
+            EXEC P_GET_EMPLOYEE_CODE_BY_ID 1, ${secretResult[0].value};
+            
+            SELECT EMPLOYEE_CODE FROM @Results;
+        `);
+            console.log('Employee code query result:', employeeResult[0]);
+        if (!employeeResult || employeeResult.length === 0) {
+            console.error('No employee code found for value:', secretResult[0].value);
+            return null;
+        }
+        
+        console.log('Secret key query result Employee:', employeeResult[0].EMPLOYEE_CODE);
+        return employeeResult[0].EMPLOYEE_CODE;
+    } catch (error) {
+        console.error('Error in getSecretKeyValues:', error);
+        return null;
+    }
+}
+
 module.exports = {
     getCompanionsfromDB,
     getTransportAllowancefromDB,
@@ -542,5 +621,6 @@ module.exports = {
     getHotelRoomsPricingFromDB,
     getHotelRoomTypesFromDB,
     submitTripApplication,
-    getHotelsFromDB
+    getHotelsFromDB,
+    getSecretKeyValues
 };

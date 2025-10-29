@@ -7,6 +7,7 @@ const pricingRoutes = require('./routes/pricingRoutes');
 const transportRoutes = require('./routes/transportRoutes');
 const roomTypeRoutes = require('./routes/roomTypeRoutes');
 const companionRoutes = require('./routes/companionRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 
 const app = express();
@@ -119,6 +120,7 @@ app.use('/api', companionRoutes);
 app.use('/api', pricingRoutes);
 app.use('/api', transportRoutes);
 app.use('/api', roomTypeRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

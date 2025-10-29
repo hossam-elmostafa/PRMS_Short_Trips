@@ -8,15 +8,15 @@ router.get('/companions/:employeeId', async (req, res) => {
     const { employeeId } = req.params;
     const lang = req.query.lang || 'ar'; // Get language from query
     
-    console.log('🌐 API Route - Language received:', lang); // ADD THIS
+    //console.log('🌐 API Route - Language received:', lang); // ADD THIS
     
     const companions = await companionService.getCompanions(employeeId, lang);
-
-    if (!companions || companions.length === 0) {
+     
+    if (!companions){ /*|| companions.length === 08)*/ //{ It is valid to have zero companions
       return res.status(404).json({ success: false, message: 'companion not found' });
     }
 
-    console.log('📤 Sending companions:', companions); // ADD THIS
+    //console.log('📤 Sending companions:', companions); // ADD THIS
     res.json({ success: true, data: companions });
   } catch (error) {
     console.error('Error in companions route:', error);

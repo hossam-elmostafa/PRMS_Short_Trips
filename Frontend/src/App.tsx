@@ -246,17 +246,22 @@ const selectHotel = async (hotel: Hotel) => {
   const hasSupportedRoomTypes = supportedRoomTypes.length > 0;
   
   ROOM_TYPES.forEach(rt => {
-    maxBeds[rt.key] = Math.floor(Math.random() * 3);
+    console.log('hotel: ',hotel)  
+    maxBeds[rt.key] =getMaxAllowedExtrabeds(hotel.supportedRoomExtraBeds,rt.key)!;//Math.floor(Math.random() * 3);
+    
     
     // Check if room type is supported AND hotel has room types configured
     const isSupported = hasSupportedRoomTypes && supportedRoomTypes.includes(rt.key);
     
     if (isSupported) {
-      // Keep existing counts for supported room types
+      // Keep existing counts for supported room types   maxExtraBeds
+      //console.log('columns[currentColumn]',columns[currentColumn]);
+      //maxBeds[rt.key] = columns[currentColumn].maxExtraBeds[rt.key] || 0;
       resetRoomCounts[rt.key] = columns[currentColumn].roomCounts[rt.key] || 0;
       resetExtraBeds[rt.key] = columns[currentColumn].extraBedCounts[rt.key] || 0;
     } else {
       // Not supported OR hotel has no room types - set to 0
+      maxBeds[rt.key] =  0;
       resetRoomCounts[rt.key] = 0;
       resetExtraBeds[rt.key] = 0;
     }
@@ -352,6 +357,7 @@ const openCalendar = async (col: number) => {  // ADD async here
 };
 
 const selectDate = (dateObj: Date) => {
+  //console.log(dateObj);
   if (calendarColumn === null) return;
   const yyyy = dateObj.getFullYear();
   const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
@@ -378,7 +384,7 @@ const selectDate = (dateObj: Date) => {
       
       ROOM_TYPES.forEach(rt => {
         const price = priceFor(selectedHotel.id, rt.key, dateObj);
-        
+        //console.log('selectDate priceFor:', selectedHotel.id, rt.key, dateObj, price);
         // Check if room type is supported AND hotel has room types
         const isSupported = hasSupportedRoomTypes && supportedRoomTypes.includes(rt.key);
         
@@ -453,6 +459,8 @@ const updateRoomCount = (col: number, roomKey: string, value: number) => {
   }
 
   const hotelPricing = hotelPricingCache[cacheKey];
+  //console.log(`priceFor hotelId: ${hotelId}, roomTypeKey: ${roomTypeKey}, date: ${dateObj ? dateObj.toISOString().split('T')[0] : 'N/A'}`);
+  //console.log('hotelPricing from cache:', hotelPricing);
   if (!hotelPricing) {
     return { room_price: null, extra_bed_price: null }; // No pricing data available
   }
@@ -464,7 +472,7 @@ const updateRoomCount = (col: number, roomKey: string, value: number) => {
     //console.log(`typeof foundRoom.ROOM_EXTRABED_PRICE : ${foundRoom?.EXTRA_BED_PRICE}`, typeof foundRoom?.EXTRA_BED_PRICE  );
     return {
       room_price: foundRoom && typeof foundRoom.ROOM_PRICE === 'number' ? foundRoom.ROOM_PRICE : null,
-      extra_bed_price: foundRoom && typeof foundRoom.EXTRA_BED_PRICE === 'string' ? foundRoom.EXTRA_BED_PRICE : null,      
+      extra_bed_price: foundRoom ? foundRoom.EXTRA_BED_PRICE : null,      
     };
   } else {
     return {
@@ -490,6 +498,7 @@ const updateRoomCount = (col: number, roomKey: string, value: number) => {
 
 const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
   //console.log('handleTooltipShow')
+  //console.log(1);
   const yyyy = dateObj.getFullYear();
   const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
   const dd = String(dateObj.getDate()).padStart(2, "0");
@@ -504,7 +513,7 @@ const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
     setTooltip({ show: false, x: 0, y: 0, content: '' });
     return;
   }
-
+//console.log(2);
   // Fetch fresh pricing data for this hotel and date if not cached
   const dateStr = yyyy+'-'+mm+'-'+dd;
   const cacheKey = `${hotelId}_${dateStr}`;
@@ -519,10 +528,11 @@ const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
     return;
   
   }
-
+//console.log(3);
   // Filter room types to only show those with valid non-zero prices
   const roomTypesWithPrices = ROOM_TYPES.filter(rt => {
     const price = priceFor(hotelId, rt.key, dateObj);
+    //console.log('Filtering room type:', rt.key, 'with price:', price);
     return price.room_price !== null && price.room_price > 0;
   });
 
@@ -533,15 +543,18 @@ const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
     extraBedPrice = '"' + hotelPricing.extra_bed_price +'"';
   }
 
+  //console.log(4);
+  //console.log('hotelPricing :', hotelPricing);
+  //console.log('extraBedPrice fetched for tooltip:', extraBedPrice);
   // If no room types have prices and no extra bed price, don't show tooltip
   if (roomTypesWithPrices.length === 0 && extraBedPrice === "0") {
     setTooltip({ show: false, x: 0, y: 0, content: '' });
     return;
   }
-
+//console.log(5);
   // Build tooltip HTML only for room types with valid non-zero prices
   let html = `<div style="font-weight:700;margin-bottom:6px">${weekdayFull(dateObj.getDay())} — ${localDateStr}</div>`;
-  
+  //console.log('roomTypesWithPrices:', roomTypesWithPrices);
   if (roomTypesWithPrices.length > 0) {
     html += `<table style="width:100%;font-size:13px;margin-bottom:6px"><thead><tr>
       <th style="padding:2px 8px">${t('pricing.roomType')}</th>
@@ -550,6 +563,7 @@ const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
     
     roomTypesWithPrices.forEach(rt => {
       const price = priceFor(hotelId, rt.key, dateObj);
+      //console.log('price object for room type:', rt.key, price);
       //console.log('price for hotelId:', hotelId, ':rt.key', rt.key);
       //console.log('extraBedPrice price for', rt.key, ':', extraBedPrice , price);
       if (extraBedPrice=="0") //BUG-PR-26-10-2025.5 changed type to string
@@ -563,9 +577,10 @@ const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
 
     html += `</tbody></table>`;
   }
-
+  //console.log('extraBedPrice in tooltip:', extraBedPrice);
   if (extraBedPrice != "0") {
     //BUG-PR-26-10-2025.5 Fixing extra bed price display in tooltip
+    //console.log('Displaying extra bed price in tooltip:', extraBedPrice);
     if(/%/.test(extraBedPrice))
         html += `<div style="margin-top:8px;font-weight:bold;color:#e11d48;text-align:center;border-top:2px solid #e11d48;">${t('pricing.extraBedPrice')}: ${extraBedPrice}</div>`;
       else
@@ -671,17 +686,45 @@ const renderCalendar = () => {
 
       ROOM_TYPES.forEach(rt => {
         const count = colData.roomCounts[rt.key] || 0;
+        const ExtraBedcount = colData.extraBedCounts[rt.key] || 0;
+        //console.log('colData', colData);
         const priceData = priceFor(colData.selectedHotel!.id, rt.key, dateObj);
-        
+        //console.log('Calculating total for room type:', rt.key, 'Count:', count, 'PriceData:', priceData);
     // Check if any room type has a valid non-zero price
     if (priceData.room_price !== null && priceData.room_price > 0) {
       hasAnyPrice = true;
     }
-        
+        //console.log('priceData:', priceData);
+        //console.log('colData:', colData);
     // Only add to total if price is valid and count > 0
     if (count > 0 && priceData.room_price !== null && priceData.room_price > 0) {
       total += priceData.room_price * count;
     }
+
+    if(ExtraBedcount > 0 && priceData.extra_bed_price !== null){
+    console.log('ExtraBedcount', ExtraBedcount);
+      console.log('Calculating extra bed price for', rt.key, 'with extra bed price:', priceData.extra_bed_price);
+        if(/%/.test(priceData.extra_bed_price))
+        {          
+          const priceData_room_price=priceData.room_price? priceData.room_price : 0;
+          const extraBedPriceNum = parseFloat(priceData.extra_bed_price.replace('%',''));
+          total += (extraBedPriceNum / 100) * priceData_room_price * ExtraBedcount;
+        }
+        else
+        {
+          const extraBedPriceNum = parseFloat(priceData.extra_bed_price);
+          console.log ('total before extra bed:', total);
+          total += extraBedPriceNum * ExtraBedcount;
+          console.log ('total after extra bed:', total);
+        }
+    }
+
+    
+
+
+
+
+
       });
     }
 
@@ -793,6 +836,7 @@ const renderCalendar = () => {
   if (colData.selectedHotel && colData.arrivalDate) {
     const dateObj = new Date(colData.arrivalDate);
     priceData = priceFor(colData.selectedHotel.id, rt.key, dateObj);
+    //console.log('Room type:', rt.key, 'Price data on date', colData.arrivalDate, ':', priceData);
     hasValidPrice = priceData.room_price !== null && priceData.room_price > 0;
   }
   
@@ -919,11 +963,31 @@ const renderCalendar = () => {
     );
   };
 
+  function validateChoicesOrder(choices: ColumnState[] | any[]): { valid: boolean; message: string } {
+  let foundEmpty = false;
+  for (let i = 0; i < choices.length; i++) {
+    if (choices[i].selectedCity === '') {
+      foundEmpty = true;
+    } else if (foundEmpty) {
+      // Found a filled element after an empty one
+      return { valid: false, message: 'Please fill elements in order' };
+    }
+  }
+  
+  return { valid: true, message: 'Valid' };
+}
   function getSelectedHotelsData(): { hotelCode: string; hotelName:string; date: string; roomsData: string; }[] {
     const res=[];
+    console.log('getSelectedHotelsData columns:', columns);
+    const r= validateChoicesOrder(Object.values(columns));
+    console.log('validateChoicesOrder result:', r);
+    if(!r.valid){
+      return [];
+    }
+
     for (const col in columns) {
       const columnData = columns[Number(col)];
-      console.log(columnData);
+      //console.log(columnData);
       const selectedHotel = columnData?.selectedHotel;
       
       const hotelName = selectedHotel?.en || selectedHotel?.ar || '';
@@ -944,7 +1008,7 @@ const renderCalendar = () => {
         roomsData: Object.entries(columnData?.roomCounts || {}).map(([key, count]) => `${key},${count},${columnData?.extraBedCounts[key]}`).join('|')
       });
     }
-    console.log('getSelectedHotelsData:', res);
+    //console.log('getSelectedHotelsData:', res);
     return res;
   }
 
@@ -1437,3 +1501,42 @@ const renderCalendar = () => {
 }
 
 export default App;
+
+function getValueByKey(data, key) {
+  // Split the string by comma to get individual pairs
+  const pairs = data.split(',');
+  
+  // Loop through each pair
+  for (let pair of pairs) {
+    // Split by colon to get key and value
+    const [k, v] = pair.split(':');
+    
+    // If the key matches, return the value as a number
+    if (k === key) {
+      return parseInt(v);
+    }
+  }
+  
+  // If key not found, return 0
+  return 0;
+}
+function getMaxAllowedExtrabeds(supportedRoomExtraBeds: String | undefined, roomTybe:String): number {
+  console.log('supportedRoomExtraBeds:', supportedRoomExtraBeds ,'roomTybe: ' , roomTybe);
+  // Split the string by comma to get individual pairs
+  const pairs = supportedRoomExtraBeds?.split(',') ?? [];
+  
+  // Loop through each pair
+  for (let pair of pairs) {
+    // Split by colon to get key and value
+    const [k, v] = pair.split(':');
+    
+    // If the key matches, return the value as a number
+    if (k === roomTybe) {
+      return parseInt(v);
+    }
+  }
+  
+  // If key not found, return 0
+  return 0;
+//  return Math.floor(Math.random() * 3);
+}

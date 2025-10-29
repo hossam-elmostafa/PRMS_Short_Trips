@@ -39,7 +39,7 @@
   },
   "transport": {
     "allowance": "بدل انتقال",
-    "none": "لا يوجد"
+    "none": ""
   },
   "rooms": {
     "types": "أنواع الغرف والسرير الإضافي",
@@ -112,7 +112,7 @@
         "correctErrorsTitle": "أخطاء في التحقق",
     "correctErrors": "الرجاء تصحيح الأخطاء التالية قبل الإرسال:",
     "employeeIdMissing": "الرقم الوظيفي مفقود أو غير صحيح",
-    "noHotelsSelected": "لم يتم تحديد أي فنادق للرحلة",
+    "noHotelsSelected": "لم يتم تحديد أي فنادق للرحلة أو لم يدخلوا بالترتيب",
     "hotelEntryInvalid": "إدخال الفندق رقم {{index}} غير صحيح",
     "hotelCodeEmpty": "إدخال الفندق رقم {{index}} يحتوي على رمز فندق فارغ",
     "hotelMissingDate": "الفندق {{hotelName}}: يفتقد التاريخ",

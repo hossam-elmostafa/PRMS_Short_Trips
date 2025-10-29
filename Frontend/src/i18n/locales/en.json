@@ -39,7 +39,7 @@
   },
   "transport": {
     "allowance": "Travel Allowance",
-    "none": "None"
+    "none": ""
   },
   "rooms": {
     "types": "Room Types and Extra Beds",

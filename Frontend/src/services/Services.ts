@@ -5,7 +5,8 @@ export interface Hotel {
   id: string;
   en: string;
   ar: string;
-  supportedRoomTypes?: string; // Add this field - e.g., "S,D,T"
+  supportedRoomTypes?: string; // Add this field - e.g., "S,D,T";
+  supportedRoomExtraBeds?: string; // e.g., "S:2,D:2,T:1"  
 
 }
 
@@ -57,10 +58,12 @@ export async function getHotelsFromServer() {
 export async function getHotelsByCityFromServer(city: string, lang: 'ar' | 'en' = 'ar') {
   try {
     const response = await fetch(`http://${getApiBase()}/api/hotels/${encodeURIComponent(city)}?lang=${lang}`);
+    console.log('Fetching hotels for city:', response.url);
     if (!response.ok) {
       throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
+    console.log('Fetched hotels for city', city, ':', result);
     if (!result.success) {
       throw new Error(result.message || i18n.t('errors.fetchHotelsByCity'));
     }
@@ -79,7 +82,7 @@ export async function getHotelRoomPricesFromServer(hotelCode: string, date?: str
   try {
     const dateParam = date || new Date().toISOString().slice(0, 10);
     const url = `http://${getApiBase()}/api/hotel/${encodeURIComponent(hotelCode)}/rooms?date=${encodeURIComponent(dateParam)}`;
-    
+    //console.log('Fetching room prices from:', url);
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(i18n.t('errors.httpError', { status: response.status }));
@@ -88,7 +91,7 @@ export async function getHotelRoomPricesFromServer(hotelCode: string, date?: str
     if (!result.success) {
       throw new Error(result.message || i18n.t('errors.fetchHotelRoomPrices'));
     }
-    
+    //console.log('Fetched room prices for hotel', hotelCode, 'on', dateParam, ':', result.data);
     return result.data as HotelRoomPrices;
   } catch (error) {
     console.error(i18n.t('errors.fetchHotelRoomPrices'), error);
@@ -117,7 +120,7 @@ export async function getCompanionsFromServer(employeeID: number, lang?: 'ar' | 
   try {
     const currentLang = lang || i18n.language as 'ar' | 'en';
     const url = `http://${getApiBase()}/api/companions/${employeeID}?lang=${currentLang}`;
-    
+    console.log('Fetching companions from:', url);
     //console.log('🔗 Fetching companions from:', url);
     
     const response = await fetch(url);
@@ -251,6 +254,7 @@ export async function getHotelRoomBedCountsFromServer(hotelCode: string): Promis
     
     const response = await fetch(`http://${getApiBase()}/api/hotel/${encodeURIComponent(hotelCode)}/beds`);
     
+    
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -312,6 +316,8 @@ export async function validateTripData(tripData: {
   if (!hotels || hotels.length === 0) {
     errors.push(i18n.t('validation.noHotelsSelected'));
   }
+
+  console.log('Trip data has', hotels);
   
   // familyIds: if present, split by '|' to count companions
   const famStr = (tripData?.familyIds ?? '').toString().trim();
@@ -426,5 +432,26 @@ export async function submitTripFromServer(
   } catch (err) {
     console.error(i18n.t('errors.networkError'), err);
     return { success: false, errors: [i18n.t('errors.networkError')] };
+  }
+}
+
+//RQ-PR-AA-28-10-2025.01
+export async function getSecretKeyValueFromServer(secret: String) {
+  try {
+    const response = await fetch('http://' + getApiBase() + '/api/admin/key/' + secret);
+    console.log('Fetching secret key from server:', secret);
+    if (!response.ok) {
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
+    }
+    const result = await response.json();
+    console.log('Fetched secret key from server:', result);
+    if (!result.success) {
+      throw new Error(result.message );
+    }
+    //console.log('Secret key value:', result.data);
+    return result.data;
+  } catch (error) {
+    console.error('Secret Key', error);
+    throw error;
   }
 }
