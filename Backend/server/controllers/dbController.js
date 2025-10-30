@@ -2,6 +2,7 @@ require('dotenv').config();
 const prisma = require('../lib/prisma');
 
 async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
+    console.log(`[getHotelsByCityFromDB] lang=${lang}, city=${city}`);
     try {
         //console.log(10);
         let cityInput = String(city).trim();
@@ -63,7 +64,7 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
             INSERT INTO @Results
             EXEC P_GET_STRIP_HOTEL ${bit}, N'${city}';
 
-            SELECT HOTEL_CODE, HOTEL_NAME, HOTEL_ROOM_TYPES,HOTEL_EXTRA_BEDS_COUNTS FROM @Results;
+            SELECT HOTEL_CODE, HOTEL_NAME, HOTEL_ROOM_TYPES,HOTEL_EXTRA_BEDS_COUNTS,HOTEL_BEDS_COUNTS FROM @Results;
         `);
 
         // First try with resolved code; then, if needed, retry with original city name
@@ -79,6 +80,7 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
         const enByCode = new Map();
         const roomTypesByCode = new Map();
         const roomExtraBeds = new Map();
+        const roomBeds = new Map();
         
         (rowsAr || []).forEach(r => {
             const code = String(r.HOTEL_CODE || '').trim();
@@ -94,6 +96,11 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
                     //console.log('Adding extra beds for', code, r.HOTEL_EXTRA_BEDS_COUNTS);
                     roomExtraBeds.set(code, String(r.HOTEL_EXTRA_BEDS_COUNTS).trim());
                 }
+                if (r.HOTEL_BEDS_COUNTS) {
+                    console.log(' beds for', code, r.HOTEL_BEDS_COUNTS);
+                    roomBeds.set(code, String(r.HOTEL_BEDS_COUNTS).trim());
+                }
+                
             }
         });
         
@@ -108,6 +115,10 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
                 if (r.HOTEL_EXTRA_BEDS_COUNTS && !roomExtraBeds.has(code)) {
                     roomExtraBeds.set(code, String(r.HOTEL_EXTRA_BEDS_COUNTS).trim());
                 }
+                if (r.HOTEL_BEDS_COUNTS && !roomBeds.has(code)) {
+                    roomBeds.set(code, String(r.HOTEL_BEDS_COUNTS).trim());
+                }
+                
             }
         });
 
@@ -122,13 +133,15 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
             const id = code || `${cityCode}-${index + 1}`;
             const supportedRoomTypes = roomTypesByCode.get(code) || 'S,D,T'; // Default to all if not specified
             const supportedRoomExtraBeds = roomExtraBeds.get(code) || 'S:0,D:0,T:0'; // Default to all if not specified
+            const supportedRoomBeds = roomBeds.get(code) || 'D:2,FR:4,FS:5,J:6,S:1,T:3'; // Default to all if not specified
             
             return { 
                 id, 
                 ar: arName, 
                 en: enName,
                 supportedRoomTypes, // Add supported room types
-                supportedRoomExtraBeds
+                supportedRoomExtraBeds,
+                supportedRoomBeds
             };
         });
 

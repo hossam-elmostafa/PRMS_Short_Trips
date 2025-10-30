@@ -238,6 +238,7 @@ useEffect(() => {
       (async () => {
         try {
           const hotels = await getHotelsByCityFromServer(city, i18n.language as 'ar' | 'en');
+          console.log('Fetched hotels for city', city, hotels);
           setHOTELS(prev => ({ ...prev, [city]: hotels }));
 
           const allowance = await getTransportAllowanceFromServer(employeeID, city, i18n.language as 'ar' | 'en');
@@ -274,6 +275,7 @@ useEffect(() => {
     }
     try {
       const hotels = await getHotelsByCityFromServer(city, i18n.language as 'ar' | 'en');
+      console.log('Fetched hotels for city 2', city, hotels);
       setHOTELS(prev => ({ ...prev, [city]: hotels }));
     } catch (e) {
       console.error('Failed to refresh hotels for city before opening popup', city, e);
@@ -758,8 +760,14 @@ const renderCalendar = () => {
         if(/%/.test(priceData.extra_bed_price))
         {          
           const priceData_room_price=priceData.room_price? priceData.room_price : 0;
-          const extraBedPriceNum = parseFloat(priceData.extra_bed_price.replace('%',''));
-          total += (extraBedPriceNum / 100) * priceData_room_price * ExtraBedcount;
+          const extraBedPriceNum = parseFloat(priceData.extra_bed_price.replace('%',''))/count;
+          //console.log ('priceData.extra_bed_price:', priceData.extra_bed_price , 'Count: ',count);
+          //console.log ('colData.selectedHotel: ', HOTELS[colData.selectedCity]?.find(h=>h.id===colData.selectedHotel?.id));
+          const bedsCounts=HOTELS[colData.selectedCity]?.find(h=>h.id===colData.selectedHotel?.id).supportedRoomBeds//BUG-PR-26-10-2025.5
+          const bedsCountInARoom=getMaxAllowedExtrabeds(bedsCounts,rt.key)!;
+          console.log ('bedCounts: ', bedsCountInARoom);
+          console.log ('colData: ', colData, 'RT Key: ',rt.key);
+          total += (extraBedPriceNum / 100) * (priceData_room_price/bedsCountInARoom) * ExtraBedcount;//BUG-PR-26-10-2025.5
         }
         else
         {
