@@ -140,31 +140,59 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
     }
 }
 
+// BUG-AZ-PR-29-10-2025.1: Fixed by AG - Use language-specific city names for grouping hotels
+// Issue: Hotels were always grouped by Arabic city names
+// Solution: Query both English and Arabic city names, then group by the requested language
 async function getHotelsFromDB(lang = 'ar') {
     try {
-        // prefer Arabic names unless lang === 'en'
+        // Use language-specific city names
+        const langBit = lang === 'en' ? 1 : 0;
+        console.log(`[getHotelsFromDB] lang=${lang}, langBit=${langBit}`);
         const rows = await prisma.$queryRawUnsafe(`
-            SELECT
+            SELECT TOP 5
                 h.Hotel_Code AS HOTEL_CODE,
                 h.Hotel_Name AS HOTEL_EN_NAME,
                 h.Hotel_TName AS HOTEL_AR_NAME,
-                COALESCE(NULLIF(c.CITIES_TNAME, ''), NULLIF(c.CITIES_NAME, ''), h.Hotel_City) AS CITY_NAME
+                c.CITIES_CODE AS CITY_CODE,
+                c.CITIES_NAME AS CITY_EN_NAME,
+                c.CITIES_TNAME AS CITY_AR_NAME
             FROM PRMS_HOTEL h
             LEFT JOIN CMN_CITIES c ON c.CITIES_CODE = h.Hotel_City
             WHERE ISNULL(h.Hotel_Active, 'Y') = 'Y'
         `);
+        console.log(`[getHotelsFromDB] Sample row:`, rows[0]);
+        
+        // Get all rows for actual processing
+        const allRows = await prisma.$queryRawUnsafe(`
+            SELECT
+                h.Hotel_Code AS HOTEL_CODE,
+                h.Hotel_Name AS HOTEL_EN_NAME,
+                h.Hotel_TName AS HOTEL_AR_NAME,
+                c.CITIES_CODE AS CITY_CODE,
+                c.CITIES_NAME AS CITY_EN_NAME,
+                c.CITIES_TNAME AS CITY_AR_NAME
+            FROM PRMS_HOTEL h
+            LEFT JOIN CMN_CITIES c ON c.CITIES_CODE = h.Hotel_City
+            WHERE ISNULL(h.Hotel_Active, 'Y') = 'Y'
+        `);
+        
         const hotelsByCity = {};
-        (rows || []).forEach(r => {
+        (allRows || []).forEach(r => {
             const code = String(r.HOTEL_CODE || '').trim();
             if (!code) return;
             const en = String(r.HOTEL_EN_NAME || '').trim();
             const ar = String(r.HOTEL_AR_NAME || r.HOTEL_EN_NAME || '').trim();
-            const cityRaw = String(r.CITY_NAME || 'Unknown').trim();
-            const cityKey = cityRaw || 'غير محدد';
+            
+            // BUG-AZ-PR-29-10-2025.1: Use language-specific city name for grouping
+            // CITIES_NAME = English name, CITIES_TNAME = Arabic name (based on database schema)
+            const cityEn = String(r.CITY_EN_NAME || 'Unknown').trim();
+            const cityAr = String(r.CITY_AR_NAME || cityEn || 'غير محدد').trim();
+            const cityKey = lang === 'en' ? cityEn : cityAr;
 
             if (!hotelsByCity[cityKey]) hotelsByCity[cityKey] = [];
             hotelsByCity[cityKey].push({ id: code, en, ar });
         });
+        console.log(`[getHotelsFromDB] City keys:`, Object.keys(hotelsByCity).slice(0, 3));
         return hotelsByCity;
     } catch (error) {
         console.error('getHotelsFromDB: database query failed:', error && error.message ? error.message : error);
@@ -179,9 +207,14 @@ async function getHotelsFromDB(lang = 'ar') {
     }
 }
 
+// BUG-AZ-PR-29-10-2025.1: Fixed by AG - Corrected stored procedure language parameter
+// Issue: Cities were showing in wrong language (reversed)
+// Solution: The stored procedure P_GET_STRIP_CITIES uses reversed logic: 0=English, 1=Arabic
 async function getCitiesFromDB(lang = 'ar') {
     try {
-        const langBit = lang === 'en' ? 1 : 0;
+        // The stored procedure has reversed logic: 0=English, 1=Arabic
+        const langBit = lang === 'en' ? 0 : 1;
+        console.log(`[getCitiesFromDB] lang=${lang}, langBit=${langBit}`);
         const rows = await prisma.$queryRawUnsafe(`
             DECLARE @Results TABLE (
                 CITIES_CODE VARCHAR(50),
@@ -194,7 +227,9 @@ async function getCitiesFromDB(lang = 'ar') {
             SELECT CITIES_CODE, CITIES_NAME FROM @Results;
         `);
 
-        return (rows || []).map(r => ({ code: r.CITIES_CODE, name: r.CITIES_NAME }));
+        const result = (rows || []).map(r => ({ code: r.CITIES_CODE, name: r.CITIES_NAME }));
+        console.log(`[getCitiesFromDB] First 3 cities:`, result.slice(0, 3));
+        return result;
     } catch (error) {
         console.error('Error calling stored procedure P_GET_STRIP_CITIES:', error);
         console.error('Parameters used - lang:', lang);

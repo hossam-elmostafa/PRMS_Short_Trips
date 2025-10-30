@@ -2,8 +2,11 @@ const { getHotelsFromDB,getHotelsByCityFromDB, getCitiesFromDB, getPolicyDataFro
 
 
 
-async function getAllHotels() {
-  return await getHotelsFromDB();
+// BUG-AZ-PR-29-10-2025.1: Fixed by AG - Added language parameter to getAllHotels
+// Issue: Hotels were grouped by Arabic city names regardless of language
+// Solution: Pass language parameter to database controller
+async function getAllHotels(lang = 'ar') {
+  return await getHotelsFromDB(lang);
 }
 
 async function getHotelsByCity(city, lang = 'ar') {
