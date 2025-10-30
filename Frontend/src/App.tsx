@@ -763,7 +763,7 @@ const renderCalendar = () => {
           const extraBedPriceNum = parseFloat(priceData.extra_bed_price.replace('%',''))/count;
           //console.log ('priceData.extra_bed_price:', priceData.extra_bed_price , 'Count: ',count);
           //console.log ('colData.selectedHotel: ', HOTELS[colData.selectedCity]?.find(h=>h.id===colData.selectedHotel?.id));
-          const bedsCounts=HOTELS[colData.selectedCity]?.find(h=>h.id===colData.selectedHotel?.id).supportedRoomBeds//BUG-PR-26-10-2025.5
+          const bedsCounts=HOTELS[colData.selectedCity]?.find(h=>h.id===colData.selectedHotel?.id)?.supportedRoomBeds//BUG-PR-26-10-2025.5
           const bedsCountInARoom=getMaxAllowedExtrabeds(bedsCounts,rt.key)!;
           console.log ('bedCounts: ', bedsCountInARoom);
           console.log ('colData: ', colData, 'RT Key: ',rt.key);

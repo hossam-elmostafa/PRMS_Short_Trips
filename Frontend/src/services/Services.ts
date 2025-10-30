@@ -7,7 +7,7 @@ export interface Hotel {
   ar: string;
   supportedRoomTypes?: string; // Add this field - e.g., "S,D,T";
   supportedRoomExtraBeds?: string; // e.g., "S:2,D:2,T:1"  
-
+  supportedRoomBeds?: string; // e.g., "D:2,FR:4,FS:5,J:6,S:1,T:3"
 }
 
 export interface Companion {
