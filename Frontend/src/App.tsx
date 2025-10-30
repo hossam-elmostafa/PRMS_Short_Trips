@@ -422,8 +422,16 @@ const selectDate = (dateObj: Date) => {
 
 
 const updateRoomCount = (col: number, roomKey: string, value: number) => {
+  //console.log('updateRoomCount called with value:', value);
     const val = Math.max(0, value);
     setColumns(prev => {
+      ///////////////////////////// BUG-AZ-PR-29-10-2025.3
+      if(val<prev[col].roomCounts[roomKey]){
+        //reset extra bed count if room count decreased below extra bed count
+        updateExtraBedCount(col, roomKey, 0);
+      }
+      //////////////////////////////
+      //console.log('Previous state:', prev[col].roomCounts);
       const updated = {
         ...prev,
         [col]: {
