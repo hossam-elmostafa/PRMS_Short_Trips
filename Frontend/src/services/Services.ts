@@ -154,6 +154,40 @@ export async function getCompanionsFromServer(employeeID: number, lang?: 'ar' | 
   }
 }
 
+export async function getLastCompanionsFromServer(employeeID: number, lang: 'ar' | 'en' = 'ar') {
+  try {
+    const url = `http://${getApiBase()}/api/last-companions/${employeeID}?lang=${lang}`;
+    const response = await fetch(url);
+    const result = await response.json();
+    if (result.success) {
+      return result.data as Companion[];
+    } else {
+      console.error(i18n.t('errors.fetchCompanions'), result.message);
+      return [];
+    }
+  } catch (error) {
+    console.error(i18n.t('errors.fetchCompanions'), error);
+    return [];
+  }
+}
+
+export async function getLastHotelsFromServer(employeeID: number, lang: 'ar' | 'en' = 'ar') {
+  try {
+    const url = `http://${getApiBase()}/api/last-hotels/${employeeID}?lang=${lang}`;
+    const response = await fetch(url);
+    const result = await response.json();
+    if (result.success) {
+      return result.data;
+    } else {
+      console.error(i18n.t('errors.fetchHotels'), result.message);
+      return [];
+    }
+  } catch (error) {
+    console.error(i18n.t('errors.fetchHotels'), error);
+    return [];
+  }
+}
+
 export async function getRoomTypesFromServer() {
   try {
     const response = await fetch('http://' + getApiBase() + '/api/room-types');
@@ -449,7 +483,7 @@ export async function submitTripFromServer(
 }
 
 //RQ-PR-AA-28-10-2025.01
-export async function getSecretKeyValueFromServer(secret: String) {
+export async function getSecretKeyValueFromServer(secret: string) {
   try {
     const response = await fetch('http://' + getApiBase() + '/api/admin/key/' + secret);
     console.log('Fetching secret key from server:', secret);

@@ -53,4 +53,19 @@ router.get('/maximum-no-of-companions/:employeeId', async (req, res) => {
   }
 });
 
+router.get('/last-companions/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const lang = req.query.lang || 'ar';
+    const companions = await companionService.getLastCompanions(employeeId, lang);
+    if (!companions) {
+      return res.status(404).json({ success: false, message: 'last companions not found' });
+    }
+    res.json({ success: true, data: companions });
+  } catch (error) {
+    console.error('Error in last-companions route:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 module.exports = router;

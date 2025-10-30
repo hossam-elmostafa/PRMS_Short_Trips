@@ -4,6 +4,9 @@
     "shortTrips": "رحلات قصيرة",
     "english": "English"
   },
+  "policy": {
+    "readonlyNotice": "تم تعطيل الرحلة لأنها قد تم تحديدها مسبقاً"
+  },
   "employee": {
     "name": "اسم الموظف/الموظفة",
     "id": "الرقم الوظيفى"

@@ -553,9 +553,9 @@ async function submitTripApplication(employeeId, familyIds, hotels=[]) {
     if (employeeId  && hotels && hotels.length > 0  )
     {
                 try {
-                    await prisma.$executeRawUnsafe(
-                    `DELETE FROM PRMS_STRIP WHERE STRIP_EmpNo = ${employeeId}`
-                    );
+                    // await prisma.$executeRawUnsafe(
+                    // `DELETE FROM PRMS_STRIP WHERE STRIP_EmpNo = ${employeeId}`
+                    // );
                     await prisma.$queryRawUnsafe(`EXEC P_STRIP_SUBMIT_CLEAR_HOTEL ${employeeId}`);
                 
                     await prisma.$queryRawUnsafe(`
@@ -658,6 +658,72 @@ async function getSecretKeyValues(secret) {
     }
 }
 
+// Get the last saved companions data via stored proc P_GET_STRIP_GET_LAST_EMP_FAMILY
+async function getLastCompanionsFromDB(lang = 'ar', empCode) {
+    try {
+        const langBit = lang === 'ar' ? 1 : 0;
+        empCode = String(empCode).replace(/^:+/, '').trim();
+        
+        const result = await prisma.$queryRawUnsafe(`
+            DECLARE @Results TABLE (
+                EMPFAMILY_RelativeID VARCHAR(150),
+                EMPFAMILY_RELTYPE VARCHAR(20),
+                EMPFAMILY_NAME VARCHAR(300)
+            );
+            INSERT INTO @Results
+            EXEC P_GET_STRIP_GET_LAST_EMP_FAMILY ${langBit}, '${empCode}';
+            SELECT 
+                EMPFAMILY_RelativeID AS RELID, 
+                EMPFAMILY_NAME AS name, 
+                EMPFAMILY_RELTYPE AS rel 
+            FROM @Results;
+        `);
+        return result;
+    } catch (error) {
+        console.error('Error calling stored procedure P_GET_STRIP_GET_LAST_EMP_FAMILY:', error);
+        console.error('Parameters used - empCode:', empCode, 'lang:', lang);
+        return '';
+    }
+}
+
+// Get the last saved hotels data via stored proc P_GET_STRIP_GET_LAST_HOTELS
+async function getLastHotelsFromDB(lang = 'ar', empCode) {
+    try {
+        // Convert lang to bit: 'ar' = 1, anything else = 0
+        const langBit = lang === 'ar' ? 1 : 0;
+        empCode = String(empCode).replace(/^:+/, '').trim();
+        // Call stored procedure and return result table
+        const result = await prisma.$queryRawUnsafe(`
+            DECLARE @Results TABLE (
+                CITY_CODE VARCHAR(50),
+                CITY_NAME VARCHAR(100),
+                HOTEL_CODE VARCHAR(50),
+                HOTEL_NAME VARCHAR(100),
+                REQ_DATE DATETIME,
+                SELECTED_ROOMS VARCHAR(200),
+                TOTAL_COST INT,
+                EMP_COST FLOAT
+            );
+            INSERT INTO @Results
+            EXEC P_GET_STRIP_GET_LAST_HOTELS ${langBit}, '${empCode}';
+            SELECT
+                CITY_CODE,
+                CITY_NAME,
+                HOTEL_CODE,
+                HOTEL_NAME,
+                CONVERT(varchar(10), REQ_DATE, 120) AS REQ_DATE,
+                SELECTED_ROOMS,
+                TOTAL_COST,
+                EMP_COST
+            FROM @Results;`);
+        return result;
+    } catch (error) {
+        console.error('Error calling stored procedure P_GET_STRIP_GET_LAST_HOTELS:', error);
+        console.error('Parameters used - empCode:', empCode, 'lang:', lang);
+        return '';
+    }
+}
+
 module.exports = {
     getCompanionsfromDB,
     getTransportAllowancefromDB,
@@ -670,5 +736,7 @@ module.exports = {
     getHotelRoomTypesFromDB,
     submitTripApplication,
     getHotelsFromDB,
-    getSecretKeyValues
+    getSecretKeyValues,
+    getLastCompanionsFromDB,
+    getLastHotelsFromDB
 };

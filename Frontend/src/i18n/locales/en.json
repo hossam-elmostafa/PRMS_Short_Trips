@@ -4,6 +4,9 @@
     "shortTrips": "Short Trips",
     "english": "العربية"
   },
+  "policy": {
+    "readonlyNotice": "The trip has been disabled as it has been previously selected"
+  },
   "employee": {
     "name": "Employee Name",
     "id": "Employee ID"

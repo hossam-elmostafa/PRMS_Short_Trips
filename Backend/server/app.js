@@ -110,7 +110,9 @@ app.get('/inf', (req, res) => {
       employees: '/api/employees',
       pricing: '/api/pricing',
       transport: '/api/transport',
-      roomTypes: '/api/room-types'
+      roomTypes: '/api/room-types',
+      lastCompanions: '/api/last-companions'
+
     }
   });
 });
@@ -120,7 +122,7 @@ app.use('/api', companionRoutes);
 app.use('/api', pricingRoutes);
 app.use('/api', transportRoutes);
 app.use('/api', roomTypeRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin', adminRoutes); // Admin endpoints
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

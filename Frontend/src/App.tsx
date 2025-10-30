@@ -15,7 +15,9 @@ import {
   City,
   getEmployeeNameFromServer,
   getPolicyDataFromServer,
-  submitTripFromServer
+  submitTripFromServer,
+  getLastCompanionsFromServer,
+  getLastHotelsFromServer
 } from './services/Services';
 
 interface ToastNotification {
@@ -33,6 +35,8 @@ interface ColumnState {
   roomCounts: Record<string, number>;
   extraBedCounts: Record<string, number>;
   maxExtraBeds: Record<string, number>;
+  totalCost?: number;
+  empCost?: number;
 }
 
 interface AppProps {
@@ -66,22 +70,25 @@ function App({ employeeID }: AppProps) {
   const [hotelPricingCache, setHotelPricingCache] = useState<Record<string, PricingPayload>>({});
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [exitingToasts, setExitingToasts] = useState<number[]>([]);
-
-  const showToast = (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, type, title, message }]);
-    setTimeout(() => {
-      dismissToast(id);
-    }, 5000);
-  };
-
-  const dismissToast = (id: number) => {
+  const [readonlyMode, setReadonlyMode] = useState(false);
+  const dismissToast = useCallback((id: number) => {
     setExitingToasts(prev => [...prev, id]);
     setTimeout(() => {
       setToasts(prev => prev.filter(toast => toast.id !== id));
       setExitingToasts(prev => prev.filter(toastId => toastId !== id));
     }, 400);
-  };
+  }, []);
+
+const showToast = useCallback(
+  (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, type, title, message }]);
+    setTimeout(() => {
+      dismissToast(id);
+    }, 5000);
+  },
+  [dismissToast]
+);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -113,11 +120,71 @@ function App({ employeeID }: AppProps) {
       setPolicyStartDate(policyData.startDate)
       setPolicyEndDate(policyData.endDate)
       setEmpContribution(policyData.empContribution || 0)
+      if (policyData?.allColumns?.POLICY_STRIP_ENABLED === 0 || policyData?.allColumns?.POLICY_STRIP_ENABLED === '0') {
+        setReadonlyMode(true);
+        showToast('info', t('policy.readonlyNotice'), '');
+        
+        // Fetch and set last saved data
+        const [lastCompanions, lastHotels] = await Promise.all([
+          getLastCompanionsFromServer(employeeID, currentLang),
+          getLastHotelsFromServer(employeeID, currentLang)
+        ]);
+        console.log('lastCompanions', lastCompanions);
+        console.log('lastHotels', lastHotels);
+        setCOMPANIONS(Array.isArray(lastCompanions) ? lastCompanions : []);
+
+        // Build columns for readonly display from lastHotels only
+        if (Array.isArray(lastHotels) && lastHotels.length > 0) {
+          const cols: Record<number, ColumnState> = {};
+          lastHotels.forEach((hotel, idx) => {
+            cols[idx + 1] = {
+              selectedCity: hotel.CITY_NAME || '',
+              selectedHotel: {
+                id: hotel.HOTEL_CODE,
+                ar: hotel.HOTEL_NAME,
+                en: hotel.HOTEL_NAME,
+                supportedRoomTypes: '',
+                supportedRoomExtraBeds: hotel.HOTEL_EXTRA_BEDS_COUNTS,
+                supportedRoomBeds: hotel.HOTEL_BEDS_COUNTS,
+              },
+              travelAllowance: '',
+              arrivalDate: hotel.REQ_DATE || '',
+              roomCounts: {},
+              extraBedCounts: {},
+              maxExtraBeds: {},
+              totalCost: hotel.TOTAL_COST,
+              empCost: hotel.EMP_COST,
+
+            };
+            if (hotel.SELECTED_ROOMS) {
+              hotel.SELECTED_ROOMS.split('|').forEach((segment: string) => {
+                const parts = segment.split(',');
+                const type = (parts[0] || '').trim();
+                const count = parseInt(parts[1] || '0');
+                const extra = parseInt(parts[2] || '0');
+                cols[idx + 1].roomCounts[type] = count;
+                cols[idx + 1].extraBedCounts[type] = extra;
+                if (hotel.HOTEL_EXTRA_BEDS_COUNTS) {
+                  hotel.HOTEL_EXTRA_BEDS_COUNTS.split(',').forEach((pair: string) => {
+                    const [k, v] = pair.split(':');
+                    if (k && v && k.trim() === type) {
+                      cols[idx + 1].maxExtraBeds[type] = parseInt(v);
+                    }
+                  });
+                }
+              });
+            }
+          });
+          setColumns(cols);
+        }
+      } else {
+        setReadonlyMode(false);
+      }
+      
     };
 
     fetchInitialData();
-  }, [employeeID, i18n.language]);
-
+  }, [employeeID, i18n.language, showToast, t]);
   const [currentColumn, setCurrentColumn] = useState<number | null>(null);
   const [calendarColumn, setCalendarColumn] = useState<number | null>(null);
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
@@ -133,7 +200,7 @@ function App({ employeeID }: AppProps) {
   // The columns now update naturally when their specific data changes
 
   useEffect(() => {
-    if (maximumNoOfHotels === 0) return;
+    if (readonlyMode || maximumNoOfHotels === 0) return;
 
     const newColumns: Record<number, ColumnState> = {};
     for (let i = 1; i <= maximumNoOfHotels; i++) {
@@ -149,7 +216,7 @@ function App({ employeeID }: AppProps) {
       };
     }
     setColumns(newColumns);
-  }, [maximumNoOfHotels, t]);
+  }, [readonlyMode, maximumNoOfHotels, t]);
 
 // BUG-PR-26-10-2025.3: Batch load pricing for entire month to prevent flicker
 // Used useCallback instead of useEffect because:
@@ -783,7 +850,7 @@ const renderCalendar = () => {
 
 
 
-
+    console.log('readonlyMode:', readonlyMode, colData);
       });
     }
 
@@ -800,6 +867,8 @@ const renderCalendar = () => {
           className="w-full border rounded p-3 mb-4 text-lg"
           value={colData.selectedCity}
           onChange={(e) => handleCityChange(col, e.target.value)}
+          disabled={readonlyMode}
+          
         >
           <option value="">{t('city.select')}</option>
           {/* BUG-AZ-PR-29-10-2025.1: Fixed by AG - Use city.code as key and city.name for display */}
@@ -813,6 +882,7 @@ const renderCalendar = () => {
           <button
             className="bg-indigo-600 text-white px-6 py-2 rounded-lg"
             onClick={() => openHotelPopup(col)}
+            disabled={readonlyMode}
           >
             {t('hotel.select')}
           </button>
@@ -861,7 +931,7 @@ const renderCalendar = () => {
         <label className="block font-semibold mb-1">{t('rooms.types')}</label>
         
         {/* Show warning if hotel and date selected but no prices available */}
-        {colData.selectedHotel && colData.arrivalDate && !hasAnyPrice && (
+        {colData.selectedHotel && colData.arrivalDate && !hasAnyPrice && !readonlyMode && (
           <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex items-start gap-2">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
@@ -931,7 +1001,7 @@ const renderCalendar = () => {
         min="0"
         value={roomCount}
         onChange={(e) => updateRoomCount(col, rt.key, parseInt(e.target.value) || 0)}
-        disabled={!isEnabled}
+        disabled={!isEnabled || readonlyMode}
         style={{ 
           width: '40px', 
           textAlign: 'center', 
@@ -950,7 +1020,7 @@ const renderCalendar = () => {
         max="2"
         value={maxBeds}
         readOnly
-        disabled={!isEnabled}
+        disabled={!isEnabled || readonlyMode}
         style={{ 
           width: '32px', 
           textAlign: 'center', 
@@ -968,7 +1038,7 @@ const renderCalendar = () => {
         min="0"
         value={reqBeds}
         onChange={(e) => updateExtraBedCount(col, rt.key, parseInt(e.target.value) || 0)}
-        disabled={!isEnabled}
+        disabled={!isEnabled || readonlyMode}
         style={{ 
           width: '32px', 
           textAlign: 'center', 
@@ -986,6 +1056,7 @@ const renderCalendar = () => {
         <button
           className="bg-indigo-600 text-white px-10 py-2 rounded-lg mt-3"
           onClick={() => openCalendar(col)}
+          disabled={readonlyMode}
         >
           {t('date.select')}
         </button>
@@ -996,23 +1067,28 @@ const renderCalendar = () => {
           value={colData.arrivalDate}
           className="border p-1 rounded w-full bg-gray-50 text-lg"
           placeholder="—"
+          disabled={readonlyMode}
         />
 
-        {total > 0 && (
-          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px', borderRadius: '8px' }} className="mt-4">
-            <div className="font-semibold">
               {/* RQ_HSM_PR_27_10_25.01 */}
-              {t('pricing.total')}: EGP {(total * 3).toFixed(2)}<br />
-              {t('pricing.employee')}: ({empContribution > 0 ? empContribution : 60}%) EGP {(employee * 3).toFixed(2)}
-            </div>
-          </div>
-        )}
+              {((!readonlyMode && total > 0) || (readonlyMode && colData.totalCost != null && colData.empCost != null)) && (
+  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px', borderRadius: '8px' }} className="mt-4">
+    <div className="font-semibold">
+      {t('pricing.total')}: EGP {readonlyMode ? colData.totalCost : (total * 3).toFixed(2)}<br />
+      {t('pricing.employee')}: {readonlyMode
+          ? `EGP ${colData.empCost}`
+          : `(${empContribution > 0 ? empContribution : 60}%) EGP ${(employee * 3).toFixed(2)}`
+        }
+    </div>
+  </div>
+)}
       </section>
+      
     );
+    
   };
 
-  function validateChoicesOrder(choices: ColumnState[] | any[]): { valid: boolean; message: string } {
-  let foundEmpty = false;
+  function validateChoicesOrder(choices: ColumnState[]): { valid: boolean; message: string } {  let foundEmpty = false;
   for (let i = 0; i < choices.length; i++) {
     if (choices[i].selectedCity === '') {
       foundEmpty = true;
@@ -1109,17 +1185,19 @@ const renderCalendar = () => {
           <section className="bg-white p-6 rounded-2xl shadow-lg">
             <label className="block font-semibold mb-2">{t('companions.title')} — {t('companions.max')} {maximumNoOfCompanions}</label>
             <div className="grid grid-cols-4 gap-2">
-              {COMPANIONS.slice(0, 12).map((c, i) => {
-                const companionValue = `${c.rel}|${c.name}|${c.RELID}`;
-                return (
+            {COMPANIONS.slice(0, 12).map((c: Companion, i: number) => {
+              const companionValue = `${c.rel}|${c.name}|${c.RELID}`;
+              return (
                   <div key={`companion-${i}`} className="flex items-center gap-3">
                     <input
                       type="checkbox"
                       checked={selectedCompanions.includes(companionValue)}
                       onChange={(e) => handleCompanionChange(companionValue, e.target.checked)}
                       style={{ width: '20px', height: '20px' }}
+                      disabled={readonlyMode}
                     />
-                    <span>{c.rel} — {c.name} </span>
+                         <span>{c.name} — {c.rel}</span>
+
                   </div>
                 );
               })}
@@ -1141,7 +1219,7 @@ const renderCalendar = () => {
             } else {
               showToast('error', t('errors.submitErrorTitle'), t('errors.submitError'));
             }
-          }} className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
+          }} className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition" disabled={readonlyMode}>
             {t('submit.button')}
           </button>
         </div>
@@ -1166,6 +1244,7 @@ const renderCalendar = () => {
                   key={h.id}
                   className="block w-full text-left p-3 border rounded mb-2 hover:bg-blue-50"
                   onClick={() => selectHotel(h)}
+                  disabled={readonlyMode}
                 >
                   <img
                     src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60"
@@ -1197,6 +1276,7 @@ const renderCalendar = () => {
                     setCalendarMonth(m);
                     setCalendarYear(y);
                   }}
+                  disabled={readonlyMode}
                 >
                   {t('date.prevMonth')}
                 </button>
@@ -1209,6 +1289,7 @@ const renderCalendar = () => {
                     setCalendarMonth(m);
                     setCalendarYear(y);
                   }}
+                  disabled={readonlyMode}
                 >
                   {t('date.nextMonth')}
                 </button>
@@ -1218,6 +1299,7 @@ const renderCalendar = () => {
                     setShowCalendar(false);
                     setTooltip({ show: false, x: 0, y: 0, content: '' });
                   }}
+                  disabled={readonlyMode}
                 >
                   {t('hotel.close')}
                 </button>
@@ -1550,31 +1632,14 @@ const renderCalendar = () => {
 
 export default App;
 
-function getValueByKey(data, key) {
-  // Split the string by comma to get individual pairs
-  const pairs = data.split(',');
-  
-  // Loop through each pair
-  for (let pair of pairs) {
-    // Split by colon to get key and value
-    const [k, v] = pair.split(':');
-    
-    // If the key matches, return the value as a number
-    if (k === key) {
-      return parseInt(v);
-    }
-  }
-  
-  // If key not found, return 0
-  return 0;
-}
-function getMaxAllowedExtrabeds(supportedRoomExtraBeds: String | undefined, roomTybe:String): number {
+
+function getMaxAllowedExtrabeds(supportedRoomExtraBeds: string | undefined, roomTybe:string): number {
   console.log('supportedRoomExtraBeds:', supportedRoomExtraBeds ,'roomTybe: ' , roomTybe);
   // Split the string by comma to get individual pairs
   const pairs = supportedRoomExtraBeds?.split(',') ?? [];
-  
+
   // Loop through each pair
-  for (let pair of pairs) {
+  for (const pair of pairs) {
     // Split by colon to get key and value
     const [k, v] = pair.split(':');
     
