@@ -118,36 +118,35 @@ const showToast = useCallback(
 // 4. Moving it here (before the useEffect that uses it) prevents "used before declaration" errors
 const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, month: number) => {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const pricingPromises: Array<Promise<{ cacheKey: string; pricing: PricingPayload } | null>> = [];
-  setHotelPricingCache(currentCache => {
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const cacheKey = `${hotelId}_${dateStr}`;
-      if (!currentCache[cacheKey]) {  // ← Using currentCache from functional update
-        pricingPromises.push(
-          getHotelRoomPricesFromServer(hotelId, dateStr)
-            .then(pricing => ({ cacheKey, pricing }))
-            .catch(() => null)
-        );
-      }
+  const pricingPromises = [];
+  
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const cacheKey = `${hotelId}_${dateStr}`;
+    
+    // Check cache directly, not inside setState
+    if (!hotelPricingCache[cacheKey]) {
+      pricingPromises.push(
+        getHotelRoomPricesFromServer(hotelId, dateStr)
+          .then(pricing => ({ cacheKey, pricing }))
+          .catch(() => null)
+      );
     }
-    return currentCache; // Return unchanged cache immediately
-  });
-
-
-  // Load all missing prices
+  }
+  
   const results = await Promise.all(pricingPromises);
   const newCache: Record<string, PricingPayload> = {};
+  
   results.forEach(result => {
     if (result) {
       newCache[result.cacheKey] = result.pricing;
     }
   });
-  // Update cache with new prices if any were loaded
+  
   if (Object.keys(newCache).length > 0) {
     setHotelPricingCache(prev => ({ ...prev, ...newCache }));
   }
-}, []);  // ← Empty dependency array - function never recreated
+}, [hotelPricingCache]); // Include hotelPricingCache in dependencies
 
 useEffect(() => {
   // Only run once on mount or when explicitly triggered
@@ -627,14 +626,57 @@ const openCalendar = async (col: number) => {  // ADD async here
   }
 };
 
-const selectDate = (dateObj: Date) => {
-  //console.log(dateObj);
+const selectDate = async (dateObj: Date) => {
+  console.log('selectDate called with:', dateObj);
   if (calendarColumn === null) return;
+  
   const yyyy = dateObj.getFullYear();
   const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
   const dd = String(dateObj.getDate()).padStart(2, "0");
   const dateStr = yyyy+'-'+mm+'-'+dd;
   
+  // Get the CURRENT column's hotel (not from old state)
+  const currentColumn = columns[calendarColumn];
+  const selectedHotel = currentColumn?.selectedHotel;
+  
+  console.log('Calendar column:', calendarColumn);
+  console.log('Current column data:', currentColumn);
+  console.log('Selected hotel:', selectedHotel);
+  
+  if (!selectedHotel) {
+    showToast('warning', t('alerts.selectHotelTitle'), t('alerts.selectHotel'));
+    setShowCalendar(false);
+    return;
+  }
+  
+  // Load pricing for this specific date if not cached
+  const cacheKey = `${selectedHotel.id}_${dateStr}`;
+  console.log('Cache key:', cacheKey);
+  console.log('Cached pricing before fetch:', hotelPricingCache[cacheKey]);
+  
+  if (!hotelPricingCache[cacheKey]) {
+    try {
+      console.log('Fetching pricing for:', selectedHotel.id, dateStr);
+      const pricing = await getHotelRoomPricesFromServer(selectedHotel.id, dateStr);
+      console.log('Fetched pricing:', pricing);
+      
+      setHotelPricingCache(prev => {
+        const updated = { ...prev, [cacheKey]: pricing };
+        console.log('Updated cache:', updated);
+        return updated;
+      });
+      
+      // Wait a moment for state to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } catch (e) {
+      console.error('Failed to load pricing for date', dateStr, e);
+      showToast('error', t('rooms.noPricesTitle'), t('rooms.NotAvailable'));
+      setShowCalendar(false);
+      return;
+    }
+  }
+  
+  // Now update the column with the selected date
   setColumns(prev => {
     const updatedColumn = {
       ...prev[calendarColumn],
@@ -644,41 +686,35 @@ const selectDate = (dateObj: Date) => {
     const resetRoomCounts: Record<string, number> = {};
     const resetExtraBeds: Record<string, number> = {};
     
-    const selectedHotel = prev[calendarColumn].selectedHotel;
+    // Use the hotel from the current column (already verified above)
+    const supportedRoomTypes = selectedHotel.supportedRoomTypes 
+      ? selectedHotel.supportedRoomTypes.split(',').map(t => t.trim())
+      : [];
     
-    if (selectedHotel) {
-      const supportedRoomTypes = selectedHotel.supportedRoomTypes 
-        ? selectedHotel.supportedRoomTypes.split(',').map(t => t.trim())
-        : [];
+    const hasSupportedRoomTypes = supportedRoomTypes.length > 0;
+    
+    ROOM_TYPES.forEach(rt => {
+      // Get price using the CORRECT hotel and date
+      const price = priceFor(selectedHotel.id, rt.key, dateObj);
+      console.log('Price check for room type:', rt.key, 'Price data:', price);
       
-      const hasSupportedRoomTypes = supportedRoomTypes.length > 0;
+      const isSupported = hasSupportedRoomTypes && supportedRoomTypes.includes(rt.key);
       
-      ROOM_TYPES.forEach(rt => {
-        const price = priceFor(selectedHotel.id, rt.key, dateObj);
-        //console.log('selectDate priceFor:', selectedHotel.id, rt.key, dateObj, price);
-        // Check if room type is supported AND hotel has room types
-        const isSupported = hasSupportedRoomTypes && supportedRoomTypes.includes(rt.key);
-        
-        // If hotel has no room types OR room type not supported OR price invalid, set to 0
-        if (!hasSupportedRoomTypes || !isSupported || price.room_price === null || price.room_price === 0) {
-          resetRoomCounts[rt.key] = 0;
-          resetExtraBeds[rt.key] = 0;
-        } else {
-          // Keep existing counts for valid room types
-          resetRoomCounts[rt.key] = prev[calendarColumn].roomCounts[rt.key] || 0;
-          resetExtraBeds[rt.key] = prev[calendarColumn].extraBedCounts[rt.key] || 0;
-        }
-      });
-    } else {
-      // No hotel selected, reset all counts
-      ROOM_TYPES.forEach(rt => {
+      // If hotel has no room types OR room type not supported OR price invalid, set to 0
+      if (!hasSupportedRoomTypes || !isSupported || price.room_price === null || price.room_price === 0) {
         resetRoomCounts[rt.key] = 0;
         resetExtraBeds[rt.key] = 0;
-      });
-    }
+      } else {
+        // Keep existing counts for valid room types
+        resetRoomCounts[rt.key] = prev[calendarColumn].roomCounts[rt.key] || 0;
+        resetExtraBeds[rt.key] = prev[calendarColumn].extraBedCounts[rt.key] || 0;
+      }
+    });
     
     updatedColumn.roomCounts = resetRoomCounts;
     updatedColumn.extraBedCounts = resetExtraBeds;
+    
+    console.log('Updated column state:', updatedColumn);
     
     return {
       ...prev,
@@ -738,8 +774,8 @@ const updateRoomCount = (col: number, roomKey: string, value: number) => {
   }
 
   const hotelPricing = hotelPricingCache[cacheKey];
-  //console.log(`priceFor hotelId: ${hotelId}, roomTypeKey: ${roomTypeKey}, date: ${dateObj ? dateObj.toISOString().split('T')[0] : 'N/A'}`);
-  //console.log('hotelPricing from cache:', hotelPricing);
+  console.log(`priceFor hotelId: ${hotelId}, roomTypeKey: ${roomTypeKey}, date: ${dateObj ? dateObj.toISOString().split('T')[0] : 'N/A'}`);
+  console.log('hotelPricing from cache:', hotelPricing);
   if (!hotelPricing) {
     return { room_price: null, extra_bed_price: null }; // No pricing data available
   }
@@ -944,9 +980,12 @@ const renderCalendar = () => {
               </div>
             );
           })}
+          
         </div>
       </>
+      
     );
+    
   };
 
   const getArabicOrdinal = (num: number): string => {
@@ -1017,7 +1056,10 @@ const renderCalendar = () => {
           // console.log ('total after extra bed:', total);
         }
     }
-
+    console.log('Column data:', colData);
+    console.log('Has any price:', hasAnyPrice);
+    console.log('Supported room types:', colData.selectedHotel?.supportedRoomTypes);
+    
     
 
 
@@ -1257,6 +1299,7 @@ const renderCalendar = () => {
       </section>
       
     );
+    
     
   };
 
