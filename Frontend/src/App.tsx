@@ -17,7 +17,7 @@ import {
   getPolicyDataFromServer,
   submitTripFromServer,
   getLastCompanionsFromServer,
-  getLastHotelsFromServer
+  getLastHotelsFromServer,
 } from './services/Services';
 
 interface ToastNotification {
@@ -47,6 +47,23 @@ interface AppProps {
 type RoomPricing = { ROOM_TYPE: string; ROOM_PRICE: number ,EXTRA_BED_PRICE: string };
 type PricingPayload = RoomPricing[] | (Record<string, number> & { room_price?: number; extra_bed_price?: number });
 
+// Typed shape for rows returned by P_GET_STRIP_GET_LAST_HOTELS
+interface LastHotelRow {
+  CITY_CODE?: string;
+  CITY_NAME?: string;
+  HOTEL_CODE?: string;
+  HOTEL_NAME?: string;
+  REQ_DATE?: string;
+  SELECTED_ROOMS?: string;
+  TOTAL_COST?: number | string;
+  EMP_COST?: number | string;
+  // alternative keys (defensive)
+  cityCode?: string;
+  hotelCode?: string;
+  reqDate?: string;
+  selectedRooms?: string;
+}
+
 function App({ employeeID }: AppProps) {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
@@ -71,6 +88,10 @@ function App({ employeeID }: AppProps) {
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [exitingToasts, setExitingToasts] = useState<number[]>([]);
   const [readonlyMode, setReadonlyMode] = useState(false);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  const [/*forceRefresh*/, setForceRefresh] = useState(0);
+
+
   const dismissToast = useCallback((id: number) => {
     setExitingToasts(prev => [...prev, id]);
     setTimeout(() => {
@@ -89,102 +110,288 @@ const showToast = useCallback(
   },
   [dismissToast]
 );
-
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      const currentLang = i18n.language as 'ar' | 'en';
-
-      const [hotelsData, citiesData, companionsData, roomTypesData, , employeeName, policyData] = await Promise.all([
-        getHotelsFromServer(currentLang),
-        getCitiesFromServer(currentLang),
-        getCompanionsFromServer(employeeID, currentLang),
-        getRoomTypesFromServer(),
-        getTransportOptionsFromServer(employeeID),
-        getEmployeeNameFromServer(employeeID, currentLang),
-        getPolicyDataFromServer(employeeID),
-      ]);
-
-      setHOTELS(hotelsData);
-      setCITIES(citiesData);
-
-      if (Array.isArray(companionsData)) {
-        setCOMPANIONS(companionsData as Companion[]);
-      } else {
-        setCOMPANIONS((companionsData as { companions?: Companion[] })?.companions ?? []);
+// BUG-PR-26-10-2025.3: Batch load pricing for entire month to prevent flicker
+// Used useCallback instead of useEffect because:
+// 1. This function is called from multiple places (useEffect and openCalendar)
+// 2. useCallback prevents the function from being recreated on every render
+// 3. This ensures the useEffect dependency array works correctly without infinite loops
+// 4. Moving it here (before the useEffect that uses it) prevents "used before declaration" errors
+const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, month: number) => {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const pricingPromises: Array<Promise<{ cacheKey: string; pricing: PricingPayload } | null>> = [];
+  setHotelPricingCache(currentCache => {
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const cacheKey = `${hotelId}_${dateStr}`;
+      if (!currentCache[cacheKey]) {  // ← Using currentCache from functional update
+        pricingPromises.push(
+          getHotelRoomPricesFromServer(hotelId, dateStr)
+            .then(pricing => ({ cacheKey, pricing }))
+            .catch(() => null)
+        );
       }
+    }
+    return currentCache; // Return unchanged cache immediately
+  });
 
-      setROOM_TYPES(Array.isArray(roomTypesData) ? roomTypesData : []);
-      setEmployeeName(employeeName)
-      setMaximumNoOfCompanions(policyData.maxCompanions || 0)
-      setMaximumNoOfHotels(policyData.maxHotels || 0)
-      setPolicyStartDate(policyData.startDate)
-      setPolicyEndDate(policyData.endDate)
-      setEmpContribution(policyData.empContribution || 0)
-      if (policyData?.allColumns?.POLICY_STRIP_ENABLED === 0 || policyData?.allColumns?.POLICY_STRIP_ENABLED === '0') {
-        setReadonlyMode(true);
-        showToast('info', t('policy.readonlyNotice'), '');
-        
-        // Fetch and set last saved data
-        const [lastCompanions, lastHotels] = await Promise.all([
-          getLastCompanionsFromServer(employeeID, currentLang),
-          getLastHotelsFromServer(employeeID, currentLang)
-        ]);
-        console.log('lastCompanions', lastCompanions);
-        console.log('lastHotels', lastHotels);
-        setCOMPANIONS(Array.isArray(lastCompanions) ? lastCompanions : []);
 
-        // Build columns for readonly display from lastHotels only
-        if (Array.isArray(lastHotels) && lastHotels.length > 0) {
-          const cols: Record<number, ColumnState> = {};
-          lastHotels.forEach((hotel, idx) => {
-            cols[idx + 1] = {
-              selectedCity: hotel.CITY_NAME || '',
-              selectedHotel: {
-                id: hotel.HOTEL_CODE,
-                ar: hotel.HOTEL_NAME,
-                en: hotel.HOTEL_NAME,
-                supportedRoomTypes: '',
-                supportedRoomExtraBeds: hotel.HOTEL_EXTRA_BEDS_COUNTS,
-                supportedRoomBeds: hotel.HOTEL_BEDS_COUNTS,
-              },
-              travelAllowance: '',
-              arrivalDate: hotel.REQ_DATE || '',
-              roomCounts: {},
-              extraBedCounts: {},
-              maxExtraBeds: {},
-              totalCost: hotel.TOTAL_COST,
-              empCost: hotel.EMP_COST,
+  // Load all missing prices
+  const results = await Promise.all(pricingPromises);
+  const newCache: Record<string, PricingPayload> = {};
+  results.forEach(result => {
+    if (result) {
+      newCache[result.cacheKey] = result.pricing;
+    }
+  });
+  // Update cache with new prices if any were loaded
+  if (Object.keys(newCache).length > 0) {
+    setHotelPricingCache(prev => ({ ...prev, ...newCache }));
+  }
+}, []);  // ← Empty dependency array - function never recreated
 
-            };
-            if (hotel.SELECTED_ROOMS) {
-              hotel.SELECTED_ROOMS.split('|').forEach((segment: string) => {
-                const parts = segment.split(',');
-                const type = (parts[0] || '').trim();
-                const count = parseInt(parts[1] || '0');
-                const extra = parseInt(parts[2] || '0');
-                cols[idx + 1].roomCounts[type] = count;
-                cols[idx + 1].extraBedCounts[type] = extra;
-                if (hotel.HOTEL_EXTRA_BEDS_COUNTS) {
-                  hotel.HOTEL_EXTRA_BEDS_COUNTS.split(',').forEach((pair: string) => {
-                    const [k, v] = pair.split(':');
-                    if (k && v && k.trim() === type) {
-                      cols[idx + 1].maxExtraBeds[type] = parseInt(v);
-                    }
-                  });
-                }
-              });
+useEffect(() => {
+  // Only run once on mount or when explicitly triggered
+  if (initialDataLoaded) return;
+
+  const fetchInitialData = async () => {
+    const currentLang = i18n.language as 'ar' | 'en';
+    const [hotelsData, citiesData, companionsData, roomTypesData, , employeeName, policyData] = await Promise.all([
+      getHotelsFromServer(currentLang),
+      getCitiesFromServer(currentLang),
+      getCompanionsFromServer(employeeID, currentLang),
+      getRoomTypesFromServer(),
+      getTransportOptionsFromServer(employeeID),
+      getEmployeeNameFromServer(employeeID, currentLang),
+      getPolicyDataFromServer(employeeID),
+    ]);
+
+    setHOTELS(hotelsData);
+    setCITIES(citiesData);
+    setROOM_TYPES(Array.isArray(roomTypesData) ? roomTypesData : []);
+    setEmployeeName(employeeName)
+    setMaximumNoOfCompanions(policyData.maxCompanions || 0)
+    setMaximumNoOfHotels(policyData.maxHotels || 0)
+    setPolicyStartDate(policyData.startDate)
+    setPolicyEndDate(policyData.endDate)
+    setEmpContribution(policyData.empContribution || 0)
+    
+    const policyEnabled = policyData?.allColumns?.POLICY_STRIP_ENABLED === 1 || policyData?.allColumns?.POLICY_STRIP_ENABLED === '1';
+    if (policyEnabled) {
+      // Load all companions for checkbox list
+      const allComps: Companion[] = Array.isArray(companionsData) ? companionsData as Companion[] : [];
+      setCOMPANIONS(allComps);
+      
+      // Fetch latest submitted selections
+      const [lastCompanions, lastHotels] = await Promise.all([
+        getLastCompanionsFromServer(employeeID, currentLang),
+        getLastHotelsFromServer(employeeID, currentLang)
+      ]);
+      
+      // Build fresh columns with prefilled city/hotel/date/rooms from lastHotels
+      const freshColumns: Record<number, ColumnState> = {};
+      for (let i = 1; i <= (policyData.maxHotels || 0); i++) {
+        freshColumns[i] = {
+          selectedCity: '',
+          selectedHotel: null,
+          travelAllowance: '',
+          arrivalDate: '',
+          roomCounts: {},
+          extraBedCounts: {},
+          maxExtraBeds: {},
+          totalCost: undefined,
+          empCost: undefined
+        };
+      }
+      (lastHotels as LastHotelRow[] || []).forEach((h: LastHotelRow, idx: number) => {
+        const colIndex = idx + 1;
+        if (!freshColumns[colIndex]) return;
+        const cityName = ((citiesData as City[]).find((c: City) => c.code === (h.CITY_CODE || h.cityCode))?.name) || '';
+        const hotelList = (hotelsData as Record<string, Hotel[]>)[cityName] || [];
+        const selectedHotel = hotelList.find((ht: Hotel) => ht.id === (h.HOTEL_CODE || h.hotelCode)) || null;
+        const roomsStr: string = (h.SELECTED_ROOMS || h.selectedRooms || '').toString();
+        const roomCounts: Record<string, number> = {};
+        const extraBedCounts: Record<string, number> = {};
+        if (roomsStr) {
+          roomsStr.split('|').map((s: string) => s.trim()).filter(Boolean).forEach((part: string) => {
+            const [type, countStr, extraStr] = part.split(',');
+            const key = (type || '').trim();
+            const count = Number(countStr || 0) || 0;
+            const extra = Number(extraStr || 0) || 0;
+            if (key) {
+              roomCounts[key] = count;
+              extraBedCounts[key] = extra;
             }
           });
-          setColumns(cols);
         }
-      } else {
-        setReadonlyMode(false);
-      }
+        const reqDate: string = (h.REQ_DATE || h.reqDate || '').toString().slice(0, 10);
+        freshColumns[colIndex] = {
+          ...freshColumns[colIndex],
+          selectedCity: cityName,
+          selectedHotel,
+          arrivalDate: reqDate,
+          roomCounts,
+          extraBedCounts,
+          totalCost: h.TOTAL_COST !== undefined ? Number(h.TOTAL_COST) : undefined,
+          empCost: h.EMP_COST !== undefined ? Number(h.EMP_COST) : undefined
+        };
+      });
+      setColumns(freshColumns);
       
-    };
+      // Load transport allowances for each column with a city
+      const transportPromises = (lastHotels as LastHotelRow[] || []).map(async (h: LastHotelRow, idx: number) => {
+        const colIndex = idx + 1;
+        const cityName = ((citiesData as City[]).find((c: City) => c.code === (h.CITY_CODE || h.cityCode))?.name) || '';
+        
+        if (cityName) {
+          try {
+            const allowance = await getTransportAllowanceFromServer(employeeID, cityName, currentLang);
+            return { colIndex, allowance: allowance?.label || '' };
+          } catch (e) {
+            console.error('Failed to load transport allowance for city', cityName, e);
+            return { colIndex, allowance: '' };
+          }
+        }
+        return { colIndex, allowance: '' };
+      });
+      
+      const transportResults = await Promise.all(transportPromises);
+      
+      // Update columns with transport allowances
+      setColumns(prev => {
+        const updated = { ...prev };
+        transportResults.forEach(result => {
+          if (updated[result.colIndex]) {
+            updated[result.colIndex] = {
+              ...updated[result.colIndex],
+              travelAllowance: result.allowance
+            };
+          }
+        });
+        return updated;
+      });
+      
+      // Warm pricing cache for the selected hotel/date pairs to avoid false warnings
+      // DO NOT await this - let it run in background
+      (lastHotels as LastHotelRow[] || []).forEach((h: LastHotelRow) => {
+        const hotelCode = (h.HOTEL_CODE || h.hotelCode);
+        const reqDateStr = (h.REQ_DATE || h.reqDate || '').toString().slice(0, 10);
+        if (hotelCode && reqDateStr) {
+          const d = new Date(reqDateStr);
+          if (!isNaN(d.getTime())) {
+            // Load pricing in background - don't await
+            batchLoadMonthPricing(hotelCode, d.getFullYear(), d.getMonth());
+          }
+        }
+      });
+      
+      // Pre-check companions from last companions data
+      const companionRelIds = (Array.isArray(lastCompanions) ? lastCompanions.map((c: Companion) => c.RELID) : []);
+      setCheckedCompanions(companionRelIds);
+      
+      const preselected = allComps
+        .filter(c => companionRelIds.includes(c.RELID))
+        .map(c => `${c.rel}|${c.name}|${c.RELID}`);
+      setSelectedCompanions(preselected);
+      setReadonlyMode(false);
+    } else if (policyData?.allColumns?.POLICY_STRIP_ENABLED === 0 || policyData?.allColumns?.POLICY_STRIP_ENABLED === '0') {
+      setReadonlyMode(true);
+      // Fetch and set last saved data
+      const [lastCompanions, lastHotels] = await Promise.all([
+        getLastCompanionsFromServer(employeeID, currentLang),
+        getLastHotelsFromServer(employeeID, currentLang),
+      ]);
+      setCOMPANIONS(Array.isArray(lastCompanions) ? lastCompanions : []);
+      const checked: string[] = (Array.isArray(lastCompanions) ? lastCompanions.map((c: Companion) => c.RELID) : []);
+      setCheckedCompanions(checked);
+      setSelectedCompanions([]); // not used in readonly, clear to prevent confusion
 
-    fetchInitialData();
-  }, [employeeID, i18n.language, showToast, t]);
+      // Prefill columns as a numbered object
+      const freshColumns: Record<number, ColumnState> = {};
+      ((lastHotels as LastHotelRow[]) || []).forEach((h: LastHotelRow, idx: number) => {
+        const colIndex: number = idx + 1;
+        const cityName = (citiesData.find((c: City) => c.code === (h.CITY_CODE || h.cityCode))?.name) || '';
+        const hotelList = ((hotelsData as Record<string, Hotel[]>)[cityName] as Hotel[]) || [];
+        const selectedHotel = hotelList.find((ht: Hotel) => ht.id === (h.HOTEL_CODE || h.hotelCode)) || null;
+        const roomsStr: string = (h.SELECTED_ROOMS || h.selectedRooms || '').toString();
+        const roomCounts: Record<string, number> = {};
+        const extraBedCounts: Record<string, number> = {};
+        if (roomsStr) {
+          roomsStr.split('|').map((s: string) => s.trim()).filter(Boolean).forEach((part: string) => {
+            const [type, countStr, extraStr] = part.split(',');
+            const key: string = (type || '').trim();
+            const count: number = Number(countStr || 0) || 0;
+            const extra: number = Number(extraStr || 0) || 0;
+            if (key) {
+              roomCounts[key] = count;
+              extraBedCounts[key] = extra;
+            }
+          });
+        }
+        const reqDate: string = (h.REQ_DATE || h.reqDate || '').toString().slice(0, 10);
+        freshColumns[colIndex] = {
+          selectedCity: cityName,
+          selectedHotel,
+          arrivalDate: reqDate,
+          roomCounts,
+          extraBedCounts,
+          travelAllowance: '',
+          maxExtraBeds: {},
+          totalCost: h.TOTAL_COST !== undefined ? Number(h.TOTAL_COST) : undefined,
+          empCost: h.EMP_COST !== undefined ? Number(h.EMP_COST) : undefined
+        };
+      });
+      setColumns(freshColumns);
+      
+      // Load transport allowances for readonly mode
+      const transportPromises = ((lastHotels as LastHotelRow[]) || []).map(async (h: LastHotelRow, idx: number) => {
+        const colIndex = idx + 1;
+        const cityName = (citiesData.find((c: City) => c.code === (h.CITY_CODE || h.cityCode))?.name) || '';
+        
+        if (cityName) {
+          try {
+            const allowance = await getTransportAllowanceFromServer(employeeID, cityName, currentLang);
+            return { colIndex, allowance: allowance?.label || '' };
+          } catch (e) {
+            console.error('Failed to load transport allowance for city in readonly mode', cityName, e);
+            return { colIndex, allowance: '' };
+          }
+        }
+        return { colIndex, allowance: '' };
+      });
+      
+      const transportResults = await Promise.all(transportPromises);
+      
+      // Update columns with transport allowances
+      setColumns(prev => {
+        const updated = { ...prev };
+        transportResults.forEach(result => {
+          if (updated[result.colIndex]) {
+            updated[result.colIndex] = {
+              ...updated[result.colIndex],
+              travelAllowance: result.allowance
+            };
+          }
+        });
+        return updated;
+      });
+      
+      setCheckedCompanions(checked);
+    }
+    
+    // Mark as loaded at the very end
+    setInitialDataLoaded(true);
+  };
+  
+  fetchInitialData();
+  
+  // SIMPLIFIED DEPENDENCY ARRAY - only things that should trigger a full reload
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [employeeID, i18n.language, initialDataLoaded]);
+
+
+
+
+
   const [currentColumn, setCurrentColumn] = useState<number | null>(null);
   const [calendarColumn, setCalendarColumn] = useState<number | null>(null);
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
@@ -194,13 +401,14 @@ const showToast = useCallback(
   });
 
   const [columns, setColumns] = useState<Record<number, ColumnState>>({});
+  const [checkedCompanions, setCheckedCompanions] = useState<string[]>([]);
 
   // BUG-PR-26-10-2025.3: Removed useEffect that was recreating all columns unnecessarily
   // when hotelPricingCache or empContribution changed, causing transport allowance flicker
   // The columns now update naturally when their specific data changes
 
   useEffect(() => {
-    if (readonlyMode || maximumNoOfHotels === 0) return;
+    if (readonlyMode || maximumNoOfHotels === 0 || Object.keys(columns).length > 0) return;
 
     const newColumns: Record<number, ColumnState> = {};
     for (let i = 1; i <= maximumNoOfHotels; i++) {
@@ -208,6 +416,7 @@ const showToast = useCallback(
         selectedCity: '',
         selectedHotel: null,
         // BUG-PR-26-10-2025.3: Initialize with empty string to prevent transport allowance flicker
+        // when transport allowance is being loaded from server
         travelAllowance: '',
         arrivalDate: '',
         roomCounts: {},
@@ -216,45 +425,9 @@ const showToast = useCallback(
       };
     }
     setColumns(newColumns);
-  }, [readonlyMode, maximumNoOfHotels, t]);
+  }, [readonlyMode, maximumNoOfHotels, t, columns]);
 
-// BUG-PR-26-10-2025.3: Batch load pricing for entire month to prevent flicker
-// Used useCallback instead of useEffect because:
-// 1. This function is called from multiple places (useEffect and openCalendar)
-// 2. useCallback prevents the function from being recreated on every render
-// 3. This ensures the useEffect dependency array works correctly without infinite loops
-// 4. Moving it here (before the useEffect that uses it) prevents "used before declaration" errors
-const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, month: number) => {
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const pricingPromises = [];
-  
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const cacheKey = `${hotelId}_${dateStr}`;
-    
-    // Only fetch if not already cached
-    if (!hotelPricingCache[cacheKey]) {
-      pricingPromises.push(
-        getHotelRoomPricesFromServer(hotelId, dateStr)
-          .then(pricing => ({ cacheKey, pricing }))
-          .catch(() => null)
-      );
-    }
-  }
-  
-  const results = await Promise.all(pricingPromises);
-  const newCache: Record<string, PricingPayload> = {};
-  
-  results.forEach(result => {
-    if (result) {
-      newCache[result.cacheKey] = result.pricing;
-    }
-  });
-  
-  if (Object.keys(newCache).length > 0) {
-    setHotelPricingCache(prev => ({ ...prev, ...newCache }));
-  }
-}, [hotelPricingCache]);
+
 
 // BUG-PR-26-10-2025.3: useEffect for calendar pricing loading
 // This useEffect calls batchLoadMonthPricing when calendar is shown and month/year changes
@@ -305,7 +478,7 @@ useEffect(() => {
       (async () => {
         try {
           const hotels = await getHotelsByCityFromServer(city, i18n.language as 'ar' | 'en');
-          console.log('Fetched hotels for city', city, hotels);
+          // console.log('Fetched hotels for city', city, hotels);
           setHOTELS(prev => ({ ...prev, [city]: hotels }));
 
           const allowance = await getTransportAllowanceFromServer(employeeID, city, i18n.language as 'ar' | 'en');
@@ -342,7 +515,7 @@ useEffect(() => {
     }
     try {
       const hotels = await getHotelsByCityFromServer(city, i18n.language as 'ar' | 'en');
-      console.log('Fetched hotels for city 2', city, hotels);
+      // console.log('Fetched hotels for city 2', city, hotels);
       setHOTELS(prev => ({ ...prev, [city]: hotels }));
     } catch (e) {
       console.error('Failed to refresh hotels for city before opening popup', city, e);
@@ -376,7 +549,7 @@ const selectHotel = async (hotel: Hotel) => {
   const hasSupportedRoomTypes = supportedRoomTypes.length > 0;
   
   ROOM_TYPES.forEach(rt => {
-    console.log('hotel: ',hotel)  
+    // console.log('hotel: ',hotel)  
     maxBeds[rt.key] =getMaxAllowedExtrabeds(hotel.supportedRoomExtraBeds,rt.key)!;//Math.floor(Math.random() * 3);
     
     
@@ -791,7 +964,7 @@ const renderCalendar = () => {
       return translatedName;
     }
     // Log missing translations for debugging
-    console.log(`Missing translation for room type key: ${roomType.key}, ar: ${roomType.ar}`);
+    // console.log(`Missing translation for room type key: ${roomType.key}, ar: ${roomType.ar}`);
     return roomType.ar; // Fallback to Arabic name
   };
 
@@ -822,8 +995,8 @@ const renderCalendar = () => {
     }
 
     if(ExtraBedcount > 0 && priceData.extra_bed_price !== null){
-    console.log('ExtraBedcount', ExtraBedcount);
-      console.log('Calculating extra bed price for', rt.key, 'with extra bed price:', priceData.extra_bed_price);
+    // console.log('ExtraBedcount', ExtraBedcount);
+    //   console.log('Calculating extra bed price for', rt.key, 'with extra bed price:', priceData.extra_bed_price);
         if(/%/.test(priceData.extra_bed_price))
         {          
           const priceData_room_price=priceData.room_price? priceData.room_price : 0;
@@ -832,16 +1005,16 @@ const renderCalendar = () => {
           //console.log ('colData.selectedHotel: ', HOTELS[colData.selectedCity]?.find(h=>h.id===colData.selectedHotel?.id));
           const bedsCounts=HOTELS[colData.selectedCity]?.find(h=>h.id===colData.selectedHotel?.id)?.supportedRoomBeds//BUG-PR-26-10-2025.5
           const bedsCountInARoom=getMaxAllowedExtrabeds(bedsCounts,rt.key)!;
-          console.log ('bedCounts: ', bedsCountInARoom);
-          console.log ('colData: ', colData, 'RT Key: ',rt.key);
+          // console.log ('bedCounts: ', bedsCountInARoom);
+          // console.log ('colData: ', colData, 'RT Key: ',rt.key);
           total += (extraBedPriceNum / 100) * (priceData_room_price/bedsCountInARoom) * ExtraBedcount;//BUG-PR-26-10-2025.5
         }
         else
         {
           const extraBedPriceNum = parseFloat(priceData.extra_bed_price);
-          console.log ('total before extra bed:', total);
+          // console.log ('total before extra bed:', total);
           total += extraBedPriceNum * ExtraBedcount;
-          console.log ('total after extra bed:', total);
+          // console.log ('total after extra bed:', total);
         }
     }
 
@@ -850,7 +1023,7 @@ const renderCalendar = () => {
 
 
 
-    console.log('readonlyMode:', readonlyMode, colData);
+    // console.log('readonlyMode:', readonlyMode, colData);
       });
     }
 
@@ -931,7 +1104,7 @@ const renderCalendar = () => {
         <label className="block font-semibold mb-1">{t('rooms.types')}</label>
         
         {/* Show warning if hotel and date selected but no prices available */}
-        {colData.selectedHotel && colData.arrivalDate && !hasAnyPrice && !readonlyMode && (
+        {colData.selectedHotel && colData.arrivalDate && !hasAnyPrice && !readonlyMode && !(colData.totalCost || colData.empCost) && (
           <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex items-start gap-2">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
@@ -947,11 +1120,12 @@ const renderCalendar = () => {
           </div>
         )}
         
+        
         <div>
 {ROOM_TYPES.map(rt => {
-  const maxBeds = colData.maxExtraBeds[rt.key] ?? 0;
-  const roomCount = colData.roomCounts[rt.key] ?? 0;
-  const reqBeds = colData.extraBedCounts[rt.key] ?? 0;
+  const maxBeds = (colData.maxExtraBeds?.[rt.key] ?? 0);
+  const roomCount = (colData.roomCounts?.[rt.key] ?? 0);
+  const reqBeds = (colData.extraBedCounts?.[rt.key] ?? 0);
   
   // Check if this room type is supported by the selected hotel
   const supportedRoomTypes = colData.selectedHotel?.supportedRoomTypes 
@@ -959,7 +1133,7 @@ const renderCalendar = () => {
     : [];
   
   const hasSupportedRoomTypes = supportedRoomTypes.length > 0;
-  const isSupported = hasSupportedRoomTypes && supportedRoomTypes.includes(rt.key);
+  const isSupported = hasSupportedRoomTypes ? supportedRoomTypes.includes(rt.key) : true;
   
   // Check pricing for this room type (only if date is selected)
   let priceData = { room_price: null as number | null, extra_bed_price: null as string | null };
@@ -973,11 +1147,9 @@ const renderCalendar = () => {
   }
   
   // Room type is enabled if:
-  // - Hotel is selected AND hotel has room types configured
-  // - AND room type is supported by hotel
+  // - Hotel is selected AND (no restriction list or room type is supported)
   // - AND (no date selected OR date selected with valid price)
-  const isEnabled = colData.selectedHotel && 
-                    hasSupportedRoomTypes &&
+  const isEnabled = !!colData.selectedHotel && 
                     isSupported && 
                     (!colData.arrivalDate || hasValidPrice);
 
@@ -1072,16 +1244,16 @@ const renderCalendar = () => {
 
               {/* RQ_HSM_PR_27_10_25.01 */}
               {((!readonlyMode && total > 0) || (readonlyMode && colData.totalCost != null && colData.empCost != null)) && (
-  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px', borderRadius: '8px' }} className="mt-4">
-    <div className="font-semibold">
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px', borderRadius: '8px' }} className="mt-4">
+            <div className="font-semibold">
       {t('pricing.total')}: EGP {readonlyMode ? colData.totalCost : (total * 3).toFixed(2)}<br />
       {t('pricing.employee')}: {readonlyMode
           ? `EGP ${colData.empCost}`
           : `(${empContribution > 0 ? empContribution : 60}%) EGP ${(employee * 3).toFixed(2)}`
         }
-    </div>
-  </div>
-)}
+            </div>
+          </div>
+        )}
       </section>
       
     );
@@ -1102,9 +1274,9 @@ const renderCalendar = () => {
 }
   function getSelectedHotelsData(): { hotelCode: string; hotelName:string; date: string; roomsData: string; }[] {
     const res=[];
-    console.log('getSelectedHotelsData columns:', columns);
+    // console.log('getSelectedHotelsData columns:', columns);
     const r= validateChoicesOrder(Object.values(columns));
-    console.log('validateChoicesOrder result:', r);
+    // console.log('validateChoicesOrder result:', r);
     if(!r.valid){
       return [];
     }
@@ -1186,20 +1358,23 @@ const renderCalendar = () => {
             <label className="block font-semibold mb-2">{t('companions.title')} — {t('companions.max')} {maximumNoOfCompanions}</label>
             <div className="grid grid-cols-4 gap-2">
             {COMPANIONS.slice(0, 12).map((c: Companion, i: number) => {
-              const companionValue = `${c.rel}|${c.name}|${c.RELID}`;
-              return (
-                  <div key={`companion-${i}`} className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedCompanions.includes(companionValue)}
-                      onChange={(e) => handleCompanionChange(companionValue, e.target.checked)}
-                      style={{ width: '20px', height: '20px' }}
-                      disabled={readonlyMode}
-                    />
-                         <span>{c.name} — {c.rel}</span>
+                const companionValue = `${c.rel}|${c.name}|${c.RELID}`;
+                  const isChecked = readonlyMode 
+    ? checkedCompanions.includes(String(c.RELID))
+    : selectedCompanions.includes(companionValue);
 
-                  </div>
-                );
+                return (
+                  <div key={`companion-${c.RELID}-${i}`} className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(e) => handleCompanionChange(companionValue, e.target.checked)}
+                    style={{ width: '20px', height: '20px' }}
+                    disabled={readonlyMode}
+                  />
+                  <span>{c.name} — {c.rel}</span>
+                </div>
+                            );
               })}
             </div>
           </section>
@@ -1214,6 +1389,10 @@ const renderCalendar = () => {
             const result = await submitTripFromServer(employeeID, getCompanionsFormated(), getSelectedHotelsData());
             if (result.success) {
               showToast('success', t('success.submitTripTitle'), t('success.submitTrip'));
+                  // Force refresh the data from server
+            setInitialDataLoaded(false); // This will trigger the useEffect to run again
+            setForceRefresh(prev => prev + 1);
+            
             } else if (result.errors && result.errors.length > 0) {
               showToast('error', t('validation.correctErrorsTitle'), result.errors.join('\n'));
             } else {
@@ -1634,10 +1813,10 @@ export default App;
 
 
 function getMaxAllowedExtrabeds(supportedRoomExtraBeds: string | undefined, roomTybe:string): number {
-  console.log('supportedRoomExtraBeds:', supportedRoomExtraBeds ,'roomTybe: ' , roomTybe);
+  // console.log('supportedRoomExtraBeds:', supportedRoomExtraBeds ,'roomTybe: ' , roomTybe);
   // Split the string by comma to get individual pairs
   const pairs = supportedRoomExtraBeds?.split(',') ?? [];
-
+  
   // Loop through each pair
   for (const pair of pairs) {
     // Split by colon to get key and value

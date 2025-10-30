@@ -68,4 +68,16 @@ router.get('/last-companions/:employeeId', async (req, res) => {
   }
 });
 
+router.get('/last-submission/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const lang = req.query.lang || 'ar';
+    const data = await companionService.getLastSubmission(employeeId, lang);
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error in last-submission route:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 module.exports = router;

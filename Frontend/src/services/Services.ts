@@ -502,3 +502,20 @@ export async function getSecretKeyValueFromServer(secret: string) {
     throw error;
   }
 }
+
+export interface LastHotelRow {
+  CITY_CODE?: string;
+  CITY_NAME?: string;
+  HOTEL_CODE?: string;
+  HOTEL_NAME?: string;
+  REQ_DATE?: string;
+  SELECTED_ROOMS?: string;
+  TOTAL_COST?: number | string;
+  EMP_COST?: number | string;
+  cityCode?: string;
+  hotelCode?: string;
+  reqDate?: string;
+  selectedRooms?: string;
+}
+
+

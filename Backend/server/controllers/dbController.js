@@ -724,6 +724,7 @@ async function getLastHotelsFromDB(lang = 'ar', empCode) {
     }
 }
 
+
 module.exports = {
     getCompanionsfromDB,
     getTransportAllowancefromDB,
