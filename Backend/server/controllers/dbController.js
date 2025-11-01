@@ -548,6 +548,310 @@ async function getEmployeeInfoFromDB(employeeId, lang = 'ar') {
     }
 }
 
+// RQ-AZ-PR-31-10-2024.1: Review Trip and Calculate Cost
+// Calls P_STRIP_SUBMIT_FAMILY, P_STRIP_SUBMIT_CLEAR_HOTEL, P_STRIP_SUBMIT_HOTEL (loop)
+async function reviewTripAndCalculateCost(lang = 'ar', empCode, familyIds, hotels = []) {
+    try {
+        const langBit = lang === 'ar' ? 1 : 0;
+        empCode = String(empCode).replace(/^:+/, '').trim();
+        const esc = (s) => String(s || '').replace(/'/g, "''");
+        
+        // 1. Execute P_STRIP_SUBMIT_FAMILY
+        // Handle empty familyIds - pass empty string if no companions selected
+        const familyIdsParam = familyIds && familyIds.trim() !== '' ? familyIds : '';
+        console.log(`[reviewTripAndCalculateCost] Calling P_STRIP_SUBMIT_FAMILY with lang=${langBit}, empCode=${empCode}, familyIds=${familyIdsParam}`);
+        
+        let familySuccess = false;
+        let familyErrorMsg = null;
+        
+        try {
+            // The stored procedure returns result in a result set, not as RETURN value
+            // Call it directly and check the result set
+            const familyResult = await prisma.$queryRawUnsafe(`
+                EXEC P_STRIP_SUBMIT_FAMILY ${langBit}, '${esc(empCode)}', '${esc(familyIdsParam)}';
+            `);
+            console.log('[reviewTripAndCalculateCost] P_STRIP_SUBMIT_FAMILY result:', JSON.stringify(familyResult));
+            
+            if (familyResult && familyResult.length > 0) {
+                const firstRow = familyResult[0];
+                // Check for Result column (common pattern)
+                const resultValue = firstRow.Result || firstRow.RESULT || firstRow.result;
+                const allValues = Object.values(firstRow);
+                const firstValue = allValues.length > 0 ? allValues[0] : null;
+                
+                // Check if result is 1 (success) - could be number or string "1"
+                if (resultValue !== undefined && resultValue !== null) {
+                    const resultNum = Number(resultValue);
+                    const resultStr = String(resultValue).trim();
+                    if (resultNum === 1 || resultStr === '1') {
+                        familySuccess = true;
+                    } else if (resultStr !== '' && !isNaN(resultNum)) {
+                        // It's a number but not 1 - might be an error code
+                        familyErrorMsg = `Family submission failed with code: ${resultNum}`;
+                    } else {
+                        // Might be an error message
+                        familyErrorMsg = String(resultValue);
+                    }
+                } else if (firstValue !== null && firstValue !== undefined) {
+                    // Check first value if Result column doesn't exist
+                    const firstValueNum = Number(firstValue);
+                    const firstValueStr = String(firstValue).trim();
+                    if (firstValueNum === 1 || firstValueStr === '1') {
+                        familySuccess = true;
+                    } else if (firstValueStr !== '' && !isNaN(firstValueNum)) {
+                        familyErrorMsg = `Family submission failed with code: ${firstValueNum}`;
+                    } else {
+                        familyErrorMsg = String(firstValue);
+                    }
+                }
+            }
+            
+        } catch (err) {
+            console.error('[reviewTripAndCalculateCost] Error calling P_STRIP_SUBMIT_FAMILY:', err);
+            return {
+                success: false,
+                message: err.message || 'Failed to call P_STRIP_SUBMIT_FAMILY stored procedure',
+                hotels: []
+            };
+        }
+        
+        console.log('[reviewTripAndCalculateCost] Family success:', familySuccess, 'Error message:', familyErrorMsg);
+        
+        // Check if result is 1 (success)
+        if (!familySuccess) {
+            // Use error message if available, otherwise generic error
+            const errorMsg = familyErrorMsg || 'Failed to submit family members';
+            console.error('[reviewTripAndCalculateCost] Family submission failed:', errorMsg);
+            return {
+                success: false,
+                message: errorMsg,
+                hotels: []
+            };
+        }
+        
+        console.log('[reviewTripAndCalculateCost] Family submission successful');
+        
+        // 2. Execute P_STRIP_SUBMIT_CLEAR_HOTEL
+        await prisma.$queryRawUnsafe(`EXEC P_STRIP_SUBMIT_CLEAR_HOTEL '${esc(empCode)}'`);
+        
+        // 3. Execute P_STRIP_SUBMIT_HOTEL for each hotel
+        const hotelResults = [];
+        if (Array.isArray(hotels) && hotels.length > 0) {
+            for (const h of hotels) {
+                if (!h || !h.hotelCode) {
+                    continue;
+                }
+                
+                try {
+                    const hotelCodeEsc = esc(h.hotelCode);
+                    // Convert date format from "01 NOV 2025" to "YYYY-MM-DD" for SQL Server
+                    let dateFormatted = h.date;
+                    try {
+                        // Try to parse the date string if it's in a format like "01 NOV 2025"
+                        const dateMatch = h.date.match(/(\d{1,2})\s+([A-Z]{3})\s+(\d{4})/i);
+                        if (dateMatch) {
+                            const [, day, month, year] = dateMatch;
+                            const monthMap = {
+                                'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04',
+                                'MAY': '05', 'JUN': '06', 'JUL': '07', 'AUG': '08',
+                                'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12'
+                            };
+                            const monthNum = monthMap[month.toUpperCase()] || month;
+                            dateFormatted = `${year}-${monthNum}-${day.padStart(2, '0')}`;
+                            console.log(`[reviewTripAndCalculateCost] Converted date from "${h.date}" to "${dateFormatted}"`);
+                        }
+                    } catch (dateParseErr) {
+                        // If parsing fails, use the original date string
+                        console.log(`[reviewTripAndCalculateCost] Could not parse date "${h.date}", using as-is`);
+                    }
+                    const dateEsc = esc(dateFormatted);
+                    const roomsDataEsc = esc(h.roomsData);
+                    
+                    console.log(`[reviewTripAndCalculateCost] Calling P_STRIP_SUBMIT_HOTEL with lang=${langBit}, empCode=${empCode}, hotelCode=${hotelCodeEsc}, date=${dateEsc}, rooms=${roomsDataEsc}`);
+                    
+                    const hotelResult = await prisma.$queryRawUnsafe(`
+                        DECLARE @Results TABLE (
+                            TOTAL_COST INT,
+                            EMP_COST FLOAT,
+                            RESUT_MESSAGE NVARCHAR(500)
+                        );
+                        INSERT INTO @Results
+                        EXEC P_STRIP_SUBMIT_HOTEL ${langBit}, '${esc(empCode)}', '${hotelCodeEsc}', '${dateEsc}', '${roomsDataEsc}';
+                        SELECT TOTAL_COST, EMP_COST, RESUT_MESSAGE FROM @Results;
+                    `);
+                    
+                    console.log(`[reviewTripAndCalculateCost] P_STRIP_SUBMIT_HOTEL result for ${h.hotelCode}:`, hotelResult);
+                    
+                    if (hotelResult && hotelResult.length > 0) {
+                        const result = hotelResult[0];
+                        let resultMessage = (result.RESUT_MESSAGE || result.RESULT_MESSAGE || result.Result || '').toString();
+                        // Clean up message - remove carriage returns, line feeds, and trim
+                        resultMessage = resultMessage.replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ').trim();
+                        const totalCost = Number(result.TOTAL_COST) || 0;
+                        const empCost = Number(result.EMP_COST) || 0;
+                        
+                        console.log(`[reviewTripAndCalculateCost] Hotel ${h.hotelCode} - Result message: "${resultMessage}", TotalCost: ${totalCost}, EmpCost: ${empCost}`);
+                        
+                        // Check if result message indicates success
+                        // According to spec: RESUT_MESSAGE = 1 means saved successfully
+                        // The message should be exactly "1" or contain only "1" with whitespace
+                        // If it contains other text (even garbled), it's likely an error message
+                        const resultMsgTrimmed = resultMessage.trim();
+                        
+                        // Check for exact match first (most reliable)
+                        const isExactOne = resultMsgTrimmed === '1' || 
+                                          resultMsgTrimmed === '1.0' ||
+                                          /^\s*1\s*$/.test(resultMsgTrimmed) ||
+                                          (resultMsgTrimmed.length === 1 && resultMsgTrimmed === '1');
+                        
+                        // If not exact, check if message contains only "1" and whitespace/punctuation
+                        // but NOT if it contains letters (even garbled ones suggest an error message)
+                        const hasLetters = /[a-zA-Z\u0600-\u06FF]/.test(resultMsgTrimmed); // ASCII and Arabic letters
+                        const numericOnly = resultMsgTrimmed.replace(/[^0-9]/g, '');
+                        const isNumericOneOnly = !hasLetters && numericOnly === '1';
+                        
+                        const isSuccessMessage = isExactOne || isNumericOneOnly;
+                        
+                        console.log(`[reviewTripAndCalculateCost] Hotel ${h.hotelCode} - Message analysis: trimmed="${resultMsgTrimmed}", numericOnly="${numericOnly}", isSuccessMessage=${isSuccessMessage}`);
+                        
+                        // If message is "1" OR costs are > 0, consider it success
+                        if (isSuccessMessage || totalCost > 0) {
+                            hotelResults.push({
+                                hotelCode: h.hotelCode,
+                                hotelName: h.hotelName || '',
+                                date: h.date,
+                                totalCost: totalCost,
+                                empCost: empCost,
+                                success: true
+                            });
+                            console.log(`[reviewTripAndCalculateCost] Hotel ${h.hotelCode} - Success! TotalCost: ${totalCost}, EmpCost: ${empCost}`);
+                        } else {
+                            // Message is not "1" and costs are 0 - this is an error
+                            const errorMsg = resultMessage || `Failed to submit hotel ${h.hotelCode}`;
+                            console.error(`[reviewTripAndCalculateCost] Hotel submission failed: ${errorMsg}`);
+                            return {
+                                success: false,
+                                message: errorMsg,
+                                hotels: []
+                            };
+                        }
+                    } else {
+                        console.error(`[reviewTripAndCalculateCost] No result returned for hotel ${h.hotelCode}`);
+                        return {
+                            success: false,
+                            message: `No result returned for hotel ${h.hotelCode}`,
+                            hotels: []
+                        };
+                    }
+                } catch (innerErr) {
+                    console.error(`Error submitting hotel ${h.hotelCode}:`, innerErr);
+                    return {
+                        success: false,
+                        message: innerErr.message || `Failed to submit hotel ${h.hotelCode}`,
+                        hotels: []
+                    };
+                }
+            }
+        }
+        
+        return {
+            success: true,
+            message: 'Trip reviewed and costs calculated successfully',
+            hotels: hotelResults
+        };
+        
+    } catch (error) {
+        console.error('Error in reviewTripAndCalculateCost:', error);
+        return {
+            success: false,
+            message: error.message || 'Failed to review trip and calculate costs',
+            hotels: []
+        };
+    }
+}
+
+// RQ-AZ-PR-31-10-2024.1: Check Trip Submission
+// Calls P_STRIP_SUBMIT
+async function checkTripSubmission(lang = 'ar', empCode) {
+    try {
+        const langBit = lang === 'ar' ? 1 : 0;
+        empCode = String(empCode).replace(/^:+/, '').trim();
+        const esc = (s) => String(s || '').replace(/'/g, "''");
+        
+        console.log(`[checkTripSubmission] Calling P_STRIP_SUBMIT with lang=${langBit}, empCode=${empCode}`);
+        
+        // Call the stored procedure directly and check the result set
+        // Similar to how P_STRIP_SUBMIT_FAMILY works
+        const result = await prisma.$queryRawUnsafe(`
+            EXEC P_STRIP_SUBMIT ${langBit}, '${esc(empCode)}';
+        `);
+        
+        console.log('[checkTripSubmission] P_STRIP_SUBMIT result:', JSON.stringify(result));
+        
+        let success = false;
+        let message = '';
+        
+        if (result && result.length > 0) {
+            const firstRow = result[0];
+            // Check for Result column (common pattern)
+            const resultValue = firstRow.Result || firstRow.RESULT || firstRow.result;
+            const allValues = Object.values(firstRow);
+            const firstValue = allValues.length > 0 ? allValues[0] : null;
+            
+            // Check if result is 1 (success) - could be number or string "1"
+            if (resultValue !== undefined && resultValue !== null) {
+                const resultNum = Number(resultValue);
+                const resultStr = String(resultValue).trim();
+                if (resultNum === 1 || resultStr === '1') {
+                    success = true;
+                    message = 'Trip submitted successfully';
+                } else if (resultStr !== '' && !isNaN(resultNum)) {
+                    // It's a number but not 1 - might be an error code
+                    message = `Trip submission failed with code: ${resultNum}`;
+                } else {
+                    // Might be an error message
+                    message = String(resultValue);
+                }
+            } else if (firstValue !== null && firstValue !== undefined) {
+                // Check first value if Result column doesn't exist
+                const firstValueNum = Number(firstValue);
+                const firstValueStr = String(firstValue).trim();
+                if (firstValueNum === 1 || firstValueStr === '1') {
+                    success = true;
+                    message = 'Trip submitted successfully';
+                } else if (firstValueStr !== '' && !isNaN(firstValueNum)) {
+                    message = `Trip submission failed with code: ${firstValueNum}`;
+                } else {
+                    message = String(firstValue);
+                }
+            }
+        }
+        
+        console.log('[checkTripSubmission] Success:', success, 'Message:', message);
+        
+        return {
+            success: success,
+            message: message || (success ? 'Trip submitted successfully' : 'Failed to check trip submission')
+        };
+        
+    } catch (error) {
+        console.error('[checkTripSubmission] Error calling P_STRIP_SUBMIT:', error);
+        
+        // Check if the error is about the procedure not existing
+        if (error.message && error.message.includes('Could not find stored procedure')) {
+            return {
+                success: false,
+                message: 'Stored procedure P_STRIP_SUBMIT not found in database. Please ensure it is created.'
+            };
+        }
+        
+        return {
+            success: false,
+            message: error.message || 'Failed to check trip submission'
+        };
+    }
+}
+
 async function submitTripApplication(employeeId, familyIds, hotels=[]) {
     let results = [];
     if (employeeId  && hotels && hotels.length > 0  )
@@ -693,6 +997,8 @@ async function getLastHotelsFromDB(lang = 'ar', empCode) {
         const langBit = lang === 'ar' ? 1 : 0;
         empCode = String(empCode).replace(/^:+/, '').trim();
         // Call stored procedure and return result table
+        // Procedure returns: CITY_CODE, CITY_NAME, HOTEL_CODE, HOTEL_NAME, REQ_DATE, 
+        // SELECTED_ROOMS, HOTEL_BEDS_COUNTS, HOTEL_EXTRA_BEDS_COUNTS, HOTEL_PIC, TOTAL_COST, EMP_COST
         const result = await prisma.$queryRawUnsafe(`
             DECLARE @Results TABLE (
                 CITY_CODE VARCHAR(50),
@@ -701,6 +1007,9 @@ async function getLastHotelsFromDB(lang = 'ar', empCode) {
                 HOTEL_NAME VARCHAR(100),
                 REQ_DATE DATETIME,
                 SELECTED_ROOMS VARCHAR(200),
+                HOTEL_BEDS_COUNTS VARCHAR(100),
+                HOTEL_EXTRA_BEDS_COUNTS VARCHAR(100),
+                HOTEL_PIC VARCHAR(300),
                 TOTAL_COST INT,
                 EMP_COST FLOAT
             );
@@ -713,6 +1022,9 @@ async function getLastHotelsFromDB(lang = 'ar', empCode) {
                 HOTEL_NAME,
                 CONVERT(varchar(10), REQ_DATE, 120) AS REQ_DATE,
                 SELECTED_ROOMS,
+                HOTEL_BEDS_COUNTS,
+                HOTEL_EXTRA_BEDS_COUNTS,
+                HOTEL_PIC,
                 TOTAL_COST,
                 EMP_COST
             FROM @Results;`);
@@ -739,5 +1051,7 @@ module.exports = {
     getHotelsFromDB,
     getSecretKeyValues,
     getLastCompanionsFromDB,
-    getLastHotelsFromDB
+    getLastHotelsFromDB,
+    reviewTripAndCalculateCost,
+    checkTripSubmission
 };

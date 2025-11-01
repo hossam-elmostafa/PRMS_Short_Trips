@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const e = require('cors');
 const submitTripApplication = require('../controllers/dbController').submitTripApplication;
+const { reviewTripAndCalculateCost, checkTripSubmission } = require('../controllers/dbController');
 
 // router.get('/submit', async (req, res) => {
 //         const result = await submitTripApplication();
@@ -64,6 +65,53 @@ router.post('/submit', async(req, res) => {
         } else {
             return res.status(500).json(result);
         }
+});
+
+// RQ-AZ-PR-31-10-2024.1: Review Trip and Calculate Cost
+router.post('/review-trip', async (req, res) => {
+    const { employeeId, familyIds, hotels, lang } = req.body;
+    
+    if (!employeeId) {
+        return res.status(400).json({
+            success: false,
+            message: 'Employee ID is required'
+        });
+    }
+    
+    if (!hotels || !Array.isArray(hotels)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Hotels must be an array'
+        });
+    }
+    
+    const result = await reviewTripAndCalculateCost(lang || 'ar', employeeId, familyIds || '', hotels);
+    
+    if (result.success) {
+        return res.status(200).json(result);
+    } else {
+        return res.status(500).json(result);
+    }
+});
+
+// RQ-AZ-PR-31-10-2024.1: Check Trip Submission
+router.post('/check-submission', async (req, res) => {
+    const { employeeId, lang } = req.body;
+    
+    if (!employeeId) {
+        return res.status(400).json({
+            success: false,
+            message: 'Employee ID is required'
+        });
+    }
+    
+    const result = await checkTripSubmission(lang || 'ar', employeeId);
+    
+    if (result.success) {
+        return res.status(200).json(result);
+    } else {
+        return res.status(500).json(result);
+    }
 });
 
 module.exports = router;

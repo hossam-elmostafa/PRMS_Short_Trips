@@ -482,6 +482,76 @@ export async function submitTripFromServer(
   }
 }
 
+// RQ-AZ-PR-31-10-2024.1: Review Trip and Calculate Cost
+export interface ReviewHotelResult {
+  hotelCode: string;
+  hotelName: string;
+  date: string;
+  totalCost: number;
+  empCost: number;
+  success: boolean;
+}
+
+export async function reviewTripAndCalculateCostFromServer(
+  employeeID: number,
+  familyIds: string,
+  hotels: { hotelCode: string; hotelName: string; date: string; roomsData: string; }[],
+  lang: 'ar' | 'en' = 'ar'
+): Promise<{ success: boolean; message: string; hotels: ReviewHotelResult[] }> {
+  try {
+    const response = await fetch('http://' + getApiBase() + '/api/review-trip', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        employeeId: employeeID,
+        familyIds: familyIds,
+        hotels: hotels,
+        lang: lang
+      })
+    });
+
+    const data = await response.json();
+    return data;
+  } catch (err) {
+    console.error('Error reviewing trip:', err);
+    return {
+      success: false,
+      message: i18n.t('errors.networkError'),
+      hotels: []
+    };
+  }
+}
+
+// RQ-AZ-PR-31-10-2024.1: Check Trip Submission
+export async function checkTripSubmissionFromServer(
+  employeeID: number,
+  lang: 'ar' | 'en' = 'ar'
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch('http://' + getApiBase() + '/api/check-submission', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        employeeId: employeeID,
+        lang: lang
+      })
+    });
+
+    const data = await response.json();
+    return data;
+  } catch (err) {
+    console.error('Error checking trip submission:', err);
+    return {
+      success: false,
+      message: i18n.t('errors.networkError')
+    };
+  }
+}
+
 //RQ-PR-AA-28-10-2025.01
 export async function getSecretKeyValueFromServer(secret: string) {
   try {

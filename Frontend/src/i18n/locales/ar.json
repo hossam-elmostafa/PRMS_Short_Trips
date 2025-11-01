@@ -67,7 +67,7 @@
       "SU": "جناح",
       "AS": "جناح ملحق",
       "AN": "جناح ملحق",
-      "J": "جناح صغير",
+      "J": "جناح ملحق",
       "PS": "جناح رئاسي",
       "DS": "جناح فاخر"
     }
@@ -93,6 +93,13 @@
   },
   "submit": {
     "button": "إرسال الطلب ورحلة سعيدة"
+  },
+  "review": {
+    "button": "مراجعة الطلب وحساب التكلفة",
+    "title": "مراجعة الطلب",
+    "calculating": "جارٍ حساب التكلفة...",
+    "totalCost": "التكلفة الإجمالية",
+    "employeeCost": "تكلفة الموظف"
   },
   "footer": {
     "company": "First Information & Technology Solutions",
@@ -138,7 +145,9 @@
     "hotelMissingDate": "الفندق {{hotelName}}: يفتقد التاريخ",
     "hotelEmptyRooms": "الفندق {{hotelName}}: بيانات الغرف فارغة",
     "hotelRoomsMismatch": "فندق {{hotelName}}: عدد الأسرة المتوقع {{expected}} سرير (موظف + {{familyCount}} من العائلة), ولكن المطلوب {{actual}} سرير",
-    "hotelRoomsSegmentEmpty": "الفندق {{hotelCode}} قطعة بيانات الغرف رقم {{segment}} فارغة"
+    "hotelRoomsSegmentEmpty": "الفندق {{hotelCode}} قطعة بيانات الغرف رقم {{segment}} فارغة",
+    "atLeastOneHotelRequired": "يجب إدخال خيار واحد على الأقل (فندق مع تاريخ وغرف)",
+    "cityMissingHotel": "العمود {{columnNumber}} - المدينة {{cityName}}: يجب اختيار فندق مع التاريخ والغرف"
   },
   "errors": {
     "fetchHotels": "فشل في جلب الفنادق",
@@ -160,7 +169,9 @@
   },
   "success": {
     "submitTrip": "تم إرسال الطلب بنجاح!",
-        "submitTripTitle": "تم إرسال الرحلة بنجاح"
+        "submitTripTitle": "تم إرسال الرحلة بنجاح",
+        "reviewTrip": "مراجعة الطلب وحساب التكلفة",
+        "readyToSubmit": "جاهز للإرسال"
 
   },
   "loading": {
