@@ -18,7 +18,7 @@ router.get('/key/:secret', async (req, res) => {
         //console.log('Received request for secret:', secret);
         const keyValue = await getSecretKeyValues(secret);
         
-        console.log(`Retrieved value for secret ${secret}:`, keyValue);
+        //console.log(`Retrieved value for secret ${secret}:`, keyValue);
         return res.json({
             success: true,
             data: keyValue

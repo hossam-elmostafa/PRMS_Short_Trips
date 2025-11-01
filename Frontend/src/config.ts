@@ -3,9 +3,9 @@
 // If you later prefer runtime configuration, replace this with a fetch of /config.json
 // from the `public/` folder or inject values into `window` from index.html.
 
-export const BASE_URL = 'localhost';
+export const BASE_URL = 'www.first-systems.com'//'localhost';
 //export const BASE_URL = 'www.first-systems.com';
-export const DEFAULT_API_PORT = '9090';
+export const DEFAULT_API_PORT = '909';
 
 // optional setter for runtime changes (useful in tests)
 export function setBaseUrl(v: string) {

@@ -238,7 +238,7 @@ useEffect(() => {
       (async () => {
         try {
           const hotels = await getHotelsByCityFromServer(city, i18n.language as 'ar' | 'en');
-          console.log('Fetched hotels for city', city, hotels);
+          //console.log('Fetched hotels for city', city, hotels);
           setHOTELS(prev => ({ ...prev, [city]: hotels }));
 
           const allowance = await getTransportAllowanceFromServer(employeeID, city, i18n.language as 'ar' | 'en');
@@ -275,7 +275,7 @@ useEffect(() => {
     }
     try {
       const hotels = await getHotelsByCityFromServer(city, i18n.language as 'ar' | 'en');
-      console.log('Fetched hotels for city 2', city, hotels);
+      //console.log('Fetched hotels for city 2', city, hotels);
       setHOTELS(prev => ({ ...prev, [city]: hotels }));
     } catch (e) {
       console.error('Failed to refresh hotels for city before opening popup', city, e);
@@ -309,7 +309,7 @@ const selectHotel = async (hotel: Hotel) => {
   const hasSupportedRoomTypes = supportedRoomTypes.length > 0;
   
   ROOM_TYPES.forEach(rt => {
-    console.log('hotel: ',hotel)  
+    //console.log('hotel: ',hotel)  
     maxBeds[rt.key] =getMaxAllowedExtrabeds(hotel.supportedRoomExtraBeds,rt.key)!;//Math.floor(Math.random() * 3);
     
     
@@ -724,7 +724,7 @@ const renderCalendar = () => {
       return translatedName;
     }
     // Log missing translations for debugging
-    console.log(`Missing translation for room type key: ${roomType.key}, ar: ${roomType.ar}`);
+    //console.log(`Missing translation for room type key: ${roomType.key}, ar: ${roomType.ar}`);
     return roomType.ar; // Fallback to Arabic name
   };
 
@@ -755,8 +755,8 @@ const renderCalendar = () => {
     }
 
     if(ExtraBedcount > 0 && priceData.extra_bed_price !== null){
-    console.log('ExtraBedcount', ExtraBedcount);
-      console.log('Calculating extra bed price for', rt.key, 'with extra bed price:', priceData.extra_bed_price);
+      //console.log('ExtraBedcount', ExtraBedcount);
+      //console.log('Calculating extra bed price for', rt.key, 'with extra bed price:', priceData.extra_bed_price);
         if(/%/.test(priceData.extra_bed_price))
         {          
           const priceData_room_price=priceData.room_price? priceData.room_price : 0;
@@ -765,16 +765,16 @@ const renderCalendar = () => {
           //console.log ('colData.selectedHotel: ', HOTELS[colData.selectedCity]?.find(h=>h.id===colData.selectedHotel?.id));
           const bedsCounts=HOTELS[colData.selectedCity]?.find(h=>h.id===colData.selectedHotel?.id)?.supportedRoomBeds//BUG-PR-26-10-2025.5
           const bedsCountInARoom=getMaxAllowedExtrabeds(bedsCounts,rt.key)!;
-          console.log ('bedCounts: ', bedsCountInARoom);
-          console.log ('colData: ', colData, 'RT Key: ',rt.key);
+          //console.log ('bedCounts: ', bedsCountInARoom);
+          //console.log ('colData: ', colData, 'RT Key: ',rt.key);
           total += (extraBedPriceNum / 100) * (priceData_room_price/bedsCountInARoom) * ExtraBedcount;//BUG-PR-26-10-2025.5
         }
         else
         {
           const extraBedPriceNum = parseFloat(priceData.extra_bed_price);
-          console.log ('total before extra bed:', total);
+          //console.log ('total before extra bed:', total);
           total += extraBedPriceNum * ExtraBedcount;
-          console.log ('total after extra bed:', total);
+          //console.log ('total after extra bed:', total);
         }
     }
 
@@ -1026,9 +1026,9 @@ const renderCalendar = () => {
 }
   function getSelectedHotelsData(): { hotelCode: string; hotelName:string; date: string; roomsData: string; }[] {
     const res=[];
-    console.log('getSelectedHotelsData columns:', columns);
+    //console.log('getSelectedHotelsData columns:', columns);
     const r= validateChoicesOrder(Object.values(columns));
-    console.log('validateChoicesOrder result:', r);
+    //console.log('validateChoicesOrder result:', r);
     if(!r.valid){
       return [];
     }
@@ -1569,7 +1569,7 @@ function getValueByKey(data, key) {
   return 0;
 }
 function getMaxAllowedExtrabeds(supportedRoomExtraBeds: String | undefined, roomTybe:String): number {
-  console.log('supportedRoomExtraBeds:', supportedRoomExtraBeds ,'roomTybe: ' , roomTybe);
+  //console.log('supportedRoomExtraBeds:', supportedRoomExtraBeds ,'roomTybe: ' , roomTybe);
   // Split the string by comma to get individual pairs
   const pairs = supportedRoomExtraBeds?.split(',') ?? [];
   

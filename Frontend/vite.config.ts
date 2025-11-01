@@ -1,9 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import fs from 'fs';
+import path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    port: 5173,
+    https: {
+      key: fs.readFileSync('../backend/certs/localhost.key'),
+      cert: fs.readFileSync('../backend/certs/localhost.crt'),
+    },
+  },
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
@@ -48,6 +57,7 @@ export default defineConfig({
     
     // Increase chunk size warning limit
     chunkSizeWarningLimit: 1000,
+    
   },
   
   // Security headers (if using Vite preview)
@@ -58,4 +68,5 @@ export default defineConfig({
       'X-XSS-Protection': '1; mode=block',
     },
   },
+  
 });

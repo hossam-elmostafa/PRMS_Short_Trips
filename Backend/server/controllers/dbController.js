@@ -2,7 +2,7 @@ require('dotenv').config();
 const prisma = require('../lib/prisma');
 
 async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
-    console.log(`[getHotelsByCityFromDB] lang=${lang}, city=${city}`);
+    //console.log(`[getHotelsByCityFromDB] lang=${lang}, city=${city}`);
     try {
         //console.log(10);
         let cityInput = String(city).trim();
@@ -97,7 +97,7 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
                     roomExtraBeds.set(code, String(r.HOTEL_EXTRA_BEDS_COUNTS).trim());
                 }
                 if (r.HOTEL_BEDS_COUNTS) {
-                    console.log(' beds for', code, r.HOTEL_BEDS_COUNTS);
+                    //console.log(' beds for', code, r.HOTEL_BEDS_COUNTS);
                     roomBeds.set(code, String(r.HOTEL_BEDS_COUNTS).trim());
                 }
                 
@@ -160,7 +160,7 @@ async function getHotelsFromDB(lang = 'ar') {
     try {
         // Use language-specific city names
         const langBit = lang === 'en' ? 1 : 0;
-        console.log(`[getHotelsFromDB] lang=${lang}, langBit=${langBit}`);
+        //console.log(`[getHotelsFromDB] lang=${lang}, langBit=${langBit}`);
         const rows = await prisma.$queryRawUnsafe(`
             SELECT TOP 5
                 h.Hotel_Code AS HOTEL_CODE,
@@ -173,7 +173,7 @@ async function getHotelsFromDB(lang = 'ar') {
             LEFT JOIN CMN_CITIES c ON c.CITIES_CODE = h.Hotel_City
             WHERE ISNULL(h.Hotel_Active, 'Y') = 'Y'
         `);
-        console.log(`[getHotelsFromDB] Sample row:`, rows[0]);
+        //console.log(`[getHotelsFromDB] Sample row:`, rows[0]);
         
         // Get all rows for actual processing
         const allRows = await prisma.$queryRawUnsafe(`
@@ -205,7 +205,7 @@ async function getHotelsFromDB(lang = 'ar') {
             if (!hotelsByCity[cityKey]) hotelsByCity[cityKey] = [];
             hotelsByCity[cityKey].push({ id: code, en, ar });
         });
-        console.log(`[getHotelsFromDB] City keys:`, Object.keys(hotelsByCity).slice(0, 3));
+        //console.log(`[getHotelsFromDB] City keys:`, Object.keys(hotelsByCity).slice(0, 3));
         return hotelsByCity;
     } catch (error) {
         console.error('getHotelsFromDB: database query failed:', error && error.message ? error.message : error);
@@ -227,7 +227,7 @@ async function getCitiesFromDB(lang = 'ar') {
     try {
         // The stored procedure has reversed logic: 0=English, 1=Arabic
         const langBit = lang === 'en' ? 0 : 1;
-        console.log(`[getCitiesFromDB] lang=${lang}, langBit=${langBit}`);
+        //console.log(`[getCitiesFromDB] lang=${lang}, langBit=${langBit}`);
         const rows = await prisma.$queryRawUnsafe(`
             DECLARE @Results TABLE (
                 CITIES_CODE VARCHAR(50),
@@ -241,7 +241,7 @@ async function getCitiesFromDB(lang = 'ar') {
         `);
 
         const result = (rows || []).map(r => ({ code: r.CITIES_CODE, name: r.CITIES_NAME }));
-        console.log(`[getCitiesFromDB] First 3 cities:`, result.slice(0, 3));
+        //console.log(`[getCitiesFromDB] First 3 cities:`, result.slice(0, 3));
         return result;
     } catch (error) {
         console.error('Error calling stored procedure P_GET_STRIP_CITIES:', error);
@@ -269,18 +269,18 @@ async function getCompanionsfromDB(employeeId, lang = 'en') {
             
             SELECT EMPFAMILY_RelativeID AS RELID ,EMPFAMILY_RELTYPE AS rel,EMPFAMILY_NAME AS name FROM @Results
         `);
-        console.log(`
-            DECLARE @Results TABLE (
-                EMPFAMILY_RelativeID VARCHAR(50),
-                EMPFAMILY_RELTYPE VARCHAR(10),
-                EMPFAMILY_NAME VARCHAR(100)
-            )
+        // console.log(`
+        //     DECLARE @Results TABLE (
+        //         EMPFAMILY_RelativeID VARCHAR(50),
+        //         EMPFAMILY_RELTYPE VARCHAR(10),
+        //         EMPFAMILY_NAME VARCHAR(100)
+        //     )
             
-            INSERT INTO @Results
-            EXEC P_GET_STRIP_EMP_FAMILY ${langBit}, '${empCode}'
+        //     INSERT INTO @Results
+        //     EXEC P_GET_STRIP_EMP_FAMILY ${langBit}, '${empCode}'
             
-            SELECT EMPFAMILY_RelativeID AS RELID ,EMPFAMILY_RELTYPE AS rel,EMPFAMILY_NAME AS name FROM @Results
-        `);
+        //     SELECT EMPFAMILY_RelativeID AS RELID ,EMPFAMILY_RELTYPE AS rel,EMPFAMILY_NAME AS name FROM @Results
+        // `);
         
         return result;
         
@@ -440,7 +440,7 @@ async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
             //     FROM GetHotelRoomPrices(N'${code}') 
             //     WHERE PRICE_DATE = N'${date}'
             // `);
-            console.log(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}',N'${date}'`);
+            //console.log(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}',N'${date}'`);
             const rows = await prisma.$queryRawUnsafe(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}',N'${date}'`);
             return rows;
         } catch (error) {
@@ -590,7 +590,7 @@ async function submitTripApplication(employeeId, familyIds, hotels=[]) {
                         EXEC P_STRIP_SUBMIT  ${employeeId}
                     `);
                     
-                        console.log('Trip application submitted successfully for employeeId:', employeeId);
+                        //console.log('Trip application submitted successfully for employeeId:', employeeId);
                     return {
                         success: true,
                         message: 'Messagge from submitTripApplication',
@@ -615,9 +615,9 @@ async function getSecretKeyValues(secret) {
         const secretResult = await prisma.$queryRawUnsafe(`
             SELECT [value] FROM tempdb..##SecretKeyValue WHERE [key] = N'${String(secret).replace(/'/g, "''")}';
         `);
-            console.log('Secret key query result:', secretResult[0]);
+            //console.log('Secret key query result:', secretResult[0]);
         if (!secretResult || secretResult.length === 0 || !secretResult[0].value) {
-            console.error('No value found for secret key:', secret);
+            //console.error('No value found for secret key:', secret);
             return null;
         }
 
@@ -633,24 +633,34 @@ async function getSecretKeyValues(secret) {
             
             SELECT EMPLOYEE_CODE FROM @Results;
         `);
-            console.log(`
-            DECLARE @Results TABLE (
-                EMPLOYEE_CODE NVARCHAR(50),
-                EMPLOYEE_NAME NVARCHAR(50)
-            );
+        //     console.log(`
+        //     DECLARE @Results TABLE (
+        //         EMPLOYEE_CODE NVARCHAR(50),
+        //         EMPLOYEE_NAME NVARCHAR(50)
+        //     );
             
-            INSERT INTO @Results
-            EXEC P_GET_EMPLOYEE_CODE_BY_ID 1, ${secretResult[0].value};
+        //     INSERT INTO @Results
+        //     EXEC P_GET_EMPLOYEE_CODE_BY_ID 1, ${secretResult[0].value};
             
-            SELECT EMPLOYEE_CODE FROM @Results;
-        `);
-            console.log('Employee code query result:', employeeResult[0]);
+        //     SELECT EMPLOYEE_CODE FROM @Results;
+        // `);
+        //     console.log('Employee code query result:', employeeResult[0]);
         if (!employeeResult || employeeResult.length === 0) {
             console.error('No employee code found for value:', secretResult[0].value);
             return null;
         }
         
-        console.log('Secret key query result Employee:', employeeResult[0].EMPLOYEE_CODE);
+        //console.log('Secret key query result Employee:', employeeResult[0].EMPLOYEE_CODE);
+        
+        // Clean up: delete the secret key entry after use after a short delay. If it is deleted immediately, 
+        // the calling code may not have time to read it.
+        setTimeout(async() => {
+  
+        const deleteResult = await prisma.$queryRawUnsafe(`
+            DELETE FROM tempdb..##SecretKeyValue WHERE [key] = N'${String(secret).replace(/'/g, "''")}';
+        `);
+
+}, 700);
         return employeeResult[0].EMPLOYEE_CODE;
     } catch (error) {
         console.error('Error in getSecretKeyValues:', error);

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const hotelRoutes = require('./routes/hotelRoutes');
 const pricingRoutes = require('./routes/pricingRoutes');
 const transportRoutes = require('./routes/transportRoutes');
@@ -12,18 +13,49 @@ const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 909;
+const certPath = path.join(process.cwd(), 'certs');
+// ✅ SSL certificate paths
+const sslOptions = {
+  key: fs.readFileSync(path.join(certPath, 'localhost.key')),
+  cert: fs.readFileSync(path.join(certPath, 'localhost.crt')),
+};
+
+// Create HTTPS server  
+https.createServer(sslOptions, app).listen(PORT, () => {
+  console.log(`✅ HTTPS Server running at https://localhost:${PORT}`);
+  console.log(`📘 API Documentation: https://localhost:${PORT}/`);
+});
 
 // 2. Define your CORS options
-const allowedOrigins = ['http://www.first-systems.com:909','http://localhost:909','http://localhost:5005','http://localhost:5173'];
+const allowedDomains = ['www.first-systems.com','localhost','Phpco.local'];
 
 const corsOptions = {
   origin: function (origin, callback) {
+    //console.log('CORS Origin:', origin);
+    if (!origin) return callback(null, true);
+
     // Check if the incoming origin is the one we want to allow
-    if (allowedOrigins.includes(origin) || !origin) {
-      callback(null, true); // Allow the request
-    } else {
-      callback(new Error('Not allowed by CORS')); // Block the request
+try {
+      const url = new URL(origin);
+      //console.log('CORS Hostname:', url.hostname);
+      const hostname = url.hostname;
+      //console.log('CORS Hostname:', hostname);
+
+      if (allowedDomains.includes(hostname)) {
+        callback(null, true); // Allow any port on the allowed domain
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    } catch (err) {
+      callback(new Error('Invalid origin'));
     }
+
+
+    // if (allowedOrigins.includes(origin) || !origin) {
+    //   callback(null, true); // Allow the request
+    // } else {
+    //   callback(new Error('Not allowed by CORS')); // Block the request
+    // }
   }
 };
 

@@ -51,7 +51,7 @@ router.get('/hotel/:hotelCode/rooms', async (req, res) => {
     const { hotelCode } = req.params;
     const { date } = req.query; // Optional date parameter
     const pricing = await hotelService.getHotelRoomPrices(hotelCode, date);
-    console.log (pricing);
+    //console.log (pricing);
     res.json({ success: true, data: pricing });
   } catch (error) {
     console.error('Error in hotel rooms pricing route:', error);
