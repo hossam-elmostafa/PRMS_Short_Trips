@@ -15,7 +15,11 @@ import {
   City,
   getEmployeeNameFromServer,
   getPolicyDataFromServer,
-  submitTripFromServer
+  getLastCompanionsFromServer,
+  getLastHotelsFromServer,
+  reviewTripAndCalculateCostFromServer,
+  checkTripSubmissionFromServer,
+  ReviewHotelResult,
 } from './services/Services';
 
 interface ToastNotification {
@@ -33,6 +37,8 @@ interface ColumnState {
   roomCounts: Record<string, number>;
   extraBedCounts: Record<string, number>;
   maxExtraBeds: Record<string, number>;
+  totalCost?: number;
+  empCost?: number;
 }
 
 interface AppProps {
@@ -42,6 +48,23 @@ interface AppProps {
 // Define types for hotel pricing cache
 type RoomPricing = { ROOM_TYPE: string; ROOM_PRICE: number ,EXTRA_BED_PRICE: string };
 type PricingPayload = RoomPricing[] | (Record<string, number> & { room_price?: number; extra_bed_price?: number });
+
+// Typed shape for rows returned by P_GET_STRIP_GET_LAST_HOTELS
+interface LastHotelRow {
+  CITY_CODE?: string;
+  CITY_NAME?: string;
+  HOTEL_CODE?: string;
+  HOTEL_NAME?: string;
+  REQ_DATE?: string;
+  SELECTED_ROOMS?: string;
+  TOTAL_COST?: number | string;
+  EMP_COST?: number | string;
+  // alternative keys (defensive)
+  cityCode?: string;
+  hotelCode?: string;
+  reqDate?: string;
+  selectedRooms?: string;
+}
 
 function App({ employeeID }: AppProps) {
   const { t, i18n } = useTranslation();
@@ -62,95 +85,35 @@ function App({ employeeID }: AppProps) {
   const [maximumNoOfHotels, setMaximumNoOfHotels] = useState<number>(0);
   const [policyStartDate, setPolicyStartDate] = useState<string | null>(null);
   const [policyEndDate, setPolicyEndDate] = useState<string | null>(null);
-  const [empContribution, setEmpContribution] = useState<number>(0);
+  // RQ-AZ-PR-31-10-2024.1: empContribution no longer needed - costs come from database via review button
+  // const [empContribution, setEmpContribution] = useState<number>(0);
   const [hotelPricingCache, setHotelPricingCache] = useState<Record<string, PricingPayload>>({});
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [exitingToasts, setExitingToasts] = useState<number[]>([]);
+  const [readonlyMode, setReadonlyMode] = useState(false);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  const [/*forceRefresh*/, setForceRefresh] = useState(0);
+  const [isReviewSuccessful, setIsReviewSuccessful] = useState(false);
 
-  const showToast = (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, type, title, message }]);
-    setTimeout(() => {
-      dismissToast(id);
-    }, 5000);
-  };
 
-  const dismissToast = (id: number) => {
+  const dismissToast = useCallback((id: number) => {
     setExitingToasts(prev => [...prev, id]);
     setTimeout(() => {
       setToasts(prev => prev.filter(toast => toast.id !== id));
       setExitingToasts(prev => prev.filter(toastId => toastId !== id));
     }, 400);
-  };
+  }, []);
 
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      const currentLang = i18n.language as 'ar' | 'en';
-
-      const [hotelsData, citiesData, companionsData, roomTypesData, , employeeName, policyData] = await Promise.all([
-        getHotelsFromServer(currentLang),
-        getCitiesFromServer(currentLang),
-        getCompanionsFromServer(employeeID, currentLang),
-        getRoomTypesFromServer(),
-        getTransportOptionsFromServer(employeeID),
-        getEmployeeNameFromServer(employeeID, currentLang),
-        getPolicyDataFromServer(employeeID),
-      ]);
-
-      setHOTELS(hotelsData);
-      setCITIES(citiesData);
-
-      if (Array.isArray(companionsData)) {
-        setCOMPANIONS(companionsData as Companion[]);
-      } else {
-        setCOMPANIONS((companionsData as { companions?: Companion[] })?.companions ?? []);
-      }
-
-      setROOM_TYPES(Array.isArray(roomTypesData) ? roomTypesData : []);
-      setEmployeeName(employeeName)
-      setMaximumNoOfCompanions(policyData.maxCompanions || 0)
-      setMaximumNoOfHotels(policyData.maxHotels || 0)
-      setPolicyStartDate(policyData.startDate)
-      setPolicyEndDate(policyData.endDate)
-      setEmpContribution(policyData.empContribution || 0)
-    };
-
-    fetchInitialData();
-  }, [employeeID, i18n.language]);
-
-  const [currentColumn, setCurrentColumn] = useState<number | null>(null);
-  const [calendarColumn, setCalendarColumn] = useState<number | null>(null);
-  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
-  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
-  const [tooltip, setTooltip] = useState<{show: boolean, x: number, y: number, content: string}>({
-    show: false, x: 0, y: 0, content: ''
-  });
-
-  const [columns, setColumns] = useState<Record<number, ColumnState>>({});
-
-  // BUG-PR-26-10-2025.3: Removed useEffect that was recreating all columns unnecessarily
-  // when hotelPricingCache or empContribution changed, causing transport allowance flicker
-  // The columns now update naturally when their specific data changes
-
-  useEffect(() => {
-    if (maximumNoOfHotels === 0) return;
-
-    const newColumns: Record<number, ColumnState> = {};
-    for (let i = 1; i <= maximumNoOfHotels; i++) {
-      newColumns[i] = {
-        selectedCity: '',
-        selectedHotel: null,
-        // BUG-PR-26-10-2025.3: Initialize with empty string to prevent transport allowance flicker
-        travelAllowance: '',
-        arrivalDate: '',
-        roomCounts: {},
-        extraBedCounts: {},
-        maxExtraBeds: {}
-      };
-    }
-    setColumns(newColumns);
-  }, [maximumNoOfHotels, t]);
-
+const showToast = useCallback(
+  (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, type, title, message }]);
+    setTimeout(() => {
+      dismissToast(id);
+    }, 5000);
+  },
+  [dismissToast]
+);
 // BUG-PR-26-10-2025.3: Batch load pricing for entire month to prevent flicker
 // Used useCallback instead of useEffect because:
 // 1. This function is called from multiple places (useEffect and openCalendar)
@@ -165,7 +128,7 @@ const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, 
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const cacheKey = `${hotelId}_${dateStr}`;
     
-    // Only fetch if not already cached
+    // Check cache directly, not inside setState
     if (!hotelPricingCache[cacheKey]) {
       pricingPromises.push(
         getHotelRoomPricesFromServer(hotelId, dateStr)
@@ -187,7 +150,287 @@ const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, 
   if (Object.keys(newCache).length > 0) {
     setHotelPricingCache(prev => ({ ...prev, ...newCache }));
   }
-}, [hotelPricingCache]);
+}, [hotelPricingCache]); // Include hotelPricingCache in dependencies
+
+  useEffect(() => {
+  // Only run once on mount or when explicitly triggered
+  if (initialDataLoaded) return;
+
+    const fetchInitialData = async () => {
+      const currentLang = i18n.language as 'ar' | 'en';
+      const [hotelsData, citiesData, companionsData, roomTypesData, , employeeName, policyData] = await Promise.all([
+        getHotelsFromServer(currentLang),
+        getCitiesFromServer(currentLang),
+        getCompanionsFromServer(employeeID, currentLang),
+        getRoomTypesFromServer(),
+        getTransportOptionsFromServer(employeeID),
+        getEmployeeNameFromServer(employeeID, currentLang),
+        getPolicyDataFromServer(employeeID),
+      ]);
+
+      setHOTELS(hotelsData);
+      setCITIES(citiesData);
+      setROOM_TYPES(Array.isArray(roomTypesData) ? roomTypesData : []);
+      setEmployeeName(employeeName)
+      setMaximumNoOfCompanions(policyData.maxCompanions || 0)
+      setMaximumNoOfHotels(policyData.maxHotels || 0)
+      setPolicyStartDate(policyData.startDate)
+      setPolicyEndDate(policyData.endDate)
+    // setEmpContribution(policyData.empContribution || 0) // No longer needed - costs come from database
+    
+    const policyEnabled = policyData?.allColumns?.POLICY_STRIP_ENABLED === 1 || policyData?.allColumns?.POLICY_STRIP_ENABLED === '1';
+    if (policyEnabled) {
+      // Load all companions for checkbox list
+      const allComps: Companion[] = Array.isArray(companionsData) ? companionsData as Companion[] : [];
+      setCOMPANIONS(allComps);
+      
+      // Fetch latest submitted selections
+      const [lastCompanions, lastHotels] = await Promise.all([
+        getLastCompanionsFromServer(employeeID, currentLang),
+        getLastHotelsFromServer(employeeID, currentLang)
+      ]);
+      
+      // Build fresh columns with prefilled city/hotel/date/rooms from lastHotels
+      const freshColumns: Record<number, ColumnState> = {};
+      for (let i = 1; i <= (policyData.maxHotels || 0); i++) {
+        freshColumns[i] = {
+          selectedCity: '',
+          selectedHotel: null,
+          travelAllowance: '',
+          arrivalDate: '',
+          roomCounts: {},
+          extraBedCounts: {},
+          maxExtraBeds: {},
+          totalCost: undefined,
+          empCost: undefined
+        };
+      }
+      (lastHotels as LastHotelRow[] || []).forEach((h: LastHotelRow, idx: number) => {
+        const colIndex = idx + 1;
+        if (!freshColumns[colIndex]) return;
+        const cityName = ((citiesData as City[]).find((c: City) => c.code === (h.CITY_CODE || h.cityCode))?.name) || '';
+        const hotelList = (hotelsData as Record<string, Hotel[]>)[cityName] || [];
+        const selectedHotel = hotelList.find((ht: Hotel) => ht.id === (h.HOTEL_CODE || h.hotelCode)) || null;
+        const roomsStr: string = (h.SELECTED_ROOMS || h.selectedRooms || '').toString();
+        const roomCounts: Record<string, number> = {};
+        const extraBedCounts: Record<string, number> = {};
+        if (roomsStr) {
+          roomsStr.split('|').map((s: string) => s.trim()).filter(Boolean).forEach((part: string) => {
+            const [type, countStr, extraStr] = part.split(',');
+            const key = (type || '').trim();
+            const count = Number(countStr || 0) || 0;
+            const extra = Number(extraStr || 0) || 0;
+            if (key) {
+              roomCounts[key] = count;
+              extraBedCounts[key] = extra;
+            }
+          });
+        }
+        const reqDate: string = (h.REQ_DATE || h.reqDate || '').toString().slice(0, 10);
+        freshColumns[colIndex] = {
+          ...freshColumns[colIndex],
+          selectedCity: cityName,
+          selectedHotel,
+          arrivalDate: reqDate,
+          roomCounts,
+          extraBedCounts,
+          totalCost: h.TOTAL_COST !== undefined ? Number(h.TOTAL_COST) : undefined,
+          empCost: h.EMP_COST !== undefined ? Number(h.EMP_COST) : undefined
+        };
+      });
+      setColumns(freshColumns);
+      
+      // Load transport allowances for each column with a city
+      const transportPromises = (lastHotels as LastHotelRow[] || []).map(async (h: LastHotelRow, idx: number) => {
+        const colIndex = idx + 1;
+        const cityName = ((citiesData as City[]).find((c: City) => c.code === (h.CITY_CODE || h.cityCode))?.name) || '';
+        
+        if (cityName) {
+          try {
+            const allowance = await getTransportAllowanceFromServer(employeeID, cityName, currentLang);
+            return { colIndex, allowance: allowance?.label || '' };
+          } catch (e) {
+            console.error('Failed to load transport allowance for city', cityName, e);
+            return { colIndex, allowance: '' };
+          }
+        }
+        return { colIndex, allowance: '' };
+      });
+      
+      const transportResults = await Promise.all(transportPromises);
+      
+      // Update columns with transport allowances
+      setColumns(prev => {
+        const updated = { ...prev };
+        transportResults.forEach(result => {
+          if (updated[result.colIndex]) {
+            updated[result.colIndex] = {
+              ...updated[result.colIndex],
+              travelAllowance: result.allowance
+            };
+          }
+        });
+        return updated;
+      });
+      
+      // Warm pricing cache for the selected hotel/date pairs to avoid false warnings
+      // DO NOT await this - let it run in background
+      (lastHotels as LastHotelRow[] || []).forEach((h: LastHotelRow) => {
+        const hotelCode = (h.HOTEL_CODE || h.hotelCode);
+        const reqDateStr = (h.REQ_DATE || h.reqDate || '').toString().slice(0, 10);
+        if (hotelCode && reqDateStr) {
+          const d = new Date(reqDateStr);
+          if (!isNaN(d.getTime())) {
+            // Load pricing in background - don't await
+            batchLoadMonthPricing(hotelCode, d.getFullYear(), d.getMonth());
+          }
+        }
+      });
+      
+      // Pre-check companions from last companions data
+      const companionRelIds = (Array.isArray(lastCompanions) ? lastCompanions.map((c: Companion) => c.RELID) : []);
+      setCheckedCompanions(companionRelIds);
+      
+      const preselected = allComps
+        .filter(c => companionRelIds.includes(c.RELID))
+        .map(c => `${c.rel}|${c.name}|${c.RELID}`);
+      setSelectedCompanions(preselected);
+      setReadonlyMode(false);
+    } else if (policyData?.allColumns?.POLICY_STRIP_ENABLED === 0 || policyData?.allColumns?.POLICY_STRIP_ENABLED === '0') {
+      setReadonlyMode(true);
+      // Fetch and set last saved data
+      const [lastCompanions, lastHotels] = await Promise.all([
+        getLastCompanionsFromServer(employeeID, currentLang),
+        getLastHotelsFromServer(employeeID, currentLang),
+      ]);
+      setCOMPANIONS(Array.isArray(lastCompanions) ? lastCompanions : []);
+      const checked: string[] = (Array.isArray(lastCompanions) ? lastCompanions.map((c: Companion) => c.RELID) : []);
+      setCheckedCompanions(checked);
+      setSelectedCompanions([]); // not used in readonly, clear to prevent confusion
+
+      // Prefill columns as a numbered object
+      const freshColumns: Record<number, ColumnState> = {};
+      ((lastHotels as LastHotelRow[]) || []).forEach((h: LastHotelRow, idx: number) => {
+        const colIndex: number = idx + 1;
+        const cityName = (citiesData.find((c: City) => c.code === (h.CITY_CODE || h.cityCode))?.name) || '';
+        const hotelList = ((hotelsData as Record<string, Hotel[]>)[cityName] as Hotel[]) || [];
+        const selectedHotel = hotelList.find((ht: Hotel) => ht.id === (h.HOTEL_CODE || h.hotelCode)) || null;
+        const roomsStr: string = (h.SELECTED_ROOMS || h.selectedRooms || '').toString();
+        const roomCounts: Record<string, number> = {};
+        const extraBedCounts: Record<string, number> = {};
+        if (roomsStr) {
+          roomsStr.split('|').map((s: string) => s.trim()).filter(Boolean).forEach((part: string) => {
+            const [type, countStr, extraStr] = part.split(',');
+            const key: string = (type || '').trim();
+            const count: number = Number(countStr || 0) || 0;
+            const extra: number = Number(extraStr || 0) || 0;
+            if (key) {
+              roomCounts[key] = count;
+              extraBedCounts[key] = extra;
+            }
+          });
+        }
+        const reqDate: string = (h.REQ_DATE || h.reqDate || '').toString().slice(0, 10);
+        freshColumns[colIndex] = {
+          selectedCity: cityName,
+          selectedHotel,
+          arrivalDate: reqDate,
+          roomCounts,
+          extraBedCounts,
+          travelAllowance: '',
+          maxExtraBeds: {},
+          totalCost: h.TOTAL_COST !== undefined ? Number(h.TOTAL_COST) : undefined,
+          empCost: h.EMP_COST !== undefined ? Number(h.EMP_COST) : undefined
+        };
+      });
+      setColumns(freshColumns);
+      
+      // Load transport allowances for readonly mode
+      const transportPromises = ((lastHotels as LastHotelRow[]) || []).map(async (h: LastHotelRow, idx: number) => {
+        const colIndex = idx + 1;
+        const cityName = (citiesData.find((c: City) => c.code === (h.CITY_CODE || h.cityCode))?.name) || '';
+        
+        if (cityName) {
+          try {
+            const allowance = await getTransportAllowanceFromServer(employeeID, cityName, currentLang);
+            return { colIndex, allowance: allowance?.label || '' };
+          } catch (e) {
+            console.error('Failed to load transport allowance for city in readonly mode', cityName, e);
+            return { colIndex, allowance: '' };
+          }
+        }
+        return { colIndex, allowance: '' };
+      });
+      
+      const transportResults = await Promise.all(transportPromises);
+      
+      // Update columns with transport allowances
+      setColumns(prev => {
+        const updated = { ...prev };
+        transportResults.forEach(result => {
+          if (updated[result.colIndex]) {
+            updated[result.colIndex] = {
+              ...updated[result.colIndex],
+              travelAllowance: result.allowance
+            };
+          }
+        });
+        return updated;
+      });
+      
+      setCheckedCompanions(checked);
+    }
+    
+    // Mark as loaded at the very end
+    setInitialDataLoaded(true);
+    };
+
+    fetchInitialData();
+  
+  // SIMPLIFIED DEPENDENCY ARRAY - only things that should trigger a full reload
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [employeeID, i18n.language, initialDataLoaded]);
+
+
+
+
+
+  const [currentColumn, setCurrentColumn] = useState<number | null>(null);
+  const [calendarColumn, setCalendarColumn] = useState<number | null>(null);
+  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
+  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
+  const [tooltip, setTooltip] = useState<{show: boolean, x: number, y: number, content: string}>({
+    show: false, x: 0, y: 0, content: ''
+  });
+
+  const [columns, setColumns] = useState<Record<number, ColumnState>>({});
+  const [checkedCompanions, setCheckedCompanions] = useState<string[]>([]);
+
+  // BUG-PR-26-10-2025.3: Removed useEffect that was recreating all columns unnecessarily
+  // when hotelPricingCache or empContribution changed, causing transport allowance flicker
+  // The columns now update naturally when their specific data changes
+
+  useEffect(() => {
+    if (readonlyMode || maximumNoOfHotels === 0 || Object.keys(columns).length > 0) return;
+
+    const newColumns: Record<number, ColumnState> = {};
+    for (let i = 1; i <= maximumNoOfHotels; i++) {
+      newColumns[i] = {
+        selectedCity: '',
+        selectedHotel: null,
+        // BUG-PR-26-10-2025.3: Initialize with empty string to prevent transport allowance flicker
+        // when transport allowance is being loaded from server
+        travelAllowance: '',
+        arrivalDate: '',
+        roomCounts: {},
+        extraBedCounts: {},
+        maxExtraBeds: {}
+      };
+    }
+    setColumns(newColumns);
+  }, [readonlyMode, maximumNoOfHotels, t, columns]);
+
+
 
 // BUG-PR-26-10-2025.3: useEffect for calendar pricing loading
 // This useEffect calls batchLoadMonthPricing when calendar is shown and month/year changes
@@ -213,11 +456,14 @@ useEffect(() => {
     } else {
       setSelectedCompanions(selectedCompanions.filter(c => c !== value));
     }
+    // Reset review state when companions change
+    setIsReviewSuccessful(false);
   };
 
   
 
   const handleCityChange = (col: number, city: string) => {
+    setIsReviewSuccessful(false); // Clear costs when city changes
     setColumns(prev => ({
       ...prev,
       [col]: {
@@ -230,9 +476,13 @@ useEffect(() => {
         arrivalDate: '',
         roomCounts: {},
         extraBedCounts: {},
-        maxExtraBeds: {}
+        maxExtraBeds: {},
+        totalCost: undefined,
+        empCost: undefined
       }
     }));
+    // Reset review state when city changes
+    setIsReviewSuccessful(false);
 
     if (city) {
       (async () => {
@@ -337,10 +587,14 @@ const selectHotel = async (hotel: Hotel) => {
       selectedHotel: hotel,
       maxExtraBeds: maxBeds,
       roomCounts: resetRoomCounts,
-      extraBedCounts: resetExtraBeds
+        extraBedCounts: resetExtraBeds,
+        totalCost: undefined,
+        empCost: undefined
     }
   }));
 
+  // Reset review state when hotel changes
+  setIsReviewSuccessful(false);
   setShowHotelPopup(false);
 
   try {
@@ -387,26 +641,71 @@ const openCalendar = async (col: number) => {  // ADD async here
   }
 };
 
-const selectDate = (dateObj: Date) => {
-  //console.log(dateObj);
+const selectDate = async (dateObj: Date) => {
+  //console.log('selectDate called with:', dateObj);
   if (calendarColumn === null) return;
+  
   const yyyy = dateObj.getFullYear();
   const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
   const dd = String(dateObj.getDate()).padStart(2, "0");
   const dateStr = yyyy+'-'+mm+'-'+dd;
   
+  // Get the CURRENT column's hotel (not from old state)
+  const currentColumn = columns[calendarColumn];
+  const selectedHotel = currentColumn?.selectedHotel;
+  
+  //console.log('Calendar column:', calendarColumn);
+  //console.log('Current column data:', currentColumn);
+  //console.log('Selected hotel:', selectedHotel);
+  
+  if (!selectedHotel) {
+    showToast('warning', t('alerts.selectHotelTitle'), t('alerts.selectHotel'));
+    setShowCalendar(false);
+    return;
+  }
+  
+  // Load pricing for this specific date if not cached
+  const cacheKey = `${selectedHotel.id}_${dateStr}`;
+  //console.log('Cache key:', cacheKey);
+  //console.log('Cached pricing before fetch:', hotelPricingCache[cacheKey]);
+  
+  if (!hotelPricingCache[cacheKey]) {
+    try {
+      //console.log('Fetching pricing for:', selectedHotel.id, dateStr);
+      const pricing = await getHotelRoomPricesFromServer(selectedHotel.id, dateStr);
+      //console.log('Fetched pricing:', pricing);
+      
+      setHotelPricingCache(prev => {
+        const updated = { ...prev, [cacheKey]: pricing };
+       // console.log('Updated cache:', updated);
+        return updated;
+      });
+      
+      // Wait a moment for state to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } catch (e) {
+      console.error('Failed to load pricing for date', dateStr, e);
+      showToast('error', t('rooms.noPricesTitle'), t('rooms.NotAvailable'));
+      setShowCalendar(false);
+      return;
+    }
+  }
+  
+  // Now update the column with the selected date
   setColumns(prev => {
     const updatedColumn = {
       ...prev[calendarColumn],
-      arrivalDate: dateStr
+      arrivalDate: dateStr,
+      totalCost: undefined,
+      empCost: undefined
     };
+    // Reset review state when date changes
+    setIsReviewSuccessful(false);
     
     const resetRoomCounts: Record<string, number> = {};
     const resetExtraBeds: Record<string, number> = {};
     
-    const selectedHotel = prev[calendarColumn].selectedHotel;
-    
-    if (selectedHotel) {
+    // Use the hotel from the current column (already verified above)
       const supportedRoomTypes = selectedHotel.supportedRoomTypes 
         ? selectedHotel.supportedRoomTypes.split(',').map(t => t.trim())
         : [];
@@ -414,9 +713,10 @@ const selectDate = (dateObj: Date) => {
       const hasSupportedRoomTypes = supportedRoomTypes.length > 0;
       
       ROOM_TYPES.forEach(rt => {
+      // Get price using the CORRECT hotel and date
         const price = priceFor(selectedHotel.id, rt.key, dateObj);
-        //console.log('selectDate priceFor:', selectedHotel.id, rt.key, dateObj, price);
-        // Check if room type is supported AND hotel has room types
+      //console.log('Price check for room type:', rt.key, 'Price data:', price);
+      
         const isSupported = hasSupportedRoomTypes && supportedRoomTypes.includes(rt.key);
         
         // If hotel has no room types OR room type not supported OR price invalid, set to 0
@@ -429,16 +729,11 @@ const selectDate = (dateObj: Date) => {
           resetExtraBeds[rt.key] = prev[calendarColumn].extraBedCounts[rt.key] || 0;
         }
       });
-    } else {
-      // No hotel selected, reset all counts
-      ROOM_TYPES.forEach(rt => {
-        resetRoomCounts[rt.key] = 0;
-        resetExtraBeds[rt.key] = 0;
-      });
-    }
     
     updatedColumn.roomCounts = resetRoomCounts;
     updatedColumn.extraBedCounts = resetExtraBeds;
+    
+    //console.log('Updated column state:', updatedColumn);
     
     return {
       ...prev,
@@ -467,9 +762,13 @@ const updateRoomCount = (col: number, roomKey: string, value: number) => {
         ...prev,
         [col]: {
           ...prev[col],
-          roomCounts: { ...prev[col].roomCounts, [roomKey]: val }
+          roomCounts: { ...prev[col].roomCounts, [roomKey]: val },
+          totalCost: undefined,
+          empCost: undefined
         }
       };
+      // Reset review state when room count changes
+      setIsReviewSuccessful(false);
       return { ...updated };
     });
   };
@@ -481,9 +780,13 @@ const updateRoomCount = (col: number, roomKey: string, value: number) => {
       ...prev,
       [col]: {
         ...prev[col],
-        extraBedCounts: { ...prev[col].extraBedCounts, [roomKey]: val }
+        extraBedCounts: { ...prev[col].extraBedCounts, [roomKey]: val },
+        totalCost: undefined,
+        empCost: undefined
       }
     }));
+    // Reset review state when extra bed count changes
+    setIsReviewSuccessful(false);
   };
 
 //BUG-PR-26-10-2025.5 changed return to object instead of number to contain extra bed price
@@ -704,9 +1007,12 @@ const renderCalendar = () => {
               </div>
             );
           })}
+          
         </div>
       </>
+      
     );
+    
   };
 
   const getArabicOrdinal = (num: number): string => {
@@ -731,6 +1037,8 @@ const renderCalendar = () => {
   const renderColumn = (col: number) => {
     const colData = columns[col];
 
+    // RQ-AZ-PR-31-10-2024.1: Removed automatic cost calculation
+    // Costs are only shown after clicking review button (from database)
     let total = 0;
     let hasAnyPrice = false;
     
@@ -738,12 +1046,11 @@ const renderCalendar = () => {
       const dateObj = new Date(colData.arrivalDate);
 
       ROOM_TYPES.forEach(rt => {
-        const count = colData.roomCounts[rt.key] || 0;
-        const ExtraBedcount = colData.extraBedCounts[rt.key] || 0;
-        //console.log('colData', colData);
+        const count=colData.roomCounts[rt.key] || 0;
+        const ExtraBedcount=colData.extraBedCounts[rt.key] || 0;
         const priceData = priceFor(colData.selectedHotel!.id, rt.key, dateObj);
-        //console.log('Calculating total for room type:', rt.key, 'Count:', count, 'PriceData:', priceData);
-    // Check if any room type has a valid non-zero price
+        // Check if any room type has a valid non-zero price (for warning only)
+        // RQ-AZ-PR-31-10-2024.1: No automatic cost calculation - costs come from review button
     if (priceData.room_price !== null && priceData.room_price > 0) {
       hasAnyPrice = true;
     }
@@ -784,11 +1091,10 @@ const renderCalendar = () => {
 
 
 
+    // console.log('readonlyMode:', readonlyMode, colData);
       });
     }
 
-    const contributionPercent = empContribution > 0 ? empContribution : 60;
-    const employee = (total * contributionPercent) / 100;
 
     return (
       <section key={col} className="bg-white p-6 rounded-2xl shadow-lg">
@@ -800,6 +1106,8 @@ const renderCalendar = () => {
           className="w-full border rounded p-3 mb-4 text-lg"
           value={colData.selectedCity}
           onChange={(e) => handleCityChange(col, e.target.value)}
+          disabled={readonlyMode}
+          
         >
           <option value="">{t('city.select')}</option>
           {/* BUG-AZ-PR-29-10-2025.1: Fixed by AG - Use city.code as key and city.name for display */}
@@ -813,6 +1121,7 @@ const renderCalendar = () => {
           <button
             className="bg-indigo-600 text-white px-6 py-2 rounded-lg"
             onClick={() => openHotelPopup(col)}
+            disabled={readonlyMode}
           >
             {t('hotel.select')}
           </button>
@@ -861,7 +1170,7 @@ const renderCalendar = () => {
         <label className="block font-semibold mb-1">{t('rooms.types')}</label>
         
         {/* Show warning if hotel and date selected but no prices available */}
-        {colData.selectedHotel && colData.arrivalDate && !hasAnyPrice && (
+        {colData.selectedHotel && colData.arrivalDate && !hasAnyPrice && !readonlyMode && !(colData.totalCost || colData.empCost) && (
           <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex items-start gap-2">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
@@ -877,11 +1186,12 @@ const renderCalendar = () => {
           </div>
         )}
         
+        
         <div>
 {ROOM_TYPES.map(rt => {
-  const maxBeds = colData.maxExtraBeds[rt.key] ?? 0;
-  const roomCount = colData.roomCounts[rt.key] ?? 0;
-  const reqBeds = colData.extraBedCounts[rt.key] ?? 0;
+  const maxBeds = (colData.maxExtraBeds?.[rt.key] ?? 0);
+  const roomCount = (colData.roomCounts?.[rt.key] ?? 0);
+  const reqBeds = (colData.extraBedCounts?.[rt.key] ?? 0);
   
   // Check if this room type is supported by the selected hotel
   const supportedRoomTypes = colData.selectedHotel?.supportedRoomTypes 
@@ -889,7 +1199,7 @@ const renderCalendar = () => {
     : [];
   
   const hasSupportedRoomTypes = supportedRoomTypes.length > 0;
-  const isSupported = hasSupportedRoomTypes && supportedRoomTypes.includes(rt.key);
+  const isSupported = hasSupportedRoomTypes ? supportedRoomTypes.includes(rt.key) : true;
   
   // Check pricing for this room type (only if date is selected)
   let priceData = { room_price: null as number | null, extra_bed_price: null as string | null };
@@ -903,11 +1213,9 @@ const renderCalendar = () => {
   }
   
   // Room type is enabled if:
-  // - Hotel is selected AND hotel has room types configured
-  // - AND room type is supported by hotel
+  // - Hotel is selected AND (no restriction list or room type is supported)
   // - AND (no date selected OR date selected with valid price)
-  const isEnabled = colData.selectedHotel && 
-                    hasSupportedRoomTypes &&
+  const isEnabled = !!colData.selectedHotel && 
                     isSupported && 
                     (!colData.arrivalDate || hasValidPrice);
 
@@ -931,7 +1239,7 @@ const renderCalendar = () => {
         min="0"
         value={roomCount}
         onChange={(e) => updateRoomCount(col, rt.key, parseInt(e.target.value) || 0)}
-        disabled={!isEnabled}
+        disabled={!isEnabled || readonlyMode}
         style={{ 
           width: '40px', 
           textAlign: 'center', 
@@ -950,7 +1258,7 @@ const renderCalendar = () => {
         max="2"
         value={maxBeds}
         readOnly
-        disabled={!isEnabled}
+        disabled={!isEnabled || readonlyMode}
         style={{ 
           width: '32px', 
           textAlign: 'center', 
@@ -968,7 +1276,7 @@ const renderCalendar = () => {
         min="0"
         value={reqBeds}
         onChange={(e) => updateExtraBedCount(col, rt.key, parseInt(e.target.value) || 0)}
-        disabled={!isEnabled}
+        disabled={!isEnabled || readonlyMode}
         style={{ 
           width: '32px', 
           textAlign: 'center', 
@@ -986,6 +1294,7 @@ const renderCalendar = () => {
         <button
           className="bg-indigo-600 text-white px-10 py-2 rounded-lg mt-3"
           onClick={() => openCalendar(col)}
+          disabled={readonlyMode}
         >
           {t('date.select')}
         </button>
@@ -996,23 +1305,26 @@ const renderCalendar = () => {
           value={colData.arrivalDate}
           className="border p-1 rounded w-full bg-gray-50 text-lg"
           placeholder="—"
+          disabled={readonlyMode}
         />
 
-        {total > 0 && (
+              {/* RQ-AZ-PR-31-10-2024.1: Only show costs from database after review button */}
+              {colData.totalCost != null && colData.empCost != null && (
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px', borderRadius: '8px' }} className="mt-4">
             <div className="font-semibold">
-              {/* RQ_HSM_PR_27_10_25.01 */}
-              {t('pricing.total')}: EGP {(total * 3).toFixed(2)}<br />
-              {t('pricing.employee')}: ({empContribution > 0 ? empContribution : 60}%) EGP {(employee * 3).toFixed(2)}
+      {t('pricing.total')}: EGP {colData.totalCost}<br />
+      {t('pricing.employee')}: EGP {colData.empCost}
             </div>
           </div>
         )}
       </section>
+      
     );
+    
+    
   };
 
-  function validateChoicesOrder(choices: ColumnState[] | any[]): { valid: boolean; message: string } {
-  let foundEmpty = false;
+  function validateChoicesOrder(choices: ColumnState[]): { valid: boolean; message: string } {  let foundEmpty = false;
   for (let i = 0; i < choices.length; i++) {
     if (choices[i].selectedCity === '') {
       foundEmpty = true;
@@ -1038,9 +1350,24 @@ const renderCalendar = () => {
       //console.log(columnData);
       const selectedHotel = columnData?.selectedHotel;
       
-      const hotelName = selectedHotel?.en || selectedHotel?.ar || '';
+      // Only include columns that have a complete hotel selection (hotel, date, and rooms)
+      if (!selectedHotel || !selectedHotel.id) {
+        continue; // Skip columns without hotel
+      }
       
-      const date = new Date(columnData?.arrivalDate);
+      // Check if date and rooms are present
+      if (!columnData?.arrivalDate || columnData.arrivalDate.trim() === '' || columnData.arrivalDate === 'INVALID DATE') {
+        continue; // Skip columns without date
+      }
+      
+      const hasAnyRooms = columnData?.roomCounts && Object.values(columnData.roomCounts).some(count => (count || 0) > 0);
+      if (!hasAnyRooms) {
+        continue; // Skip columns without rooms
+      }
+      
+      const hotelName = selectedHotel.en || selectedHotel.ar || '';
+      
+      const date = new Date(columnData.arrivalDate);
       const dateFormatted = date.toLocaleDateString('en-GB', {
         day: '2-digit',
         month: 'short',
@@ -1048,12 +1375,12 @@ const renderCalendar = () => {
       }).replace(/ /g, ' ').toUpperCase();
 
       res.push({
-        hotelCode: selectedHotel?.id ?? '',
+        hotelCode: selectedHotel.id,
         hotelName: hotelName,
         date: dateFormatted,
         // BUG-PR-AZ-26-10-2025.6 add ${columnData?.extraBedCounts[key]
         //BUG-PR-AZ-23-10-2025.4
-        roomsData: Object.entries(columnData?.roomCounts || {}).map(([key, count]) => `${key},${count},${columnData?.extraBedCounts[key]}`).join('|')
+        roomsData: Object.entries(columnData.roomCounts || {}).map(([key, count]) => `${key},${count},${columnData?.extraBedCounts[key]}`).join('|')
       });
     }
     //console.log('getSelectedHotelsData:', res);
@@ -1066,6 +1393,149 @@ const renderCalendar = () => {
       .join('|');
     return result;
   }
+
+  // RQ-AZ-PR-31-10-2024.1: Review Trip and Calculate Cost
+  // No validation - just call stored procedures and get costs
+  const handleReviewRequest = async () => {
+    // If review was already successful, just show costs without re-calculating
+    if (isReviewSuccessful) {
+      let totalCost = 0;
+      let empCost = 0;
+      Object.values(columns).forEach((col) => {
+        if (col.totalCost !== undefined) totalCost += Number(col.totalCost) || 0;
+        if (col.empCost !== undefined) empCost += Number(col.empCost) || 0;
+      });
+      
+      let costMessage = '';
+      if (totalCost > 0) {
+        costMessage = `${t('review.totalCost')}: ${totalCost}`;
+        if (empCost > 0) {
+          costMessage += `\n${t('review.employeeCost')}: ${Math.round(empCost)}`;
+        }
+      } else {
+        costMessage = t('review.calculating');
+      }
+      showToast('info', t('review.title'), costMessage);
+      return;
+    }
+
+    // Validate: If city is selected, hotel with date and rooms must be selected
+    // If hotel is selected, rooms and date must be selected
+    const validationErrors: string[] = [];
+    let validHotelsCount = 0;
+    
+    Object.values(columns).forEach((colData, index) => {
+      const columnNumber = index + 1;
+      
+      // If city is selected, hotel must also be selected
+      if (colData.selectedCity && colData.selectedCity.trim() !== '' && !colData.selectedHotel) {
+        validationErrors.push(t('validation.cityMissingHotel', { cityName: colData.selectedCity, columnNumber }));
+        return; // Skip rest of validation for this column
+      }
+      
+      // If hotel is selected, validate it's complete
+      if (colData.selectedHotel) {
+        let hasErrors = false;
+        
+        // Hotel is selected - check if date is filled
+        if (!colData.arrivalDate || colData.arrivalDate.trim() === '' || colData.arrivalDate === 'INVALID DATE') {
+          const hotelName = colData.selectedHotel?.en || colData.selectedHotel?.ar || `Hotel ${columnNumber}`;
+          validationErrors.push(t('validation.hotelMissingDate', { hotelName }));
+          hasErrors = true;
+        }
+        
+        // Hotel is selected - check if at least one room is selected
+        const hasAnyRooms = colData.roomCounts && Object.values(colData.roomCounts).some(count => (count || 0) > 0);
+        if (!hasAnyRooms) {
+          const hotelName = colData.selectedHotel?.en || colData.selectedHotel?.ar || `Hotel ${columnNumber}`;
+          validationErrors.push(t('validation.hotelEmptyRooms', { hotelName }));
+          hasErrors = true;
+        }
+        
+        // If hotel is selected and has no errors, count it as valid
+        if (!hasErrors) {
+          validHotelsCount++;
+        }
+      }
+    });
+    
+    // User must enter at least 1 complete option (hotel with date and rooms)
+    if (validHotelsCount === 0) {
+      if (validationErrors.length > 0) {
+        // Show specific validation errors
+        showToast('error', t('validation.correctErrorsTitle'), validationErrors.join('\n'));
+      } else {
+        // No hotels selected at all
+        showToast('error', t('validation.correctErrorsTitle'), t('validation.atLeastOneHotelRequired'));
+      }
+      return;
+    }
+    
+    if (validationErrors.length > 0) {
+      showToast('error', t('validation.correctErrorsTitle'), validationErrors.join('\n'));
+      return;
+    }
+    
+    // Get hotels and companions data
+    const hotels = getSelectedHotelsData();
+    const companions = getCompanionsFormated();
+    
+    if (hotels.length === 0) {
+      showToast('error', t('validation.correctErrorsTitle'), t('validation.noHotelsSelected'));
+      return;
+    }
+
+    showToast('info', t('review.title'), t('review.calculating'));
+
+    // RQ-AZ-PR-31-10-2024.1: Call review trip API (no validation)
+    const currentLang = i18n.language as 'ar' | 'en';
+    const result = await reviewTripAndCalculateCostFromServer(
+      employeeID,
+      companions,
+      hotels,
+      currentLang
+    );
+
+    if (!result.success) {
+      setIsReviewSuccessful(false);
+      showToast('error', t('validation.correctErrorsTitle'), result.message || 'Failed to review trip');
+      return;
+    }
+
+    // Update columns with costs returned from review
+    if (result.hotels && result.hotels.length > 0) {
+      setColumns(prev => {
+        const updated = { ...prev };
+        result.hotels.forEach((hotelResult: ReviewHotelResult, idx: number) => {
+          const colIndex = idx + 1;
+          if (updated[colIndex]) {
+            updated[colIndex] = {
+              ...updated[colIndex],
+              totalCost: hotelResult.totalCost,
+              empCost: hotelResult.empCost
+            };
+          }
+        });
+        return updated;
+      });
+    }
+
+    // Calculate and show total costs
+    let totalCost = 0;
+    let empCost = 0;
+    result.hotels.forEach((h: ReviewHotelResult) => {
+      totalCost += h.totalCost || 0;
+      empCost += h.empCost || 0;
+    });
+
+    const costInfo = totalCost > 0 
+      ? `\n${t('review.totalCost')}: ${totalCost}${empCost > 0 ? `\n${t('review.employeeCost')}: ${Math.round(empCost)}` : ''}`
+      : '';
+
+    // Enable submit button on successful review
+    setIsReviewSuccessful(true);
+    showToast('success', t('review.title'), `${t('success.readyToSubmit') || 'Trip reviewed and costs calculated'}${costInfo}`);
+  };
 
   return (
     <div className="bg-gray-100 min-h-screen" dir={isRTL ? 'rtl' : 'ltr'} lang={i18n.language} style={{ fontSize: '16px' }}>
@@ -1109,17 +1579,22 @@ const renderCalendar = () => {
           <section className="bg-white p-6 rounded-2xl shadow-lg">
             <label className="block font-semibold mb-2">{t('companions.title')} — {t('companions.max')} {maximumNoOfCompanions}</label>
             <div className="grid grid-cols-4 gap-2">
-              {COMPANIONS.slice(0, 12).map((c, i) => {
+            {COMPANIONS.slice(0, 12).map((c: Companion, i: number) => {
                 const companionValue = `${c.rel}|${c.name}|${c.RELID}`;
+                  const isChecked = readonlyMode 
+    ? checkedCompanions.includes(String(c.RELID))
+    : selectedCompanions.includes(companionValue);
+
                 return (
-                  <div key={`companion-${i}`} className="flex items-center gap-3">
+                  <div key={`companion-${c.RELID}-${i}`} className="flex items-center gap-3">
                     <input
                       type="checkbox"
-                      checked={selectedCompanions.includes(companionValue)}
+                    checked={isChecked}
                       onChange={(e) => handleCompanionChange(companionValue, e.target.checked)}
                       style={{ width: '20px', height: '20px' }}
+                    disabled={readonlyMode}
                     />
-                    <span>{c.rel} — {c.name} </span>
+                  <span>{c.name} — {c.rel}</span>
                   </div>
                 );
               })}
@@ -1131,17 +1606,91 @@ const renderCalendar = () => {
           {Object.keys(columns).map(colKey => renderColumn(Number(colKey)))}
         </div>
 
-        <div className="flex justify-center mt-8 mb-1">
-          <button onClick={async function() {
-            const result = await submitTripFromServer(employeeID, getCompanionsFormated(), getSelectedHotelsData());
+        <div className="flex gap-4 mt-8 mb-1 w-full" style={{ backgroundColor: '#F8F8F8', padding: '16px', borderRadius: '8px' }}>
+          <button 
+            onClick={handleReviewRequest}
+            disabled={readonlyMode}
+            className="flex-1"
+            style={{
+              backgroundColor: '#007BFF',
+              color: 'white',
+              padding: '16px 24px',
+              borderRadius: '12px',
+              fontSize: '18px',
+              fontWeight: '600',
+              border: 'none',
+              cursor: readonlyMode ? 'not-allowed' : 'pointer',
+              boxShadow: '0 2px 8px rgba(0, 123, 255, 0.3)',
+              transition: 'all 0.3s ease',
+              opacity: readonlyMode ? 0.6 : 1,
+              fontFamily: 'inherit',
+              width: '100%'
+            }}
+            onMouseEnter={(e) => {
+              if (!readonlyMode) {
+                e.currentTarget.style.backgroundColor = '#0056b3';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 123, 255, 0.4)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!readonlyMode) {
+                e.currentTarget.style.backgroundColor = '#007BFF';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 123, 255, 0.3)';
+              }
+            }}
+          >
+            {t('review.button')}
+          </button>
+          <button 
+            onClick={async function() {
+              // RQ-AZ-PR-31-10-2024.1: Submit - call P_STRIP_SUBMIT_CHECK
+              const currentLang = i18n.language as 'ar' | 'en';
+              const result = await checkTripSubmissionFromServer(employeeID, currentLang);
+              
             if (result.success) {
-              showToast('success', t('success.submitTripTitle'), t('success.submitTrip'));
-            } else if (result.errors && result.errors.length > 0) {
-              showToast('error', t('validation.correctErrorsTitle'), result.errors.join('\n'));
+                showToast('success', t('success.submitTripTitle'), result.message || t('success.submitTrip'));
+                // Reset review state after successful submission
+                setIsReviewSuccessful(false);
+                // Force refresh the data from server
+                setInitialDataLoaded(false); // This will trigger the useEffect to run again
+                setForceRefresh(prev => prev + 1);
             } else {
-              showToast('error', t('errors.submitErrorTitle'), t('errors.submitError'));
-            }
-          }} className="w-full bg-green-600 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-700 transition">
+                // Show error message from stored procedure
+                showToast('error', t('errors.submitErrorTitle'), result.message || t('errors.submitError'));
+                // Reset review state if submission fails
+                setIsReviewSuccessful(false);
+              }
+            }} 
+            disabled={readonlyMode || !isReviewSuccessful}
+            className="flex-1"
+            style={{
+              backgroundColor: '#28A745',
+              color: 'white',
+              padding: '16px 24px',
+              borderRadius: '12px',
+              fontSize: '18px',
+              fontWeight: '600',
+              border: 'none',
+              cursor: (readonlyMode || !isReviewSuccessful) ? 'not-allowed' : 'pointer',
+              boxShadow: '0 2px 8px rgba(40, 167, 69, 0.3)',
+              transition: 'all 0.3s ease',
+              opacity: (readonlyMode || !isReviewSuccessful) ? 0.6 : 1,
+              fontFamily: 'inherit',
+              width: '100%'
+            }}
+            onMouseEnter={(e) => {
+              if (!readonlyMode && isReviewSuccessful) {
+                e.currentTarget.style.backgroundColor = '#218838';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(40, 167, 69, 0.4)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!readonlyMode && isReviewSuccessful) {
+                e.currentTarget.style.backgroundColor = '#28A745';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(40, 167, 69, 0.3)';
+              }
+            }}
+          >
             {t('submit.button')}
           </button>
         </div>
@@ -1166,6 +1715,7 @@ const renderCalendar = () => {
                   key={h.id}
                   className="block w-full text-left p-3 border rounded mb-2 hover:bg-blue-50"
                   onClick={() => selectHotel(h)}
+                  disabled={readonlyMode}
                 >
                   <img
                     src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60"
@@ -1197,6 +1747,7 @@ const renderCalendar = () => {
                     setCalendarMonth(m);
                     setCalendarYear(y);
                   }}
+                  disabled={readonlyMode}
                 >
                   {t('date.prevMonth')}
                 </button>
@@ -1209,6 +1760,7 @@ const renderCalendar = () => {
                     setCalendarMonth(m);
                     setCalendarYear(y);
                   }}
+                  disabled={readonlyMode}
                 >
                   {t('date.nextMonth')}
                 </button>
@@ -1218,6 +1770,7 @@ const renderCalendar = () => {
                     setShowCalendar(false);
                     setTooltip({ show: false, x: 0, y: 0, content: '' });
                   }}
+                  disabled={readonlyMode}
                 >
                   {t('hotel.close')}
                 </button>
@@ -1550,31 +2103,31 @@ const renderCalendar = () => {
 
 export default App;
 
-function getValueByKey(data, key) {
-  // Split the string by comma to get individual pairs
-  const pairs = data.split(',');
+// function getValueByKey(data:any, key:any): number {
+//   // Split the string by comma to get individual pairs
+//   const pairs = data.split(',');
   
-  // Loop through each pair
-  for (let pair of pairs) {
-    // Split by colon to get key and value
-    const [k, v] = pair.split(':');
+//   // Loop through each pair
+//   for (let pair of pairs) {
+//     // Split by colon to get key and value
+//     const [k, v] = pair.split(':');
     
-    // If the key matches, return the value as a number
-    if (k === key) {
-      return parseInt(v);
-    }
-  }
+//     // If the key matches, return the value as a number
+//     if (k === key) {
+//       return parseInt(v);
+//     }
+//   }
   
-  // If key not found, return 0
-  return 0;
-}
+//   // If key not found, return 0
+//   return 0;
+// }
 function getMaxAllowedExtrabeds(supportedRoomExtraBeds: String | undefined, roomTybe:String): number {
   //console.log('supportedRoomExtraBeds:', supportedRoomExtraBeds ,'roomTybe: ' , roomTybe);
   // Split the string by comma to get individual pairs
   const pairs = supportedRoomExtraBeds?.split(',') ?? [];
   
   // Loop through each pair
-  for (let pair of pairs) {
+  for (const pair of pairs) {
     // Split by colon to get key and value
     const [k, v] = pair.split(':');
     

@@ -1,4 +1,4 @@
-const { getHotelsFromDB,getHotelsByCityFromDB, getCitiesFromDB, getPolicyDataFromDB, getHotelRoomsPricingFromDB } = require('../controllers/dbController');
+const { getHotelsFromDB,getHotelsByCityFromDB, getCitiesFromDB, getPolicyDataFromDB, getHotelRoomsPricingFromDB, getLastHotelsFromDB } = require('../controllers/dbController');
 
 
 
@@ -30,11 +30,16 @@ async function submitTrip(employeeId, familyIds, hotels) {
  return await submitTripApplicationToDB(employeeId, familyIds, hotels);
 }
 
+async function getLastHotels(employeeId, lang = 'ar') {
+  return await getLastHotelsFromDB(lang, employeeId);
+}
+
 module.exports = {
   getAllCities,
   getAllHotels,
   getHotelsByCity,
   getPolicyData,
   getHotelRoomPrices,
-  submitTrip
+  submitTrip,
+  getLastHotels
 };

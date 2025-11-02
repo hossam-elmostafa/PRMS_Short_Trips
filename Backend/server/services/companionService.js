@@ -1,4 +1,4 @@
-const { getCompanionsfromDB, getEmployeeNamefromDB, getMaximumNoOfCompanionsfromDB } = require('../controllers/dbController');
+const { getCompanionsfromDB, getEmployeeNamefromDB, getMaximumNoOfCompanionsfromDB, getLastCompanionsFromDB, getLastSubmissionForEmployee } = require('../controllers/dbController');
 
 // Relationship type mapping - both Arabic and English
 const relationshipMapping = {
@@ -50,7 +50,7 @@ const relationshipMapping = {
  */
 function mapRelationshipType(relType, lang = 'ar') {
   const mapping = relationshipMapping[lang] || relationshipMapping['ar'];
-  return mapping[relType] || relType;
+  return mapping[(relType || '').trim()] || (relType || '').trim();
 }
 
 /**
@@ -94,9 +94,30 @@ async function getEmployeeName(employeeId, lang = 'ar') {
   return fallback;
 }
 
+/**
+ * Get last saved companions for an employee with translated relationships
+ * @param {number} employeeId - Employee ID
+ * @param {string} lang - Language code ('ar' or 'en')
+ * @returns {Promise<Array>} Array of companions with translated relationship types
+ */
+async function getLastCompanions(employeeId, lang = 'ar') {
+  const companions = await getLastCompanionsFromDB(lang, employeeId);
+  return (Array.isArray(companions) ? companions : []).map(companion => ({
+    RELID: companion.RELID,
+    name: companion.rel, // SWAPPED: DB returns name in 'rel' field
+    rel: mapRelationshipType((companion.name || '').trim(), lang) // SWAPPED: DB returns rel code in 'name' field
+  }));
+}
+
+async function getLastSubmission(employeeId, lang = 'ar') {
+  return await getLastSubmissionForEmployee(lang, employeeId);
+}
+
 module.exports = {
   getCompanions,
   getMaximumNoOfCompanions,
   getEmployeeName,
-  mapRelationshipType // Export for testing or direct use
+  mapRelationshipType, // Export for testing or direct use
+  getLastCompanions,
+  getLastSubmission
 };

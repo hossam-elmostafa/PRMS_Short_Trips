@@ -83,4 +83,16 @@ router.get('/form/submit/:employeeId', async (req, res) => {
   }
 });
 
+router.get('/last-hotels/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const lang = req.query.lang || 'ar';
+    const hotels = await hotelService.getLastHotels(employeeId, lang);
+    res.json({ success: true, data: hotels });
+  } catch (error) {
+    console.error('Error in last-hotels route:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 module.exports = router;

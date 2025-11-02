@@ -4,6 +4,9 @@
     "shortTrips": "Short Trips",
     "english": "العربية"
   },
+  "policy": {
+    "readonlyNotice": "The trip has been disabled as it has been previously selected"
+  },
   "employee": {
     "name": "Employee Name",
     "id": "Employee ID"
@@ -91,6 +94,13 @@
   "submit": {
     "button": "Submit Request & Happy Journey"
   },
+  "review": {
+    "button": "Review Request and Calculate Cost",
+    "title": "Review Request",
+    "calculating": "Calculating cost...",
+    "totalCost": "Total Cost",
+    "employeeCost": "Employee Cost"
+  },
   "footer": {
     "company": "First Information & Technology Solutions",
     "companyAr": "First Company for Information Systems and Technical Solutions"
@@ -135,7 +145,9 @@
     "hotelMissingDate": "Hotel {{hotelName}}: missing date",
     "hotelEmptyRooms": "Hotel {{hotelName}}: room data is empty",
     "hotelRoomsMismatch": "Hotel {{hotelName}}: Expected {{expected}} beds (employee + {{familyCount}} family members), but requested {{actual}} beds",
-    "hotelRoomsSegmentEmpty": "Hotel {{hotelCode}} room data segment #{{segment}} is empty"
+    "hotelRoomsSegmentEmpty": "Hotel {{hotelCode}} room data segment #{{segment}} is empty",
+    "atLeastOneHotelRequired": "At least one hotel must be selected (hotel with date and rooms)",
+    "cityMissingHotel": "Column {{columnNumber}} - City {{cityName}}: must select a hotel with date and rooms"
   },
   "errors": {
         "submitErrorTitle": "Submission Failed",
@@ -156,7 +168,9 @@
   },
   "success": {
     "submitTrip": "Request submitted successfully!",
-        "submitTripTitle": "Trip Submitted Successfully"
+        "submitTripTitle": "Trip Submitted Successfully",
+        "reviewTrip": "Review Request and Calculate Cost",
+        "readytoSubmit": "Ready to Submit"
 
   },
   "loading": {
