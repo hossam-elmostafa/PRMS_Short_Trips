@@ -823,7 +823,6 @@ async function checkTripSubmission(lang = 'ar', empCode) {
                 const resultStr = String(resultValue).trim();
                 if (resultNum === 1 || resultStr === '1') {
                     success = true;
-                    message = 'Trip submitted successfully';
                 } else if (resultStr !== '' && !isNaN(resultNum)) {
                     // It's a number but not 1 - might be an error code
                     message = `Trip submission failed with code: ${resultNum}`;
@@ -837,7 +836,6 @@ async function checkTripSubmission(lang = 'ar', empCode) {
                 const firstValueStr = String(firstValue).trim();
                 if (firstValueNum === 1 || firstValueStr === '1') {
                     success = true;
-                    message = 'Trip submitted successfully';
                 } else if (firstValueStr !== '' && !isNaN(firstValueNum)) {
                     message = `Trip submission failed with code: ${firstValueNum}`;
                 } else {
@@ -850,7 +848,6 @@ async function checkTripSubmission(lang = 'ar', empCode) {
         
         return {
             success: success,
-            message: message || (success ? 'Trip submitted successfully' : 'Failed to check trip submission')
         };
         
     } catch (error) {
