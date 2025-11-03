@@ -149,6 +149,7 @@ app.get('/inf', (req, res) => {
   });
 });
 
+
 app.use('/api', hotelRoutes);
 app.use('/api', companionRoutes);
 app.use('/api', pricingRoutes);

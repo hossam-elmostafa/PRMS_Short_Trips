@@ -526,9 +526,11 @@ export async function reviewTripAndCalculateCostFromServer(
 
 // RQ-AZ-PR-31-10-2024.1: Check Trip Submission
 export async function checkTripSubmissionFromServer(
+  
   employeeID: number,
   lang: 'ar' | 'en' = 'ar'
 ): Promise<{ success: boolean; message: string }> {
+  console.log("checkTripSubmissionFromServer: "+ employeeID + " " + lang);
   try {
     const response = await fetch('https://' + getApiBase() + '/api/check-submission', {
       method: 'POST',

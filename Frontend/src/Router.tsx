@@ -18,7 +18,7 @@ function AppWithEmployeeID() {
         const parsedSecretID = employeeID || '0';
         //console.log('Fetching employee ID for secret:', parsedSecretID);
         
-        const result = /*parsedSecretID;//*/await getSecretKeyValueFromServer(parsedSecretID);
+        const result = parsedSecretID;//*/await getSecretKeyValueFromServer(parsedSecretID);
         //console.log('Fetched employee ID from server:', result);
         const realEmployeeId = parseInt(result, 10);
         //console.log('Parsed real employee ID:', realEmployeeId);

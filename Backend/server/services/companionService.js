@@ -1,4 +1,4 @@
-const { getCompanionsfromDB, getEmployeeNamefromDB, getMaximumNoOfCompanionsfromDB, getLastCompanionsFromDB, getLastSubmissionForEmployee } = require('../controllers/dbController');
+const { getCompanionsfromDB, getEmployeeNamefromDB, getMaximumNoOfCompanionsfromDB, getLastCompanionsFromDB, getLastSubmissionForEmployee, deleteLastSubmissionFromDB } = require('../controllers/dbController');
 
 // Relationship type mapping - both Arabic and English
 const relationshipMapping = {
@@ -113,11 +113,17 @@ async function getLastSubmission(employeeId, lang = 'ar') {
   return await getLastSubmissionForEmployee(lang, employeeId);
 }
 
+async function deleteLastSubmission(employeeId) {
+  return await deleteLastSubmissionFromDB(employeeId);
+}
+
+
 module.exports = {
   getCompanions,
   getMaximumNoOfCompanions,
   getEmployeeName,
   mapRelationshipType, // Export for testing or direct use
   getLastCompanions,
-  getLastSubmission
+  getLastSubmission,
+  deleteLastSubmission
 };

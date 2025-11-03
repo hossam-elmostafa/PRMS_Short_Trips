@@ -1039,54 +1039,18 @@ const renderCalendar = () => {
 
     // RQ-AZ-PR-31-10-2024.1: Removed automatic cost calculation
     // Costs are only shown after clicking review button (from database)
-    let total = 0;
     let hasAnyPrice = false;
     
     if (colData.selectedHotel && colData.arrivalDate) {
       const dateObj = new Date(colData.arrivalDate);
 
       ROOM_TYPES.forEach(rt => {
-        const count=colData.roomCounts[rt.key] || 0;
-        const ExtraBedcount=colData.extraBedCounts[rt.key] || 0;
         const priceData = priceFor(colData.selectedHotel!.id, rt.key, dateObj);
         // Check if any room type has a valid non-zero price (for warning only)
         // RQ-AZ-PR-31-10-2024.1: No automatic cost calculation - costs come from review button
     if (priceData.room_price !== null && priceData.room_price > 0) {
       hasAnyPrice = true;
     }
-        //console.log('priceData:', priceData);
-        //console.log('colData:', colData);
-    // Only add to total if price is valid and count > 0
-    if (count > 0 && priceData.room_price !== null && priceData.room_price > 0) {
-      total += priceData.room_price * count;
-    }
-
-    if(ExtraBedcount > 0 && priceData.extra_bed_price !== null){
-      //console.log('ExtraBedcount', ExtraBedcount);
-      //console.log('Calculating extra bed price for', rt.key, 'with extra bed price:', priceData.extra_bed_price);
-        if(/%/.test(priceData.extra_bed_price))
-        {          
-          const priceData_room_price=priceData.room_price? priceData.room_price : 0;
-          const extraBedPriceNum = parseFloat(priceData.extra_bed_price.replace('%',''))/count;
-          //console.log ('priceData.extra_bed_price:', priceData.extra_bed_price , 'Count: ',count);
-          //console.log ('colData.selectedHotel: ', HOTELS[colData.selectedCity]?.find(h=>h.id===colData.selectedHotel?.id));
-          const bedsCounts=HOTELS[colData.selectedCity]?.find(h=>h.id===colData.selectedHotel?.id)?.supportedRoomBeds//BUG-PR-26-10-2025.5
-          const bedsCountInARoom=getMaxAllowedExtrabeds(bedsCounts,rt.key)!;
-          //console.log ('bedCounts: ', bedsCountInARoom);
-          //console.log ('colData: ', colData, 'RT Key: ',rt.key);
-          total += (extraBedPriceNum / 100) * (priceData_room_price/bedsCountInARoom) * ExtraBedcount;//BUG-PR-26-10-2025.5
-        }
-        else
-        {
-          const extraBedPriceNum = parseFloat(priceData.extra_bed_price);
-          //console.log ('total before extra bed:', total);
-          total += extraBedPriceNum * ExtraBedcount;
-          //console.log ('total after extra bed:', total);
-        }
-    }
-
-    
-
 
 
 
@@ -1397,6 +1361,7 @@ const renderCalendar = () => {
   // RQ-AZ-PR-31-10-2024.1: Review Trip and Calculate Cost
   // No validation - just call stored procedures and get costs
   const handleReviewRequest = async () => {
+    console.log("handleReviewRequest");
     // If review was already successful, just show costs without re-calculating
     if (isReviewSuccessful) {
       let totalCost = 0;
@@ -2121,7 +2086,7 @@ export default App;
 //   // If key not found, return 0
 //   return 0;
 // }
-function getMaxAllowedExtrabeds(supportedRoomExtraBeds: String | undefined, roomTybe:String): number {
+function getMaxAllowedExtrabeds(supportedRoomExtraBeds: string | undefined, roomTybe: string): number {
   //console.log('supportedRoomExtraBeds:', supportedRoomExtraBeds ,'roomTybe: ' , roomTybe);
   // Split the string by comma to get individual pairs
   const pairs = supportedRoomExtraBeds?.split(',') ?? [];

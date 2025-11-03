@@ -69,6 +69,7 @@ router.post('/submit', async(req, res) => {
 
 // RQ-AZ-PR-31-10-2024.1: Review Trip and Calculate Cost
 router.post('/review-trip', async (req, res) => {
+    console.log("review-trip: "+ req.body);
     const { employeeId, familyIds, hotels, lang } = req.body;
     
     if (!employeeId) {

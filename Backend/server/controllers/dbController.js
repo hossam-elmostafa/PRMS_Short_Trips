@@ -552,6 +552,7 @@ async function getEmployeeInfoFromDB(employeeId, lang = 'ar') {
 // Calls P_STRIP_SUBMIT_FAMILY, P_STRIP_SUBMIT_CLEAR_HOTEL, P_STRIP_SUBMIT_HOTEL (loop)
 async function reviewTripAndCalculateCost(lang = 'ar', empCode, familyIds, hotels = []) {
     try {
+        console.log("reviewTripAndCalculateCost: "+ lang + " " + empCode + " " + familyIds + " " + hotels);
         const langBit = lang === 'ar' ? 1 : 0;
         empCode = String(empCode).replace(/^:+/, '').trim();
         const esc = (s) => String(s || '').replace(/'/g, "''");
@@ -570,8 +571,11 @@ async function reviewTripAndCalculateCost(lang = 'ar', empCode, familyIds, hotel
             const familyResult = await prisma.$queryRawUnsafe(`
                 EXEC P_STRIP_SUBMIT_FAMILY ${langBit}, '${esc(empCode)}', '${esc(familyIdsParam)}';
             `);
-            //console.log('[reviewTripAndCalculateCost] P_STRIP_SUBMIT_FAMILY result:', JSON.stringify(familyResult));
-            
+            console.log('[reviewTripAndCalculateCost] P_STRIP_SUBMIT_FAMILY result:', JSON.stringify(familyResult));
+            console.log(`
+                EXEC P_STRIP_SUBMIT_FAMILY ${langBit}, '${esc(empCode)}', '${esc(familyIdsParam)}';
+            `);
+            console.log("familyResult: "+ JSON.stringify(familyResult));
             if (familyResult && familyResult.length > 0) {
                 const firstRow = familyResult[0];
                 // Check for Result column (common pattern)
@@ -679,6 +683,17 @@ async function reviewTripAndCalculateCost(lang = 'ar', empCode, familyIds, hotel
                         EXEC P_STRIP_SUBMIT_HOTEL ${langBit}, '${esc(empCode)}', '${hotelCodeEsc}', '${dateEsc}', '${roomsDataEsc}';
                         SELECT TOTAL_COST, EMP_COST, RESUT_MESSAGE FROM @Results;
                     `);
+
+                    console.log(`
+                        DECLARE @Results TABLE (
+                            TOTAL_COST INT,
+                            EMP_COST FLOAT,
+                            RESUT_MESSAGE NVARCHAR(500)
+                        );
+                        INSERT INTO @Results
+                        EXEC P_STRIP_SUBMIT_HOTEL ${langBit}, '${esc(empCode)}', '${hotelCodeEsc}', '${dateEsc}', '${roomsDataEsc}';
+                        SELECT TOTAL_COST, EMP_COST, RESUT_MESSAGE FROM @Results;
+                    `);
                     
                     //console.log(`[reviewTripAndCalculateCost] P_STRIP_SUBMIT_HOTEL result for ${h.hotelCode}:`, hotelResult);
                     
@@ -774,6 +789,7 @@ async function reviewTripAndCalculateCost(lang = 'ar', empCode, familyIds, hotel
 // Calls P_STRIP_SUBMIT
 async function checkTripSubmission(lang = 'ar', empCode) {
     try {
+        console.log("checkTripSubmission: "+ lang + " " + empCode);
         const langBit = lang === 'ar' ? 1 : 0;
         empCode = String(empCode).replace(/^:+/, '').trim();
         const esc = (s) => String(s || '').replace(/'/g, "''");
@@ -783,6 +799,9 @@ async function checkTripSubmission(lang = 'ar', empCode) {
         // Call the stored procedure directly and check the result set
         // Similar to how P_STRIP_SUBMIT_FAMILY works
         const result = await prisma.$queryRawUnsafe(`
+            EXEC P_STRIP_SUBMIT ${langBit}, '${esc(empCode)}';
+        `);
+        console.log("checkTripSubmission: "+ `
             EXEC P_STRIP_SUBMIT ${langBit}, '${esc(empCode)}';
         `);
         
@@ -1046,6 +1065,30 @@ async function getLastHotelsFromDB(lang = 'ar', empCode) {
     }
 }
 
+async function deleteLastSubmissionFromDB(employeeId) {
+    try {
+        const esc = (s) => String(s || '').replace(/'/g, "''").trim();
+        // Clean and escape employeeId like other functions do
+        const empCode = String(employeeId).replace(/^:+/, '').trim();
+        const empCodeEsc = esc(empCode);
+        
+        console.log(`[deleteLastSubmissionFromDB] Attempting to delete records for empCode: ${empCode}`);
+        
+        // Use $executeRawUnsafe for DELETE - it returns the number of affected rows
+        const affectedRows = await prisma.$executeRawUnsafe(`
+            DELETE FROM PRMS_STRIP WHERE STRIP_EmpNo = '${empCodeEsc}'
+        `);
+        
+        console.log(`[deleteLastSubmissionFromDB] Deleted ${affectedRows} row(s) for empCode: ${empCode}`);
+        
+        // Return true if any rows were deleted
+        return affectedRows > 0;
+    } catch (error) {
+        console.error('[deleteLastSubmissionFromDB] Error deleting submission:', error);
+        console.error('Parameters used - employeeId:', employeeId);
+        return false;
+    }
+}
 
 module.exports = {
     getCompanionsfromDB,
@@ -1063,5 +1106,6 @@ module.exports = {
     getLastCompanionsFromDB,
     getLastHotelsFromDB,
     reviewTripAndCalculateCost,
-    checkTripSubmission
+    checkTripSubmission,
+    deleteLastSubmissionFromDB
 };

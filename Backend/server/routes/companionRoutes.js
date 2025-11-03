@@ -79,5 +79,18 @@ router.get('/last-submission/:employeeId', async (req, res) => {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
-
+router.get('/delete-last-submission/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const deleted = await companionService.deleteLastSubmission(employeeId);
+    if (deleted) {
+      res.json({ success: true, message: 'Submission deleted successfully', deleted: true });
+    } else {
+      res.json({ success: false, message: 'No records found to delete', deleted: false });
+    }
+  } catch (error) {
+    console.error('Error in delete-last-submission route:', error);
+    res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
+  }
+});
 module.exports = router;
