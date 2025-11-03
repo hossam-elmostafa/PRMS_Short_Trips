@@ -1559,7 +1559,7 @@ const renderCalendar = () => {
                       style={{ width: '20px', height: '20px' }}
                     disabled={readonlyMode}
                     />
-                  <span>{c.name} — {c.rel}</span>
+                  <span> {c.rel} — {c.name} </span>
                   </div>
                 );
               })}
