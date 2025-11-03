@@ -7,11 +7,12 @@ import path from 'path';
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
-    https: {
-      key: fs.readFileSync('../backend/certs/localhost.key'),
-      cert: fs.readFileSync('../backend/certs/localhost.crt'),
-    },
+    port: 5173
+    // /*,
+    // https: {
+    //   key: fs.readFileSync('../backend/certs/localhost.key'),
+    //   cert: fs.readFileSync('../backend/certs/localhost.crt'),
+    // },*/
   },
   optimizeDeps: {
     exclude: ['lucide-react'],

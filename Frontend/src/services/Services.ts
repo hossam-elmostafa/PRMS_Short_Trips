@@ -1,6 +1,6 @@
 import { getApiBase } from '../config';
 import i18n from '../i18n/config';
-
+const protocol='http';
 export interface Hotel {
   id: string;
   en: string;
@@ -43,7 +43,7 @@ export function isRoomTypeSupported(hotel: Hotel | null, roomTypeKey: string): b
 export async function getHotelsFromServer(lang: 'ar' | 'en' = 'ar') {
   try {
     //console.log('Fetching hotels from server at api base:', getApiBase());
-    const response = await fetch(`https://${getApiBase()}/api/hotels?lang=${lang}`);
+    const response = await fetch(`${protocol}://${getApiBase()}/api/hotels?lang=${lang}`);
     const hotelResult = await response.json();
     
     if (hotelResult.success) {
@@ -70,9 +70,9 @@ export interface City {
 // BUG-AZ-PR-29-10-2025.1: Fetch cities from dedicated API endpoint with language support
 export async function getCitiesFromServer(lang: 'ar' | 'en' = 'ar') {
   try {
-    const response = await fetch(`https://${getApiBase()}/api/cities?lang=${lang}`);
+    const response = await fetch(`${protocol}://${getApiBase()}/api/cities?lang=${lang}`);
     if (!response.ok) {
-      throw new Error(i18n.t('errors.httpsError', { status: response.status }));
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
@@ -86,10 +86,10 @@ export async function getCitiesFromServer(lang: 'ar' | 'en' = 'ar') {
 }
 export async function getHotelsByCityFromServer(city: string, lang: 'ar' | 'en' = 'ar') {
   try {
-    const response = await fetch(`https://${getApiBase()}/api/hotels/${encodeURIComponent(city)}?lang=${lang}`);
+    const response = await fetch(`${protocol}://${getApiBase()}/api/hotels/${encodeURIComponent(city)}?lang=${lang}`);
     //console.log('Fetching hotels for city:', response.url);
     if (!response.ok) {
-      throw new Error(i18n.t('errors.httpsError', { status: response.status }));
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     //console.log('Fetched hotels for city', city, ':', result);
@@ -110,11 +110,11 @@ export type HotelRoomPrices = Record<string, number> & { room_price?: number; ex
 export async function getHotelRoomPricesFromServer(hotelCode: string, date?: string): Promise<HotelRoomPrices> {
   try {
     const dateParam = date || new Date().toISOString().slice(0, 10);
-    const url = `https://${getApiBase()}/api/hotel/${encodeURIComponent(hotelCode)}/rooms?date=${encodeURIComponent(dateParam)}`;
+    const url = `${protocol}://${getApiBase()}/api/hotel/${encodeURIComponent(hotelCode)}/rooms?date=${encodeURIComponent(dateParam)}`;
     //console.log('Fetching room prices from:', url);
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(i18n.t('errors.httpsError', { status: response.status }));
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
@@ -132,7 +132,7 @@ export async function getHotelRoomPricesFromServer(hotelCode: string, date?: str
 export async function getCompanionsFromServer(employeeID: number, lang?: 'ar' | 'en') {
   try {
     const currentLang = lang || i18n.language as 'ar' | 'en';
-    const url = `https://${getApiBase()}/api/companions/${employeeID}?lang=${currentLang}`;
+    const url = `${protocol}://${getApiBase()}/api/companions/${employeeID}?lang=${currentLang}`;
     //console.log('Fetching companions from:', url);
     //console.log('🔗 Fetching companions from:', url);
     
@@ -156,7 +156,7 @@ export async function getCompanionsFromServer(employeeID: number, lang?: 'ar' | 
 
 export async function getLastCompanionsFromServer(employeeID: number, lang: 'ar' | 'en' = 'ar') {
   try {
-    const url = `https://${getApiBase()}/api/last-companions/${employeeID}?lang=${lang}`;
+    const url = `${protocol}://${getApiBase()}/api/last-companions/${employeeID}?lang=${lang}`;
     const response = await fetch(url);
     const result = await response.json();
     if (result.success) {
@@ -173,7 +173,7 @@ export async function getLastCompanionsFromServer(employeeID: number, lang: 'ar'
 
 export async function getLastHotelsFromServer(employeeID: number, lang: 'ar' | 'en' = 'ar') {
   try {
-    const url = `https://${getApiBase()}/api/last-hotels/${employeeID}?lang=${lang}`;
+    const url = `${protocol}://${getApiBase()}/api/last-hotels/${employeeID}?lang=${lang}`;
     const response = await fetch(url);
     const result = await response.json();
     if (result.success) {
@@ -190,9 +190,9 @@ export async function getLastHotelsFromServer(employeeID: number, lang: 'ar' | '
 
 export async function getRoomTypesFromServer() {
   try {
-    const response = await fetch('https://' + getApiBase() + '/api/room-types');
+    const response = await fetch(`${protocol}://` + getApiBase() + `/api/room-types`);
     if (!response.ok) {
-      throw new Error(i18n.t('errors.httpsError', { status: response.status }));
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
@@ -207,9 +207,9 @@ export async function getRoomTypesFromServer() {
 
 export async function getTransportOptionsFromServer(employeeID: number) {
   try {
-    const response = await fetch('https://' + getApiBase() + '/api/transport-options/' + employeeID);
+    const response = await fetch(`${protocol}://` + getApiBase() + `/api/transport-options/` + employeeID);
     if (!response.ok) {
-      throw new Error(i18n.t('errors.httpsError', { status: response.status }));
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
@@ -224,10 +224,10 @@ export async function getTransportOptionsFromServer(employeeID: number) {
 
 export async function getTransportAllowanceFromServer(employeeID: number, city: string, lang: 'ar' | 'en' = 'ar') {
   try {
-    const url = `https://${getApiBase()}/api/transport-allowance/${employeeID}?city=${encodeURIComponent(city)}&lang=${lang}`;
+    const url = `${protocol}://${getApiBase()}/api/transport-allowance/${employeeID}?city=${encodeURIComponent(city)}&lang=${lang}`;
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(i18n.t('errors.httpsError', { status: response.status }));
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
@@ -242,9 +242,9 @@ export async function getTransportAllowanceFromServer(employeeID: number, city: 
 
 export async function getEmployeeNameFromServer(employeeID: number, currentLang: string) {
   try {
-    const response = await fetch(`https://${getApiBase()}/api/employee/${employeeID}?lang=${currentLang}`);
+    const response = await fetch(`${protocol}://${getApiBase()}/api/employee/${employeeID}?lang=${currentLang}`);
     if (!response.ok) {
-      throw new Error(i18n.t('errors.httpsError', { status: response.status }));
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
@@ -259,9 +259,9 @@ export async function getEmployeeNameFromServer(employeeID: number, currentLang:
 
 export async function getPolicyDataFromServer(employeeID: number) {
   try {
-    const response = await fetch(`https://${getApiBase()}/api/policy/${employeeID}`);
+    const response = await fetch(`${protocol}://${getApiBase()}/api/policy/${employeeID}`);
     if (!response.ok) {
-      throw new Error(i18n.t('errors.httpsError', { status: response.status }));
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     if (!result.success) {
@@ -299,7 +299,7 @@ export async function getMaximumNoOfCompanionsFromServer(employeeID: number) {
 export async function getHotelRoomBedCountsFromServer(hotelCode: string): Promise<Record<string, number>> {
   try {
     
-    const response = await fetch(`https://${getApiBase()}/api/hotel/${encodeURIComponent(hotelCode)}/beds`);
+    const response = await fetch(`${protocol}://${getApiBase()}/api/hotel/${encodeURIComponent(hotelCode)}/beds`);
     
     
     if (!response.ok) {
@@ -461,7 +461,7 @@ export async function submitTripFromServer(
   }
 
   try {
-    const res = await fetch('https://' + getApiBase() + '/api/submit', {
+    const res = await fetch(`${protocol}://` + getApiBase() + `/api/submit`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -499,7 +499,7 @@ export async function reviewTripAndCalculateCostFromServer(
   lang: 'ar' | 'en' = 'ar'
 ): Promise<{ success: boolean; message: string; hotels: ReviewHotelResult[] }> {
   try {
-    const response = await fetch('https://' + getApiBase() + '/api/review-trip', {
+    const response = await fetch(`${protocol}://` + getApiBase() + `/api/review-trip`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -532,7 +532,7 @@ export async function checkTripSubmissionFromServer(
 ): Promise<{ success: boolean; message: string }> {
   console.log("checkTripSubmissionFromServer: "+ employeeID + " " + lang);
   try {
-    const response = await fetch('https://' + getApiBase() + '/api/check-submission', {
+    const response = await fetch(`${protocol}://` + getApiBase() + `/api/check-submission`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -557,10 +557,10 @@ export async function checkTripSubmissionFromServer(
 //RQ-PR-AA-28-10-2025.01
 export async function getSecretKeyValueFromServer(secret: string) {
   try {
-    const response = await fetch('https://' + getApiBase() + '/api/admin/key/' + secret);
+    const response = await fetch(`${protocol}://` + getApiBase() + `api/admin/key/` + secret);
     //console.log('Fetching secret key from server:', secret);
     if (!response.ok) {
-      throw new Error(i18n.t('errors.httpsError', { status: response.status }));
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
     const result = await response.json();
     //console.log('Fetched secret key from server:', result);

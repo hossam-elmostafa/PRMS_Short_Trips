@@ -1535,8 +1535,8 @@ const renderCalendar = () => {
       </header>
 
       <main className="w-full px-4 pb-12">
-        <div className="mt-6 mb-2 flex justify-center text-3xl font-bold gap-[300px]">
-          <span>{t('employee.name')}: {employeeName}</span>
+      <div className="mt-6 mb-2 employee-info-header">
+      <span>{t('employee.name')}: {employeeName}</span>
           <span>{t('employee.id')}: {employeeID}</span>
         </div>
 
@@ -1567,7 +1567,7 @@ const renderCalendar = () => {
           </section>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-none">
+        <div className="hotels-grid">
           {Object.keys(columns).map(colKey => renderColumn(Number(colKey)))}
         </div>
 
@@ -1613,7 +1613,7 @@ const renderCalendar = () => {
               const result = await checkTripSubmissionFromServer(employeeID, currentLang);
               
             if (result.success) {
-                showToast('success', t('success.submitTripTitle'), result.message || t('success.submitTrip'));
+                showToast('success', t('success.submitTripTitle'), t('success.submitTrip'));
                 // Reset review state after successful submission
                 setIsReviewSuccessful(false);
                 // Force refresh the data from server
@@ -1979,89 +1979,482 @@ const renderCalendar = () => {
           );
         })}
       </div>
-
+      
       <style>{`
-        @keyframes toastSlideIn {
-          0% {
-            transform: translateX(120%) scale(0.9);
-            opacity: 0;
-          }
-          60% {
-            transform: translateX(-8px) scale(1);
-            opacity: 1;
-          }
-          80% {
-            transform: translateX(4px) scale(1);
-          }
-          100% {
-            transform: translateX(0) scale(1);
-            opacity: 1;
-          }
-        }
-        
-        @keyframes toastSlideOut {
-          0% {
-            transform: translateX(0) scale(1);
-            opacity: 1;
-          }
-          100% {
-            transform: translateX(120%) scale(0.9);
-            opacity: 0;
-          }
-        }
-        
-        @keyframes toastProgress {
-          from {
-            width: 100%;
-          }
-          to {
-            width: 0%;
-          }
-        }
-        
-        @keyframes iconBounce {
-          0% {
-            transform: scale(0) rotate(-180deg);
-            opacity: 0;
-          }
-          50% {
-            transform: scale(1.15) rotate(10deg);
-          }
-          70% {
-            transform: scale(0.95) rotate(-5deg);
-          }
-          100% {
-            transform: scale(1) rotate(0deg);
-            opacity: 1;
-          }
-        }
-        
-        @keyframes accentPulse {
-          0% {
-            transform: scaleY(0);
-            opacity: 0;
-          }
-          50% {
-            transform: scaleY(1.1);
-            opacity: 1;
-          }
-          100% {
-            transform: scaleY(1);
-            opacity: 1;
-          }
-        }
-        
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+/* FORCE everything to fit screen */
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  overflow-x: hidden !important;
+  max-width: 100vw !important;
+  width: 100% !important;
+}
+
+/* Force all containers to respect viewport */
+.bg-gray-100,
+header,
+main,
+footer,
+section {
+  max-width: 100vw !important;
+  width: 100% !important;
+  overflow-x: hidden !important;
+}
+
+/* Employee Info Header - SIMPLIFIED */
+.employee-info-header {
+  display: flex;
+  justify-content: space-around;
+  font-size: 1.5rem;
+  font-weight: 700;
+  gap: 2rem;
+  flex-wrap: wrap;
+  padding: 0 1rem;
+}
+
+/* Hotels Grid - FORCE single column on mobile */
+.hotels-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  width: 100%;
+}
+
+/* Companions grid */
+.companions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+/* Calendar grid */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  width: 100%;
+  min-width: 100%;
+}
+
+/* Header container */
+.header-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Action buttons container */
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+/* Room inputs */
+.room-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Modal container */
+.modal-container {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+/* Toast container */
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 50;
+}
+
+/* ===== TOAST ANIMATIONS ===== */
+@keyframes toastSlideIn {
+  0% {
+    transform: translateX(120%) scale(0.9);
+    opacity: 0;
+  }
+  60% {
+    transform: translateX(-8px) scale(1);
+    opacity: 1;
+  }
+  80% {
+    transform: translateX(4px) scale(1);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes toastSlideOut {
+  0% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(120%) scale(0.9);
+    opacity: 0;
+  }
+}
+
+@keyframes toastProgress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+@keyframes iconBounce {
+  0% {
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.15) rotate(10deg);
+  }
+  70% {
+    transform: scale(0.95) rotate(-5deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes accentPulse {
+  0% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scaleY(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== MOBILE RESPONSIVE STYLES ===== */
+@media (max-width: 768px) {
+  /* Employee Info Header */
+  .employee-info-header {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    text-align: center;
+    padding: 0 0.5rem;
+  }
+
+  /* Hotels Grid */
+  .hotels-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+    padding: 0 0.5rem;
+  }
+
+  /* Companions grid */
+  .companions-grid {
+    grid-template-columns: 1fr !important;
+    font-size: 0.875rem;
+    gap: 0.75rem;
+  }
+
+  /* Section cards */
+  section.bg-white {
+    padding: 1rem !important;
+    margin: 0.5rem !important;
+    border-radius: 0.5rem;
+  }
+  
+  section.bg-white h2 {
+    font-size: 1.125rem !important;
+    margin-bottom: 1rem;
+  }
+  
+  section.bg-white h3 {
+    font-size: 1rem !important;
+    margin-bottom: 0.75rem;
+  }
+  
+  section.bg-white select {
+    font-size: 0.875rem !important;
+    padding: 0.625rem !important;
+    width: 100%;
+  }
+  
+  section.bg-white button {
+    font-size: 0.875rem !important;
+    padding: 0.625rem 1rem !important;
+    white-space: nowrap;
+  }
+  
+  /* Ensure proper spacing for room sections */
+  section.bg-white > div {
+    margin-bottom: 1rem;
+  }
+  
+  section.bg-white > div:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Room inputs */
+  .room-inputs {
+    font-size: 0.813rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+  }
+  
+  .room-inputs > div {
+    display: grid;
+    grid-template-columns: 100px 60px 1fr 60px 1fr;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 48px;
+  }
+  
+  .room-inputs input {
+    width: 48px !important;
+    height: 40px !important;
+    font-size: 0.875rem;
+    text-align: center;
+    justify-self: center;
+  }
+  
+  .room-inputs span,
+  .room-inputs label {
+    font-size: 0.875rem;
+    line-height: 1.3;
+  }
+  
+  /* Room type labels - fixed width for perfect alignment */
+  .room-inputs > div > *:first-child {
+    width: 100px;
+    text-align: right;
+    padding-right: 0.5rem;
+  }
+  
+  /* Center align the input numbers */
+  .room-inputs > div > *:nth-child(2),
+  .room-inputs > div > *:nth-child(4) {
+    justify-self: center;
+    text-align: center;
+  }
+  
+  /* Right align the labels */
+  .room-inputs > div > *:nth-child(3),
+  .room-inputs > div > *:nth-child(5) {
+    text-align: right;
+    padding-right: 0.5rem;
+  }
+  
+  /* Room type section title */
+  .room-inputs .font-medium,
+  .room-inputs > h3,
+  .room-inputs > div > .font-medium {
+    font-size: 0.938rem !important;
+    margin-bottom: 0.5rem;
+    display: block;
+    width: 100%;
+    grid-column: 1 / -1;
+    text-align: right;
+  }
+
+  /* Action buttons */
+  .action-buttons {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+    padding: 0 0.5rem;
+  }
+  
+  .action-buttons button {
+    font-size: 1rem !important;
+    padding: 0.75rem 1rem !important;
+    width: 100%;
+  }
+
+  /* Header */
+  .header-container {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 1rem !important;
+    padding: 1rem 0.5rem;
+  }
+  
+  .header-center {
+    position: relative !important;
+    left: auto !important;
+    transform: none !important;
+    text-align: center;
+    order: -1;
+  }
+  
+  header img {
+    max-width: 180px !important;
+    height: auto !important;
+  }
+  
+  .header-title {
+    font-size: 0.875rem !important;
+    text-align: center;
+  }
+
+  /* Calendar */
+  .calendar-grid {
+    gap: 3px;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-width: 100%;
+  }
+  
+  .calendar-grid > div {
+    min-height: 75px !important;
+    height: auto !important;
+    padding: 8px 3px !important;
+    font-size: 0.875rem !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: visible !important;
+    min-width: 0;
+  }
+  
+  .calendar-grid button {
+    font-size: 1rem !important;
+    padding: 12px 4px !important;
+    min-height: 52px !important;
+    height: auto !important;
+    width: 100% !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    white-space: normal;
+    line-height: 1.3;
+    word-wrap: break-word;
+  }
+  
+  /* Calendar day headers */
+  .calendar-grid > div:nth-child(-n+7) {
+    font-weight: 700;
+    font-size: 0.875rem !important;
+    min-height: 48px !important;
+    padding: 10px 3px !important;
+    background-color: rgba(0, 0, 0, 0.02);
+  }
+  
+  /* Calendar container responsiveness */
+  .calendar-grid {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Ensure calendar parent containers don't compress */
+  section:has(.calendar-grid) {
+    padding: 1rem 0.5rem !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+  }
+  
+  /* Calendar text wrapping for Arabic */
+  .calendar-grid button > * {
+    display: block;
+    width: 100%;
+    text-align: center;
+  }
+
+  /* Modals */
+  .modal-container .bg-white {
+    max-width: 95vw !important;
+    max-height: 90vh !important;
+    margin: 1rem !important;
+    width: 100% !important;
+  }
+
+  /* Toasts */
+  .toast-container {
+    left: 0.5rem !important;
+    right: 0.5rem !important;
+    bottom: 0.5rem !important;
+  }
+  
+  .toast-container > div {
+    min-width: 100% !important;
+    max-width: 100% !important;
+    width: 100%;
+  }
+
+  /* Footer */
+  footer img {
+    width: 48px !important;
+    height: 48px !important;
+  }
+  
+  footer .text-lg {
+    font-size: 0.875rem !important;
+  }
+}
+
+/* Medium screens (tablets) */
+@media (max-width: 1200px) and (min-width: 769px) {
+  .hotels-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .companions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Prevent horizontal scrolling on all devices */
+@media (max-width: 480px) {
+  html, body {
+    overflow-x: hidden !important;
+  }
+  
+  main, .container, .mx-auto {
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+  }
+}
       `}</style>
+
+        
     </div>
   );
 }

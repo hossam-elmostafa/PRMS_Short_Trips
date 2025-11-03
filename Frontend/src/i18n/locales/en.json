@@ -132,7 +132,9 @@
     "selectCity": "Select city first",
     "maxCompanions": "Maximum companions is",
         "maxCompanionsTitle": "Maximum Companions Reached",
-    "selectCityTitle": "City Not Selected"
+    "selectCityTitle": "City Not Selected",
+    "selectHotel": "Select hotel first",
+    "selectHotelTitle": "Hotel not selected"
 
   },
   "validation": {

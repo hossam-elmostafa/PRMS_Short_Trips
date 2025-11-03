@@ -132,7 +132,9 @@
     "selectCity": "اختر المدينة أولاً",
     "maxCompanions": "الحد الأقصى للمرافقين هو",
         "maxCompanionsTitle": "تم الوصول للحد الأقصى من المرافقين",
-    "selectCityTitle": "لم يتم اختيار المدينة"
+    "selectCityTitle": "لم يتم اختيار المدينة",
+    "selectHotel": "اختر الفندق أولاً",
+    "selectHotelTitle": "لم يتم اختيار الفندق"
 
   },
   "validation": {

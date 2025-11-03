@@ -9,7 +9,7 @@ const transportRoutes = require('./routes/transportRoutes');
 const roomTypeRoutes = require('./routes/roomTypeRoutes');
 const companionRoutes = require('./routes/companionRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-
+const debug=true;
 
 const app = express();
 const PORT = process.env.PORT || 909;
@@ -20,11 +20,19 @@ const sslOptions = {
   cert: fs.readFileSync(path.join(certPath, 'localhost.crt')),
 };
 
-// Create HTTPS server  
-https.createServer(sslOptions, app).listen(PORT, () => {
-  console.log(`✅ HTTPS Server running at https://localhost:${PORT}`);
-  console.log(`📘 API Documentation: https://localhost:${PORT}/`);
-});
+if(debug==false){
+  // Create HTTPS server  
+  https.createServer(sslOptions, app).listen(PORT, () => {
+    console.log(`✅ HTTPS Server running at https://localhost:${PORT}`);
+    console.log(`📘 API Documentation: https://localhost:${PORT}/`);
+  });
+}
+else{
+  app.listen(PORT, () => {
+    console.log(`✅ HTTP Server running at http://localhost:${PORT}`);
+    console.log(`📘 API Documentation: http://localhost:${PORT}/`);
+  });
+}
 
 // 2. Define your CORS options
 const allowedDomains = ['www.first-systems.com','localhost','Phpco.local'];
@@ -168,7 +176,7 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-  console.log(`API Documentation: http://localhost:${PORT}/`);
+  console.log(`API Documentation: https://localhost:${PORT}/`);
 });
 
 
