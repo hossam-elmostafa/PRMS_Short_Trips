@@ -1385,24 +1385,15 @@ const renderCalendar = () => {
   const handleReviewRequest = async () => {
     console.log("handleReviewRequest");
     // If review was already successful, just show costs without re-calculating
+    // BUG-AZ-PR-04-11-2025.1: Review Message — remove costs from confirmation message
+    // Previously (deleted): Show total/employee costs in the toast when review already succeeded
+    // const sum = Object.values(columns).reduce((acc, col) => ({
+    //   total: acc.total + (Number(col.totalCost) || 0),
+    //   emp: acc.emp + (Number(col.empCost) || 0)
+    // }), { total: 0, emp: 0 });
+    // const msg = `${t('review.totalCost')}: ${sum.total}` + (sum.emp ? `\n${t('review.employeeCost')}: ${Math.round(sum.emp)}` : '');
     if (isReviewSuccessful) {
-      let totalCost = 0;
-      let empCost = 0;
-      Object.values(columns).forEach((col) => {
-        if (col.totalCost !== undefined) totalCost += Number(col.totalCost) || 0;
-        if (col.empCost !== undefined) empCost += Number(col.empCost) || 0;
-      });
-      
-      let costMessage = '';
-      if (totalCost > 0) {
-        costMessage = `${t('review.totalCost')}: ${totalCost}`;
-        if (empCost > 0) {
-          costMessage += `\n${t('review.employeeCost')}: ${Math.round(empCost)}`;
-        }
-      } else {
-        costMessage = t('review.calculating');
-      }
-      showToast('info', t('review.title'), costMessage);
+      showToast('info', t('review.title'), t('success.readyToSubmit'));
       return;
     }
 
@@ -1507,21 +1498,19 @@ const renderCalendar = () => {
       });
     }
 
-    // Calculate and show total costs
-    let totalCost = 0;
-    let empCost = 0;
-    result.hotels.forEach((h: ReviewHotelResult) => {
-      totalCost += h.totalCost || 0;
-      empCost += h.empCost || 0;
-    });
-
-    const costInfo = totalCost > 0 
-      ? `\n${t('review.totalCost')}: ${totalCost}${empCost > 0 ? `\n${t('review.employeeCost')}: ${Math.round(empCost)}` : ''}`
-      : '';
-
+    // BUG-AZ-PR-04-11-2025.1: Review Message — remove costs from confirmation message
+    // Previously (deleted): Show aggregated total/employee costs in the success toast
+    // const totals = result.hotels.reduce((acc, h) => ({
+    //   total: acc.total + (h.totalCost || 0),
+    //   emp: acc.emp + (h.empCost || 0)
+    // }), { total: 0, emp: 0 });
+    // const costInfo = totals.total > 0
+    //   ? `\n${t('review.totalCost')}: ${totals.total}` + (totals.emp > 0 ? `\n${t('review.employeeCost')}: ${Math.round(totals.emp)}` : '')
+    //   : '';
+    // showToast('success', t('review.title'), `${t('success.readyToSubmit')}${costInfo}`);
     // Enable submit button on successful review
     setIsReviewSuccessful(true);
-    showToast('success', t('review.title'), `${t('success.readyToSubmit') || 'Trip reviewed and costs calculated'}${costInfo}`);
+    showToast('success', t('review.title'), t('success.readyToSubmit') || 'Trip reviewed');
   };
 
   return (
