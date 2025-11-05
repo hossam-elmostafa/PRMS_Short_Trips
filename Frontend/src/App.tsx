@@ -1157,10 +1157,23 @@ const renderCalendar = () => {
         {colData.selectedHotel && (
           <>
             <img
-              src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60"
-              alt={colData.selectedHotel.en || colData.selectedHotel.ar}
+              src={(() => {
+                const withTypes = (colData.selectedHotel as unknown as { hotelPicName?: string; hotelPic?: string }) || {};
+                const preferred = (withTypes.hotelPic && withTypes.hotelPic.trim() !== '')
+                  ? withTypes.hotelPic
+                  : (withTypes.hotelPicName || '');
+                const isHttp = /^https?:\/\//i.test(preferred);
+                const url = preferred
+                  ? (isHttp ? preferred : `/api/hotel-image?path=${encodeURIComponent(preferred)}&v=${Date.now()}`)
+                  : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60';
+                return url;
+              })()}
+              alt={colData.selectedHotel?.en || colData.selectedHotel?.ar || 'hotel'}
               style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }}
               className="mb-2"
+              onError={(e) => {
+                e.currentTarget.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60';
+              }}
             />
             <div className="mb-2 text-lg font-semibold text-blue-700">
               {colData.selectedHotel.en || colData.selectedHotel.ar || 'Hotel Selected'}
@@ -1710,15 +1723,36 @@ const renderCalendar = () => {
                   onClick={() => selectHotel(h)}
                   disabled={readonlyMode}
                 >
-                  <img
-                    src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60"
-                    alt={h.en || h.ar}
-                    style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }}
-                    className="mb-2"
-                  />
-                  <strong className="text-lg">{h.en || h.ar}</strong><br />
-                  <span className="text-sm text-gray-600">{h.ar || h.en}</span>
-                </button>
+<img
+  src={(() => {
+    const withTypes = (h as unknown as { hotelPicName?: string; hotelPic?: string });
+    // Prefer full absolute path from DB when available; fallback to filename
+    const preferred = (withTypes.hotelPic && withTypes.hotelPic.trim() !== '')
+      ? withTypes.hotelPic
+      : (withTypes.hotelPicName || '');
+    const isHttp = /^https?:\/\//i.test(preferred);
+    const safe = preferred
+      ? (isHttp
+          ? `${preferred}`
+          : `/api/hotel-image?path=${encodeURIComponent(preferred)}&v=${Date.now()}`)
+      : '';
+    const url = safe || "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60";
+    console.log('Image URL:', url);
+    return url;
+  })()}
+  alt={h.en || h.ar}
+  style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }}
+  className="mb-2"
+  onError={(e) => {
+    const withTypes = (h as unknown as { hotelPicName?: string; hotelPic?: string });
+    console.log('Image failed to load:', withTypes.hotelPic || withTypes.hotelPicName || '');
+    e.currentTarget.src = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60";
+  }}
+/>
+
+  <strong className="text-lg">{h.en || h.ar}</strong><br />
+  <span className="text-sm text-gray-600">{h.ar || h.en}</span>
+</button>
               ))}
             </div>
           </div>

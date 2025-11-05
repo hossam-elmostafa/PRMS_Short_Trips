@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const hotelService = require('../services/hotelService');
+const fs = require('fs');
+const path = require('path');
 
 router.get('/hotels/:city', async (req, res) => {
   try {
@@ -102,4 +104,69 @@ router.get('/last-hotels/:employeeId', async (req, res) => {
   }
 });
 
+
+router.get('/hotel-image', (req, res) => {
+  const filepath = req.query.path;
+  
+  if (!filepath) {
+    return res.status(400).send('Path parameter is required');
+  }
+  
+  const decodedPath = decodeURIComponent(filepath);
+  
+  // Normalize the path and handle different formats
+  let finalPath = decodedPath;
+  
+  // If it's a relative path, make it absolute
+  if (!path.isAbsolute(decodedPath)) {
+    finalPath = path.join(process.cwd(), decodedPath);
+  }
+  
+  // Add file extension if missing
+  if (!path.extname(finalPath)) {
+    finalPath += '.jpg'; // or whatever extension your images use
+  }
+  
+  console.log('Looking for image at:', finalPath);
+  
+  // Check if file exists
+  if (fs.existsSync(finalPath)) {
+    console.log('Serving image:', finalPath);
+    res.sendFile(finalPath);
+  } else {
+    console.log('Image not found:', finalPath);
+    
+    // BUG-AZ-PR-04-11-2025.8: The DB may store a path on the DB server (e.g., C:\TEMP\...).
+    // Fallback: use only the filename and look in configured local directories.
+    const fileNameOnly = path.basename(finalPath);
+    const configuredDir = process.env.HOTEL_IMAGE_DIR || '';
+    const longPrefix = /^[A-Za-z]:\\/.test(finalPath) ? `\\\\?\\${finalPath}` : '';
+    const alternativePaths = [
+      finalPath,
+      longPrefix,
+      finalPath.replace(/\\/g, '/'),
+      finalPath.replace(/\//g, '\\'),
+      longPrefix ? longPrefix.replace(/\\/g, '/') : '',
+      configuredDir ? path.join(configuredDir, fileNameOnly) : '',
+      path.join(process.cwd(), 'images', fileNameOnly),
+      path.join(process.cwd(), 'uploads', fileNameOnly),
+      path.join(process.cwd(), 'public', fileNameOnly)
+    ].filter(Boolean);
+    
+    for (const altPath of alternativePaths) {
+      if (fs.existsSync(altPath)) {
+        console.log('Found image at alternative path:', altPath);
+        return res.sendFile(altPath);
+      }
+    }
+    
+    // Return default image if none found
+    const defaultImage = path.join(process.cwd(), 'public', 'default-hotel.jpg');
+    if (fs.existsSync(defaultImage)) {
+      return res.sendFile(defaultImage);
+    }
+    
+    res.status(404).send('Image not found');
+  }
+});
 module.exports = router;

@@ -64,7 +64,7 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
             INSERT INTO @Results
             EXEC P_GET_STRIP_HOTEL ${bit}, N'${city}';
 
-            SELECT HOTEL_CODE, HOTEL_NAME, HOTEL_ROOM_TYPES,HOTEL_EXTRA_BEDS_COUNTS,HOTEL_BEDS_COUNTS FROM @Results;
+SELECT HOTEL_CODE, HOTEL_NAME, HOTEL_ROOM_TYPES,HOTEL_EXTRA_BEDS_COUNTS,HOTEL_BEDS_COUNTS, HOTEL_PIC FROM @Results;
         `);
 
         // First try with resolved code; then, if needed, retry with original city name
@@ -81,8 +81,19 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
         const roomTypesByCode = new Map();
         const roomExtraBeds = new Map();
         const roomBeds = new Map();
+        const hotelPics = new Map(); // MOVED HERE - outside the forEach loops
+        const hotelPicNames = new Map();
+
+        const extractFileName = (p) => {
+            const raw = String(p || '').trim();
+            if (!raw) return '';
+            const parts = raw.split(/[\\\/]+/);
+            return parts.length ? String(parts[parts.length - 1] || '').trim() : '';
+        };
         
         (rowsAr || []).forEach(r => {
+            console.log('Row data (AR):', r); // ADD THIS
+
             const code = String(r.HOTEL_CODE || '').trim();
             if (code) {
                 arByCode.set(code, String(r.HOTEL_NAME || '').trim());
@@ -100,7 +111,16 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
                     //console.log(' beds for', code, r.HOTEL_BEDS_COUNTS);
                     roomBeds.set(code, String(r.HOTEL_BEDS_COUNTS).trim());
                 }
-                
+                // Store hotel picture
+                if (r.HOTEL_PIC) {
+                    console.log('Setting hotelPic for', code, ':', r.HOTEL_PIC); // ADD THIS
+
+                    const pic = String(r.HOTEL_PIC).trim();
+                    hotelPics.set(code, pic);
+                    hotelPicNames.set(code, extractFileName(pic));
+                }         } else {
+                    console.log('No HOTEL_PIC for', code); // ADD THIS
+                        
             }
         });
         
@@ -118,7 +138,12 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
                 if (r.HOTEL_BEDS_COUNTS && !roomBeds.has(code)) {
                     roomBeds.set(code, String(r.HOTEL_BEDS_COUNTS).trim());
                 }
-                
+                // Store hotel picture if not already set from Arabic query
+                if (r.HOTEL_PIC && !hotelPics.has(code)) {
+                    const pic = String(r.HOTEL_PIC).trim();
+                    hotelPics.set(code, pic);
+                    hotelPicNames.set(code, extractFileName(pic));
+                }
             }
         });
 
@@ -127,6 +152,31 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
             ...Array.from(enByCode.keys())
         ]));
 
+        // BUG-AZ-PR-04-11-2025.7: Backfill HOTEL_PIC from PRMS_HOTEL when proc doesn't return it
+        const missingPicCodes = allCodes.filter(cd => !hotelPics.has(cd));
+        if (missingPicCodes.length > 0) {
+            const inList = missingPicCodes
+                .map(cd => `N'${String(cd).replace(/'/g, "''")}'`)
+                .join(',');
+            try {
+                const picRows = await prisma.$queryRawUnsafe(`
+                    SELECT LTRIM(RTRIM(HOTEL_CODE)) AS HOTEL_CODE, LTRIM(RTRIM(HOTEL_PIC)) AS HOTEL_PIC
+                    FROM PRMS_HOTEL
+                    WHERE LTRIM(RTRIM(HOTEL_CODE)) IN (${inList})
+                `);
+                (picRows || []).forEach(r => {
+                    const code = String(r.HOTEL_CODE || '').trim();
+                    const pic = String(r.HOTEL_PIC || '').trim();
+                    if (code && pic && !hotelPics.has(code)) {
+                        hotelPics.set(code, pic);
+                        hotelPicNames.set(code, extractFileName(pic));
+                    }
+                });
+            } catch (e) {
+                console.error('Backfill HOTEL_PIC failed:', e);
+            }
+        }
+
         const mapped = allCodes.map((code, index) => {
             const arName = arByCode.get(code) || '';
             const enName = enByCode.get(code) || arName || '';
@@ -134,16 +184,23 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
             const supportedRoomTypes = roomTypesByCode.get(code) || 'S,D,T'; // Default to all if not specified
             const supportedRoomExtraBeds = roomExtraBeds.get(code) || 'S:0,D:0,T:0'; // Default to all if not specified
             const supportedRoomBeds = roomBeds.get(code) || 'D:2,FR:4,FS:5,J:6,S:1,T:3'; // Default to all if not specified
-            
+            const hotelPic = hotelPics.get(code) || '';
+            const hotelPicName = hotelPicNames.get(code) || extractFileName(hotelPic);
+            console.log('Hotel:', code, 'hotelPic:', hotelPic); // ADD THIS
+
             return { 
                 id, 
                 ar: arName, 
                 en: enName,
                 supportedRoomTypes, // Add supported room types
                 supportedRoomExtraBeds,
-                supportedRoomBeds
+                supportedRoomBeds,
+                hotelPic,
+                hotelPicName
             };
         });
+        console.log('Final mapped hotels:', JSON.stringify(mapped, null, 2)); // ADD THIS
+
 
         return mapped;
     } catch (error) {
@@ -152,7 +209,6 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
         return [];
     }
 }
-
 // BUG-AZ-PR-29-10-2025.1: Fixed by AG - Use language-specific city names for grouping hotels
 // Issue: Hotels were always grouped by Arabic city names
 // Solution: Query both English and Arabic city names, then group by the requested language
@@ -1096,7 +1152,18 @@ async function getLastHotelsFromDB(lang = 'ar', empCode) {
                 TOTAL_COST,
                 EMP_COST
             FROM @Results;`);
-        return result;
+            console.log(`Query result for langBit=${langBit}, empCode=${empCode}:`, JSON.stringify(result, null, 2));
+
+        // Process results to handle image paths
+        const processedResults = result.map(hotel => ({
+            ...hotel,
+            // Add full URL for the image if HOTEL_PIC exists
+            HOTEL_PIC_URL: hotel.HOTEL_PIC 
+                ? `/hotel-image?path=${encodeURIComponent(hotel.HOTEL_PIC)}`
+                : null
+        }));
+
+        return processedResults;
     } catch (error) {
         console.error('Error calling stored procedure P_GET_STRIP_GET_LAST_HOTELS:', error);
         console.error('Parameters used - empCode:', empCode, 'lang:', lang);
