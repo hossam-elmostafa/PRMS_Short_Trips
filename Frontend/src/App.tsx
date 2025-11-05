@@ -69,6 +69,9 @@ interface LastHotelRow {
 function App({ employeeID }: AppProps) {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
+  // BUG-AZ-PR-29-10-2025.1: Normalize i18n.language to 'ar'|'en' (e.g., 'en-US' -> 'en')
+  // Reason: Backend stored procedures invert language bits and non-exact values defaulted to Arabic
+  const currentLang: 'ar' | 'en' = (i18n.language || '').toLowerCase().startsWith('en') ? 'en' : 'ar';
 
   const [ROOM_TYPES, setROOM_TYPES] = useState<RoomType[]>([]);
   const [HOTELS, setHOTELS] = useState<Record<string, Hotel[]>>({});
@@ -157,14 +160,15 @@ const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, 
   if (initialDataLoaded) return;
 
     const fetchInitialData = async () => {
-      const currentLang = i18n.language as 'ar' | 'en';
+      // BUG-AZ-PR-29-10-2025.1: Use normalized 'lang' for all initial API calls
+      const lang: 'ar' | 'en' = (i18n.language || '').toLowerCase().startsWith('en') ? 'en' : 'ar';
       const [hotelsData, citiesData, companionsData, roomTypesData, , employeeName, policyData] = await Promise.all([
-        getHotelsFromServer(currentLang),
-        getCitiesFromServer(currentLang),
-        getCompanionsFromServer(employeeID, currentLang),
+        getHotelsFromServer(lang),
+        getCitiesFromServer(lang),
+        getCompanionsFromServer(employeeID, lang),
         getRoomTypesFromServer(),
         getTransportOptionsFromServer(employeeID),
-        getEmployeeNameFromServer(employeeID, currentLang),
+        getEmployeeNameFromServer(employeeID, lang),
         getPolicyDataFromServer(employeeID),
       ]);
 
@@ -391,6 +395,24 @@ const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, 
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [employeeID, i18n.language, initialDataLoaded]);
 
+  // BUG-AZ-PR-29-10-2025.1: Refresh localized datasets when language changes
+  // Reason: Cities list and hotels-by-city keys are language-specific
+  useEffect(() => {
+    const lang: 'ar' | 'en' = (i18n.language || '').toLowerCase().startsWith('en') ? 'en' : 'ar';
+    (async () => {
+      try {
+        const [hotelsData, citiesData] = await Promise.all([
+          getHotelsFromServer(lang),
+          getCitiesFromServer(lang)
+        ]);
+        setHOTELS(hotelsData);
+        setCITIES(citiesData);
+      } catch (e) {
+        console.error('Failed to refresh localized datasets on language change', e);
+      }
+    })();
+  }, [i18n.language]);
+
 
 
 
@@ -487,11 +509,11 @@ useEffect(() => {
     if (city) {
       (async () => {
         try {
-          const hotels = await getHotelsByCityFromServer(city, i18n.language as 'ar' | 'en');
+          const hotels = await getHotelsByCityFromServer(city, currentLang);
           //console.log('Fetched hotels for city', city, hotels);
           setHOTELS(prev => ({ ...prev, [city]: hotels }));
 
-          const allowance = await getTransportAllowanceFromServer(employeeID, city, i18n.language as 'ar' | 'en');
+          const allowance = await getTransportAllowanceFromServer(employeeID, city, currentLang);
           // BUG-PR-26-10-2025.3: Update transport allowance only after successful fetch
           // to prevent flicker during loading
           setColumns(prev => ({
@@ -524,7 +546,7 @@ useEffect(() => {
       return;
     }
     try {
-      const hotels = await getHotelsByCityFromServer(city, i18n.language as 'ar' | 'en');
+      const hotels = await getHotelsByCityFromServer(city, currentLang);
       //console.log('Fetched hotels for city 2', city, hotels);
       setHOTELS(prev => ({ ...prev, [city]: hotels }));
     } catch (e) {
@@ -1453,12 +1475,12 @@ const renderCalendar = () => {
     showToast('info', t('review.title'), t('review.calculating'));
 
     // RQ-AZ-PR-31-10-2024.1: Call review trip API (no validation)
-    const currentLang = i18n.language as 'ar' | 'en';
+    const langForReview = currentLang;
     const result = await reviewTripAndCalculateCostFromServer(
       employeeID,
       companions,
       hotels,
-      currentLang
+      langForReview
     );
 
     if (!result.success) {
@@ -1609,7 +1631,6 @@ const renderCalendar = () => {
           <button 
             onClick={async function() {
               // RQ-AZ-PR-31-10-2024.1: Submit - call P_STRIP_SUBMIT_CHECK
-              const currentLang = i18n.language as 'ar' | 'en';
               const result = await checkTripSubmissionFromServer(employeeID, currentLang);
               
             if (result.success) {
