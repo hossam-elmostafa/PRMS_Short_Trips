@@ -6,7 +6,8 @@ const companionService = require('../services/companionService');
 router.get('/companions/:employeeId', async (req, res) => {
   try {
     const { employeeId } = req.params;
-    const lang = req.query.lang || 'ar'; // Get language from query
+    // BUG-AZ-PR-29-10-2025.1: Normalize lang to 'ar'|'en' (e.g., 'en-US' -> 'en')
+    const lang = (String(req.query.lang || 'ar').toLowerCase().startsWith('en')) ? 'en' : 'ar';
     
     //console.log('🌐 API Route - Language received:', lang); // ADD THIS
     
@@ -27,13 +28,14 @@ router.get('/companions/:employeeId', async (req, res) => {
 router.get('/employee/:employeeId', async (req, res) => {
   try {
     const { employeeId } = req.params;
-    const { lang } = req.query; // optional language hint: 'ar' | 'en'
+    // BUG-AZ-PR-29-10-2025.1: Normalize lang to avoid Arabic fallback in EN mode
+    const lang = (String(req.query.lang || 'ar').toLowerCase().startsWith('en')) ? 'en' : 'ar';
 
     if (!employeeId) {
       return res.status(404).json({ success: false, message: 'employee not found' });
     }
 
-    const name = await companionService.getEmployeeName(employeeId, (lang || 'ar'));
+    const name = await companionService.getEmployeeName(employeeId, lang);
     // Always respond 200 to avoid breaking frontend Promise.all; empty string if not found
     res.json({ success: true, data: name || '' });
   } catch (error) {
@@ -56,7 +58,8 @@ router.get('/maximum-no-of-companions/:employeeId', async (req, res) => {
 router.get('/last-companions/:employeeId', async (req, res) => {
   try {
     const { employeeId } = req.params;
-    const lang = req.query.lang || 'ar';
+    // BUG-AZ-PR-29-10-2025.1: Normalize lang for last-companions endpoint
+    const lang = (String(req.query.lang || 'ar').toLowerCase().startsWith('en')) ? 'en' : 'ar';
     const companions = await companionService.getLastCompanions(employeeId, lang);
     if (!companions) {
       return res.status(404).json({ success: false, message: 'last companions not found' });
@@ -71,7 +74,8 @@ router.get('/last-companions/:employeeId', async (req, res) => {
 router.get('/last-submission/:employeeId', async (req, res) => {
   try {
     const { employeeId } = req.params;
-    const lang = req.query.lang || 'ar';
+    // BUG-AZ-PR-29-10-2025.1: Normalize lang for last-submission endpoint
+    const lang = (String(req.query.lang || 'ar').toLowerCase().startsWith('en')) ? 'en' : 'ar';
     const data = await companionService.getLastSubmission(employeeId, lang);
     res.json({ success: true, data });
   } catch (error) {

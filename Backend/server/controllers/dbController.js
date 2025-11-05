@@ -252,7 +252,7 @@ async function getCitiesFromDB(lang = 'ar') {
 
 async function getCompanionsfromDB(employeeId, lang = 'en') {
     try {
-        // Convert lang to bit: 'en' = 1, others = 0
+        // BUG-AZ-PR-29-10-2025.1: Companions proc expects 1 = Arabic, 0 = English (confirmed)
         const langBit = lang === 'ar' ? 1 : 0;
         const empCode = String(employeeId).replace(/^:+/, '').trim();
         
@@ -296,7 +296,8 @@ async function getEmployeeNamefromDB(employeeId, lang = 'ar') {
     try {
         //console.log('🗃️ getEmployeeNamefromDB called with:', { employeeId, lang });
         
-        const langBit = lang === 'ar' ? 1 : 0;
+        // BUG-AZ-PR-29-10-2025.1: Correct bit for employee proc (1 = English, 0 = Arabic)
+        const langBit = lang === 'en' ? 1 : 0;
         
         //console.log('📊 Using langBit:', langBit, 'for language:', lang);
         
@@ -312,7 +313,47 @@ async function getEmployeeNamefromDB(employeeId, lang = 'ar') {
 
         if (rows && rows.length > 0) {
             const row = rows[0] || {};
-            const procName = row.EMPLOYEE_TNAME || row.EMPLOYEE_NAME || '';
+            const primary = (lang === 'en')
+                ? (row.EMPLOYEE_NAME || row.EMPLOYEE_TNAME || '')
+                : (row.EMPLOYEE_TNAME || row.EMPLOYEE_NAME || '');
+            const alternate = (lang === 'en')
+                ? (row.EMPLOYEE_TNAME || row.EMPLOYEE_NAME || '')
+                : (row.EMPLOYEE_NAME || row.EMPLOYEE_TNAME || '');
+            const isArabic = (s) => /[\u0600-\u06FF]/.test(String(s || ''));
+            let procName = primary;
+            // BUG-AZ-PR-29-10-2025.1: Some DBs return swapped columns; auto-correct by script detection
+            if (lang === 'en' && isArabic(primary) && alternate) {
+                procName = alternate;
+            }
+            if (lang === 'ar' && !isArabic(primary) && isArabic(alternate)) {
+                procName = alternate;
+            }
+
+            // BUG-AZ-PR-29-10-2025.1: Fallback requery if still mismatched script
+            const shouldBeArabic = lang !== 'en';
+            const hasArabic = isArabic(procName);
+            if ((shouldBeArabic && !hasArabic) || (!shouldBeArabic && hasArabic)) {
+                const flippedBit = langBit === 1 ? 0 : 1;
+                try {
+                    const altRows = await prisma.$queryRawUnsafe(`
+                        EXEC P_GET_EMPLOYEE ${flippedBit}, '${empCode}'
+                    `);
+                    if (altRows && altRows.length > 0) {
+                        const r = altRows[0] || {};
+                        const pickEn = (r.EMPLOYEE_NAME || r.EMPLOYEE_TNAME || '');
+                        const pickAr = (r.EMPLOYEE_TNAME || r.EMPLOYEE_NAME || '');
+                        const candidate = shouldBeArabic ? pickAr : pickEn;
+                        if (typeof candidate === 'string' && candidate.trim() !== '') {
+                            const candidateArabic = isArabic(candidate);
+                            if ((shouldBeArabic && candidateArabic) || (!shouldBeArabic && !candidateArabic)) {
+                                procName = candidate;
+                            }
+                        }
+                    }
+                } catch (_) {
+                    // ignore fallback errors
+                }
+            }
             
             //console.log('📄 Procedure returned name:', procName);
             
@@ -991,6 +1032,7 @@ async function getSecretKeyValues(secret) {
 // Get the last saved companions data via stored proc P_GET_STRIP_GET_LAST_EMP_FAMILY
 async function getLastCompanionsFromDB(lang = 'ar', empCode) {
     try {
+        // BUG-AZ-PR-29-10-2025.1: Align bit mapping with companions proc (1 = Arabic, 0 = English)
         const langBit = lang === 'ar' ? 1 : 0;
         empCode = String(empCode).replace(/^:+/, '').trim();
         

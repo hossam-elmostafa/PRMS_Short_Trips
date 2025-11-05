@@ -413,6 +413,24 @@ const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, 
     })();
   }, [i18n.language]);
 
+  // BUG-AZ-PR-29-10-2025.1: Also refresh companions and employee name on language change
+  // Reason: These were loaded only on initial fetch, causing wrong language after toggling
+  useEffect(() => {
+    const lang: 'ar' | 'en' = (i18n.language || '').toLowerCase().startsWith('en') ? 'en' : 'ar';
+    (async () => {
+      try {
+        const [companions, name] = await Promise.all([
+          getCompanionsFromServer(employeeID, lang),
+          getEmployeeNameFromServer(employeeID, lang)
+        ]);
+        setCOMPANIONS(Array.isArray(companions) ? companions : []);
+        setEmployeeName(typeof name === 'string' ? name : '');
+      } catch (e) {
+        console.error('Failed to refresh companions/employee name on language change', e);
+      }
+    })();
+  }, [i18n.language, employeeID]);
+
 
 
 

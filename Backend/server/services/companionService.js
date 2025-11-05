@@ -59,14 +59,35 @@ function mapRelationshipType(relType, lang = 'ar') {
  * @param {string} lang - Language code ('ar' or 'en')
  * @returns {Promise<Array>} Array of companions with translated relationship types
  */
+// BUG-AZ-PR-29-10-2025.1: Normalize companion names per requested language by merging AR/EN lists
+// Reason: Stored proc language bit behavior is inconsistent across DBs; fetch both and select deterministically
 async function getCompanions(employeeId, lang = 'ar'){
-  const companions = await getCompanionsfromDB(employeeId, lang);
-  
-  // Apply relationship mapping based on requested language
-  return companions.map(companion => ({
-    ...companion,
-    rel: mapRelationshipType(companion.rel, lang)
-  }));
+  const [arList, enList] = await Promise.all([
+    getCompanionsfromDB(employeeId, 'ar'),
+    getCompanionsfromDB(employeeId, 'en')
+  ]);
+
+  const byIdAr = new Map((arList || []).map(c => [String(c.RELID), c]));
+  const byIdEn = new Map((enList || []).map(c => [String(c.RELID), c]));
+
+  const allIds = Array.from(new Set([...
+    (arList || []).map(c => String(c.RELID)),
+    ...(enList || []).map(c => String(c.RELID))
+  ]));
+
+  const merged = allIds.map(id => {
+    const ar = byIdAr.get(id) || {};
+    const en = byIdEn.get(id) || {};
+    const name = (lang === 'en') ? (en.name || ar.name || '') : (ar.name || en.name || '');
+    const relCode = (ar.rel || en.rel || '').toString();
+    return {
+      RELID: id,
+      name,
+      rel: mapRelationshipType(relCode, lang)
+    };
+  });
+
+  return merged;
 }
 
 /**
@@ -100,13 +121,31 @@ async function getEmployeeName(employeeId, lang = 'ar') {
  * @param {string} lang - Language code ('ar' or 'en')
  * @returns {Promise<Array>} Array of companions with translated relationship types
  */
+// BUG-AZ-PR-29-10-2025.1: Normalize last companions by merging AR/EN lists as well
 async function getLastCompanions(employeeId, lang = 'ar') {
-  const companions = await getLastCompanionsFromDB(lang, employeeId);
-  return (Array.isArray(companions) ? companions : []).map(companion => ({
-    RELID: companion.RELID,
-    name: companion.rel, // SWAPPED: DB returns name in 'rel' field
-    rel: mapRelationshipType((companion.name || '').trim(), lang) // SWAPPED: DB returns rel code in 'name' field
-  }));
+  const [arList, enList] = await Promise.all([
+    getLastCompanionsFromDB('ar', employeeId),
+    getLastCompanionsFromDB('en', employeeId)
+  ]);
+
+  const byIdAr = new Map((arList || []).map(c => [String(c.RELID), c]));
+  const byIdEn = new Map((enList || []).map(c => [String(c.RELID), c]));
+  const allIds = Array.from(new Set([...
+    (arList || []).map(c => String(c.RELID)),
+    ...(enList || []).map(c => String(c.RELID))
+  ]));
+
+  return allIds.map(id => {
+    const ar = byIdAr.get(id) || {};
+    const en = byIdEn.get(id) || {};
+    const name = (lang === 'en') ? (en.name || ar.name || '') : (ar.name || en.name || '');
+    const relCode = (ar.rel || en.rel || '').toString();
+    return {
+      RELID: id,
+      name,
+      rel: mapRelationshipType(relCode, lang)
+    };
+  });
 }
 
 async function getLastSubmission(employeeId, lang = 'ar') {
