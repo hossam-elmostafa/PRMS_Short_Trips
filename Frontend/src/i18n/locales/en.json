@@ -172,7 +172,7 @@
     "submitTrip": "Request submitted successfully!",
         "submitTripTitle": "Trip Submitted Successfully",
         "reviewTrip": "Review Request and Calculate Cost",
-        "readytoSubmit": "Ready to Submit"
+        "readyToSubmit": "Ready to Submit"
 
   },
   "loading": {
