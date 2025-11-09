@@ -2,49 +2,32 @@
     // Use IntelliSense to learn about possible attributes.
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    //RQ-2025-11-09-setup debugging for frontend and backend
     "version": "0.2.0",
     "configurations": [
         {
             "type": "chrome",
             "request": "launch",
             "name": "Launch Chrome against localhost",
-            //"url": "https://localhost:5173",
             "url": "http://localhost:5173",
-            "webRoot": "${workspaceFolder}"
+            "webRoot": "${workspaceFolder}/Frontend"
         },
         {
-            "name": "Launch Backend (node)",
-            "type": "pwa-node",
-            "request": "launch",
-            "program": "${workspaceFolder}/Backend/server/app.js",
-            "cwd": "${workspaceFolder}/Backend",
-            "runtimeExecutable": "node",
-            "runtimeArgs": ["--inspect-brk=9229"],
-            "envFile": "${workspaceFolder}/Backend/.env",
-            "console": "integratedTerminal",
-            "skipFiles": ["<node_internals>/**"]
-        },
-        {
-            "name": "Attach to Backend (9229)",
-            "type": "pwa-node",
+            "name": "Attach to Backend",
+            "type": "node",
             "request": "attach",
-            "address": "127.0.0.1",
-            "port": 9229,
-            "localRoot": "${workspaceFolder}/Backend",
-            "remoteRoot": "${workspaceFolder}/Backend",
-            "restart": true,
+            "port": 9230,
             "skipFiles": ["<node_internals>/**"]
-        },
+        }
+    ],
+    "compounds": [
         {
-            "name": "Launch Backend via npm (debug)",
-            "type": "pwa-node",
-            "request": "launch",
-            "runtimeExecutable": "npm",
-            "runtimeArgs": ["run", "debug"],
-            "cwd": "${workspaceFolder}/Backend",
-            "envFile": "${workspaceFolder}/Backend/.env",
-            "console": "integratedTerminal",
-            "skipFiles": ["<node_internals>/**"]
+            "name": "Debug Full Stack",
+            "configurations": [
+                "Launch Chrome against localhost",
+                "Attach to Backend"
+            ],
+            "stopAll": true
         }
     ]
 }

@@ -1,13 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import fs from 'fs';
-import path from 'path';
+// import fs from 'fs';
+// import path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173
+    port: 5173,
+    // Sourcemaps are enabled by default in dev mode
     // /*,
     // https: {
     //   key: fs.readFileSync('../backend/certs/localhost.key'),
@@ -16,6 +17,10 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['lucide-react'],
+  },
+  // Enable sourcemaps for development debugging (default is true, but making explicit)
+  css: {
+    devSourcemap: true,
   },
   build: {
     // Disable source maps in production (most important!)
