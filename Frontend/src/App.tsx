@@ -397,6 +397,7 @@ const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, 
 
   // BUG-AZ-PR-29-10-2025.1: Refresh localized datasets when language changes
   // Reason: Cities list and hotels-by-city keys are language-specific
+  //BUG-AZ-PR-09-11-2025 Language in Cities
   useEffect(() => {
     const lang: 'ar' | 'en' = (i18n.language || '').toLowerCase().startsWith('en') ? 'en' : 'ar';
     (async () => {
@@ -405,14 +406,42 @@ const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, 
           getHotelsFromServer(lang),
           getCitiesFromServer(lang)
         ]);
+        
+        // Store old cities before updating state
+        const oldCities = CITIES;
+        
         setHOTELS(hotelsData);
         setCITIES(citiesData);
+        
+        // FIX: Map selected cities to new language using the fetched data
+        setColumns(prev => {
+          const updated = { ...prev };
+          Object.keys(updated).forEach(colKey => {
+            const col = updated[Number(colKey)];
+            if (col.selectedCity) {
+              // Find the city code for the current selected city name from OLD cities
+              const oldCityCode = oldCities.find(c => c.name === col.selectedCity)?.code;
+              if (oldCityCode) {
+                // Find the new city name in the NEW language from fetched data
+                const newCityName = citiesData.find((c: City) => c.code === oldCityCode)?.name;
+                if (newCityName) {
+                  updated[Number(colKey)] = {
+                    ...col,
+                    selectedCity: newCityName
+                  };
+                }
+              }
+            }
+          });
+          return updated;
+        });
+        
       } catch (e) {
         console.error('Failed to refresh localized datasets on language change', e);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i18n.language]);
-
   // BUG-AZ-PR-29-10-2025.1: Also refresh companions and employee name on language change
   // Reason: These were loaded only on initial fetch, causing wrong language after toggling
   useEffect(() => {
