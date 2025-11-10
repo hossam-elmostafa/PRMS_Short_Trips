@@ -9,6 +9,12 @@ const transportRoutes = require('./routes/transportRoutes');
 const roomTypeRoutes = require('./routes/roomTypeRoutes');
 const companionRoutes = require('./routes/companionRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const imageRoutes = require('./routes/imageRoutes');
+
+// Initialize image service early to load configuration and log status
+const imageService = require('./services/imageService');
+console.log('[Server] Image service initialized with base path:', imageService.basePath);
+
 const debug=true;
 
 const app = express();
@@ -69,6 +75,14 @@ try {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+
+// Log all API requests for debugging
+app.use('/api', (req, res, next) => {
+  if (req.path.includes('hotel-image')) {
+    console.log('[API] Request to:', req.method, req.path, 'Query:', req.query);
+  }
+  next();
+});
 
 ////////////////////////////////////////////////
 // Serve static files from the React app's build directory
@@ -151,8 +165,8 @@ app.get('/inf', (req, res) => {
       pricing: '/api/pricing',
       transport: '/api/transport',
       roomTypes: '/api/room-types',
-      lastCompanions: '/api/last-companions'
-
+      lastCompanions: '/api/last-companions',
+      hotelImage: '/api/hotel-image?path=IMAGE_PATH'
     }
   });
 });
@@ -164,6 +178,8 @@ app.use('/api', pricingRoutes);
 app.use('/api', transportRoutes);
 app.use('/api', roomTypeRoutes);
 app.use('/api/admin', adminRoutes); // Admin endpoints
+app.use('/api/images', imageRoutes);
+
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

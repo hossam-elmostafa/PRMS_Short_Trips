@@ -21,6 +21,8 @@ import {
   checkTripSubmissionFromServer,
   ReviewHotelResult,
 } from './services/Services';
+import { getApiBase } from './config';
+const protocol = 'http';
 
 interface ToastNotification {
   id: number;
@@ -1193,7 +1195,7 @@ const renderCalendar = () => {
                   : (withTypes.hotelPicName || '');
                 const isHttp = /^https?:\/\//i.test(preferred);
                 const url = preferred
-                  ? (isHttp ? preferred : `/api/hotel-image?path=${encodeURIComponent(preferred)}&v=${Date.now()}`)
+                  ? (isHttp ? preferred : `${protocol}://${getApiBase()}/api/hotel-image?path=${encodeURIComponent(preferred)}&v=${Date.now()}`)
                   : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60';
                 return url;
               })()}
@@ -1763,7 +1765,7 @@ const renderCalendar = () => {
     const safe = preferred
       ? (isHttp
           ? `${preferred}`
-          : `/api/hotel-image?path=${encodeURIComponent(preferred)}&v=${Date.now()}`)
+          : `${protocol}://${getApiBase()}/api/hotel-image?path=${encodeURIComponent(preferred)}&v=${Date.now()}`)
       : '';
     const url = safe || "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60";
     console.log('Image URL:', url);

@@ -104,69 +104,109 @@ router.get('/last-hotels/:employeeId', async (req, res) => {
   }
 });
 
+// Debug endpoint to check image service configuration
+router.get('/image-config', (req, res) => {
+  try {
+    const imageService = require('../services/imageService');
+    const fs = require('fs');
+    const path = require('path');
+    
+    const testPath = '143184823.jpg';
+    let fullPath;
+    let exists = false;
+    let error = null;
+    
+    try {
+      fullPath = imageService.getFullPath(testPath);
+      exists = fs.existsSync(fullPath);
+    } catch (e) {
+      error = e.message;
+    }
+    
+    res.json({
+      basePath: imageService.basePath,
+      basePathExists: fs.existsSync(imageService.basePath),
+      testRelativePath: testPath,
+      testFullPath: fullPath,
+      testFileExists: exists,
+      testError: error,
+      processCwd: process.cwd(),
+      envImagesBasePath: process.env.IMAGES_BASE_PATH,
+      runtimeConfigPath: process.env.RUNTIME_CONFIG_PATH || process.env.RUNTIME_CONFIG_FILE || process.env.BASE_API_CONFIG_PATH
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
-router.get('/hotel-image', (req, res) => {
-  const filepath = req.query.path;
-  
-  if (!filepath) {
-    return res.status(400).send('Path parameter is required');
-  }
-  
-  const decodedPath = decodeURIComponent(filepath);
-  
-  // Normalize the path and handle different formats
-  let finalPath = decodedPath;
-  
-  // If it's a relative path, make it absolute
-  if (!path.isAbsolute(decodedPath)) {
-    finalPath = path.join(process.cwd(), decodedPath);
-  }
-  
-  // Add file extension if missing
-  if (!path.extname(finalPath)) {
-    finalPath += '.jpg'; // or whatever extension your images use
-  }
-  
-  console.log('Looking for image at:', finalPath);
-  
-  // Check if file exists
-  if (fs.existsSync(finalPath)) {
-    console.log('Serving image:', finalPath);
-    res.sendFile(finalPath);
-  } else {
-    console.log('Image not found:', finalPath);
+
+router.get('/hotel-image', async (req, res) => {
+  console.log('[hotel-image] Endpoint hit! Query:', req.query);
+  try {
+    const filepath = req.query.path;
     
-    // BUG-AZ-PR-04-11-2025.8: The DB may store a path on the DB server (e.g., C:\TEMP\...).
-    // Fallback: use only the filename and look in configured local directories.
-    const fileNameOnly = path.basename(finalPath);
-    const configuredDir = process.env.HOTEL_IMAGE_DIR || '';
-    const longPrefix = /^[A-Za-z]:\\/.test(finalPath) ? `\\\\?\\${finalPath}` : '';
-    const alternativePaths = [
-      finalPath,
-      longPrefix,
-      finalPath.replace(/\\/g, '/'),
-      finalPath.replace(/\//g, '\\'),
-      longPrefix ? longPrefix.replace(/\\/g, '/') : '',
-      configuredDir ? path.join(configuredDir, fileNameOnly) : '',
-      path.join(process.cwd(), 'images', fileNameOnly),
-      path.join(process.cwd(), 'uploads', fileNameOnly),
-      path.join(process.cwd(), 'public', fileNameOnly)
-    ].filter(Boolean);
+    if (!filepath) {
+      console.log('[hotel-image] Missing path parameter');
+      return res.status(400).json({ error: 'Path parameter is required' });
+    }
     
-    for (const altPath of alternativePaths) {
-      if (fs.existsSync(altPath)) {
-        console.log('Found image at alternative path:', altPath);
-        return res.sendFile(altPath);
+    const decodedPath = decodeURIComponent(filepath);
+    console.log('[hotel-image] Requested image path from DB:', decodedPath);
+    
+    // Use imageService to handle path normalization and loading
+    const imageService = require('../services/imageService');
+    
+    // Get the full path that will be used (for debugging)
+    try {
+      const fullPath = imageService.getFullPath(decodedPath);
+      console.log('[hotel-image] Base path:', imageService.basePath);
+      console.log('[hotel-image] Resolved full path:', fullPath);
+    } catch (pathError) {
+      console.error('[hotel-image] Error getting full path:', pathError.message);
+    }
+    
+    // Check if image exists
+    const exists = await imageService.imageExists(decodedPath);
+    if (!exists) {
+      const fullPath = imageService.getFullPath(decodedPath);
+      console.log('[hotel-image] Image not found. Expected path:', fullPath);
+      console.log('[hotel-image] Base path used:', imageService.basePath);
+      console.log('[hotel-image] Relative path from DB:', decodedPath);
+      
+      // Try to return a default image if available
+      const defaultImagePath = path.join(process.cwd(), 'public', 'default-hotel.jpg');
+      if (fs.existsSync(defaultImagePath)) {
+        console.log('[hotel-image] Serving default image');
+        return res.sendFile(defaultImagePath);
       }
+      
+      res.setHeader('Access-Control-Allow-Origin', '*'); // Allow CORS
+      return res.status(404).json({ 
+        error: 'Image not found', 
+        message: `Image not found at expected path: ${fullPath}`,
+        basePath: imageService.basePath,
+        relativePath: decodedPath
+      });
     }
     
-    // Return default image if none found
-    const defaultImage = path.join(process.cwd(), 'public', 'default-hotel.jpg');
-    if (fs.existsSync(defaultImage)) {
-      return res.sendFile(defaultImage);
-    }
+    // Load and serve the image
+    const imageBuffer = await imageService.loadImage(decodedPath);
+    const mimeType = imageService.getMimeType(decodedPath);
     
-    res.status(404).send('Image not found');
+    // Set headers for image response
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow CORS for images
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+    
+    console.log('[hotel-image] Successfully serving image:', decodedPath, 'Size:', imageBuffer.length, 'bytes');
+    res.send(imageBuffer);
+  } catch (error) {
+    console.error('[hotel-image] Error serving hotel image:', error);
+    res.status(500).json({ 
+      error: 'Internal server error', 
+      message: error.message 
+    });
   }
 });
 module.exports = router;

@@ -1117,12 +1117,9 @@ async function getLastCompanionsFromDB(lang = 'ar', empCode) {
 // Get the last saved hotels data via stored proc P_GET_STRIP_GET_LAST_HOTELS
 async function getLastHotelsFromDB(lang = 'ar', empCode) {
     try {
-        // Convert lang to bit: 'ar' = 1, anything else = 0
         const langBit = lang === 'ar' ? 1 : 0;
         empCode = String(empCode).replace(/^:+/, '').trim();
-        // Call stored procedure and return result table
-        // Procedure returns: CITY_CODE, CITY_NAME, HOTEL_CODE, HOTEL_NAME, REQ_DATE, 
-        // SELECTED_ROOMS, HOTEL_BEDS_COUNTS, HOTEL_EXTRA_BEDS_COUNTS, HOTEL_PIC, TOTAL_COST, EMP_COST
+        
         const result = await prisma.$queryRawUnsafe(`
             DECLARE @Results TABLE (
                 CITY_CODE VARCHAR(50),
@@ -1152,14 +1149,15 @@ async function getLastHotelsFromDB(lang = 'ar', empCode) {
                 TOTAL_COST,
                 EMP_COST
             FROM @Results;`);
-            console.log(`Query result for langBit=${langBit}, empCode=${empCode}:`, JSON.stringify(result, null, 2));
+            
+        console.log(`Query result for langBit=${langBit}, empCode=${empCode}:`, JSON.stringify(result, null, 2));
 
         // Process results to handle image paths
         const processedResults = result.map(hotel => ({
             ...hotel,
-            // Add full URL for the image if HOTEL_PIC exists
+            // Create URL endpoint for loading the image from local disk
             HOTEL_PIC_URL: hotel.HOTEL_PIC 
-                ? `/hotel-image?path=${encodeURIComponent(hotel.HOTEL_PIC)}`
+                ? `/api/images/load?path=${encodeURIComponent(hotel.HOTEL_PIC)}`
                 : null
         }));
 
@@ -1167,7 +1165,7 @@ async function getLastHotelsFromDB(lang = 'ar', empCode) {
     } catch (error) {
         console.error('Error calling stored procedure P_GET_STRIP_GET_LAST_HOTELS:', error);
         console.error('Parameters used - empCode:', empCode, 'lang:', lang);
-        return '';
+        return [];
     }
 }
 
@@ -1195,6 +1193,8 @@ async function deleteLastSubmissionFromDB(employeeId) {
         return false;
     }
 }
+
+
 
 module.exports = {
     getCompanionsfromDB,

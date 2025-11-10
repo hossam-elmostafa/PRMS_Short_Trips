@@ -9,6 +9,8 @@ export interface Hotel {
   supportedRoomExtraBeds?: string; // e.g., "S:2,D:2,T:1"  
   supportedRoomBeds?: string; // e.g., "D:2,FR:4,FS:5,J:6,S:1,T:3",
   hotelPic?: string; // e.g., "https://example.com/hotel.jpg"
+  hotelPicUrl?: string; // Full URL for displaying in UI
+
 }
 
 export interface Companion {
@@ -178,7 +180,14 @@ export async function getLastHotelsFromServer(employeeID: number, lang: 'ar' | '
     const response = await fetch(url);
     const result = await response.json();
     if (result.success) {
-      return result.data;
+      // Process results to add full image URLs
+      const data = result.data.map((hotel: LastHotelRow) => ({
+        ...hotel,
+        hotelPicUrl: hotel.HOTEL_PIC 
+          ? getHotelImageUrl(hotel.HOTEL_PIC)
+          : null
+      }));
+      return data;
     } else {
       console.error(i18n.t('errors.fetchHotels'), result.message);
       return [];
@@ -575,6 +584,25 @@ export async function getSecretKeyValueFromServer(secret: string) {
     throw error;
   }
 }
+/**
+ * Get hotel image URL for displaying in the UI
+ * @param relativePath - Relative path from database (e.g., "Prms/Shorttrips/pic1.jpg")
+ * @returns Full URL to load the image
+ */
+export function getHotelImageUrl(relativePath: string | null | undefined): string | null {
+  if (!relativePath) return null;
+  return `${protocol}://${getApiBase()}/api/images/load?path=${encodeURIComponent(relativePath)}`;
+}
+
+/**
+ * Get hotel image URL by hotel code
+ * @param hotelCode - Hotel code from database
+ * @returns Full URL to load the hotel image
+ */
+export function getHotelImageUrlByCode(hotelCode: string): string {
+  return `${protocol}://${getApiBase()}/api/images/hotel/${encodeURIComponent(hotelCode)}`;
+}
+
 
 export interface LastHotelRow {
   CITY_CODE?: string;
@@ -583,12 +611,14 @@ export interface LastHotelRow {
   HOTEL_NAME?: string;
   REQ_DATE?: string;
   SELECTED_ROOMS?: string;
+  HOTEL_PIC?: string;
   TOTAL_COST?: number | string;
   EMP_COST?: number | string;
   cityCode?: string;
   hotelCode?: string;
   reqDate?: string;
   selectedRooms?: string;
+  hotelPicUrl?: string | null;
 }
 
 
