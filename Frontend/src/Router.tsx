@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import App from './App.tsx';
-import { getSecretKeyValueFromServer } from './services/Services';
+// import { getSecretKeyValueFromServer } from './services/Services';
 
 // Component to extract employeeID from URL and pass to App
 function AppWithEmployeeID() {
@@ -50,7 +50,7 @@ function AppWithEmployeeID() {
 
 export default function Router() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/shorttrips">
       <Routes>
         <Route path="/employee/:employeeID" element={<AppWithEmployeeID />} />
         <Route path="/" element={<Navigate to="/employee/0" replace />} />

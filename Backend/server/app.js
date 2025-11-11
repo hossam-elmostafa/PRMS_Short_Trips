@@ -77,7 +77,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // Log all API requests for debugging
-app.use('/api', (req, res, next) => {
+app.use('/shorttrips/api', (req, res, next) => {
   if (req.path.includes('hotel-image')) {
     console.log('[API] Request to:', req.method, req.path, 'Query:', req.query);
   }
@@ -137,8 +137,8 @@ app.use(express.static(path.join(__dirname, 'Client/build'), {
   index: false, // Prevent express.static from serving index.html
 }));
 
-// Custom handling for all routes, serving index.html with replaced API_URL
-app.get('/employee/:userID', (req, res) => {
+// Custom handling for all routes, serving index.html
+app.get('/shorttrips/employee/:userID', (req, res) => {
   // Read the index.html file
   const indexFilePath = path.resolve(__dirname, 'Client/build', 'index.html');
   fs.readFile(indexFilePath, 'utf8', (err, data) => {
@@ -160,25 +160,25 @@ app.get('/inf', (req, res) => {
     message: 'Travel Management API',
     version: '1.0.0',
     endpoints: {
-      hotels: '/api/hotels',
-      employees: '/api/employees',
-      pricing: '/api/pricing',
-      transport: '/api/transport',
-      roomTypes: '/api/room-types',
-      lastCompanions: '/api/last-companions',
-      hotelImage: '/api/hotel-image?path=IMAGE_PATH'
+      hotels: '/shorttrips/api/hotels',
+      employees: '/shorttrips/api/employees',
+      pricing: '/shorttrips/api/pricing',
+      transport: '/shorttrips/api/transport',
+      roomTypes: '/shorttrips/api/room-types',
+      lastCompanions: '/shorttrips/api/last-companions',
+      hotelImage: '/shorttrips/api/hotel-image?path=IMAGE_PATH'
     }
   });
 });
 
 
-app.use('/api', hotelRoutes);
-app.use('/api', companionRoutes);
-app.use('/api', pricingRoutes);
-app.use('/api', transportRoutes);
-app.use('/api', roomTypeRoutes);
-app.use('/api/admin', adminRoutes); // Admin endpoints
-app.use('/api/images', imageRoutes);
+app.use('/shorttrips/api', hotelRoutes);
+app.use('/shorttrips/api', companionRoutes);
+app.use('/shorttrips/api', pricingRoutes);
+app.use('/shorttrips/api', transportRoutes);
+app.use('/shorttrips/api', roomTypeRoutes);
+app.use('/shorttrips/api/admin', adminRoutes); // Admin endpoints
+app.use('/shorttrips/api/images', imageRoutes);
 
 
 app.use((err, req, res, next) => {

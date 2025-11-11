@@ -42,7 +42,9 @@ export function getApiBase(): string {
 // { "BASE_URL": "api.example.com" }
 export async function loadRuntimeConfig(): Promise<void> {
   try {
-    const resp = await fetch('/config.json', { cache: 'no-cache' });
+    // Use Vite base URL so it works under /shorttrips in dev and build
+    const baseUrl = (import.meta as any).env.BASE_URL || '/';
+    const resp = await fetch(`${baseUrl}config.json`, { cache: 'no-cache' });
     if (!resp.ok) return;
     const cfg = await resp.json();
     if (cfg && typeof cfg.BASE_URL === 'string' && cfg.BASE_URL.trim() !== '') {

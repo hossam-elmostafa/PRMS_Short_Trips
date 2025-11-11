@@ -1,19 +1,20 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 // import fs from 'fs';
-// import path from 'path';
+//import path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: '/shorttrips/',
   server: {
     port: 5173,
     // Sourcemaps are enabled by default in dev mode
-    // /*,
+    
     // https: {
     //   key: fs.readFileSync('../backend/certs/localhost.key'),
     //   cert: fs.readFileSync('../backend/certs/localhost.crt'),
-    // },*/
+    // },
   },
   optimizeDeps: {
     exclude: ['lucide-react'],

@@ -1195,7 +1195,7 @@ const renderCalendar = () => {
                   : (withTypes.hotelPicName || '');
                 const isHttp = /^https?:\/\//i.test(preferred);
                 const url = preferred
-                  ? (isHttp ? preferred : `${protocol}://${getApiBase()}/api/hotel-image?path=${encodeURIComponent(preferred)}&v=${Date.now()}`)
+                  ? (isHttp ? preferred : `${protocol}://${getApiBase()}/shorttrips/api/hotel-image?path=${encodeURIComponent(preferred)}&v=${Date.now()}`)
                   : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60';
                 return url;
               })()}
@@ -1580,7 +1580,7 @@ const renderCalendar = () => {
       <header className="bg-white shadow p-4 mb-4">
         <div className="max-w-7xl mx-auto flex items-start justify-between relative">
           <div className="absolute left-1/2 transform -translate-x-1/2">
-            <img src="/Logo.png" width="300" height="200" alt="Logo" className="object-contain mx-auto" />
+            <img src="/shorttrips/Logo.png" width="300" height="200" alt="Logo" className="object-contain mx-auto" />
           </div>
 
           <div className={`${isRTL ? 'text-right ml-auto' : 'text-left mr-auto'}`}>
@@ -1765,7 +1765,7 @@ const renderCalendar = () => {
     const safe = preferred
       ? (isHttp
           ? `${preferred}`
-          : `${protocol}://${getApiBase()}/api/hotel-image?path=${encodeURIComponent(preferred)}&v=${Date.now()}`)
+          : `${protocol}://${getApiBase()}/shorttrips/api/hotel-image?path=${encodeURIComponent(preferred)}&v=${Date.now()}`)
       : '';
     const url = safe || "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60";
     console.log('Image URL:', url);
@@ -1866,7 +1866,7 @@ const renderCalendar = () => {
 
       <footer className="bg-white shadow p-4 mt-8">
         <div className="max-w-6xl mx-auto flex items-center justify-center gap-4">
-          <img src="/First.jpeg" alt="First logo" className="w-16 h-16 object-contain" />
+          <img src="/shorttrips//First.jpeg" alt="First logo" className="w-16 h-16 object-contain" />
           <div>
             <div className="text-lg font-bold">{t('footer.company')}</div>
             <div className="text-sm text-gray-600">{t('footer.companyAr')}</div>
