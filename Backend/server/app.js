@@ -20,24 +20,17 @@ const debug=true;
 const app = express();
 const PORT = process.env.PORT || 909;
 const certPath = path.join(process.cwd(), 'certs');
-// ✅ SSL certificate paths
-const sslOptions = {
-  key: fs.readFileSync(path.join(certPath, 'localhost.key')),
-  cert: fs.readFileSync(path.join(certPath, 'localhost.crt')),
-};
-
-if(debug==false){
-  // Create HTTPS server  
-  https.createServer(sslOptions, app).listen(PORT, () => {
-    console.log(`✅ HTTPS Server running at https://localhost:${PORT}`);
-    console.log(`📘 API Documentation: https://localhost:${PORT}/`);
-  });
-}
-else{
-  app.listen(PORT, () => {
-    console.log(`✅ HTTP Server running at http://localhost:${PORT}`);
-    console.log(`📘 API Documentation: http://localhost:${PORT}/`);
-  });
+// ✅ SSL certificate paths - only load if not in gateway mode
+let sslOptions = null;
+if (!process.env.GATEWAY_MODE && fs.existsSync(path.join(certPath, 'localhost.key'))) {
+  try {
+    sslOptions = {
+      key: fs.readFileSync(path.join(certPath, 'localhost.key')),
+      cert: fs.readFileSync(path.join(certPath, 'localhost.crt')),
+    };
+  } catch (err) {
+    console.warn('[Short Trips] Failed to load SSL certificates:', err);
+  }
 }
 
 // 2. Define your CORS options
@@ -76,6 +69,31 @@ try {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// IMPORTANT: Serve static files BEFORE other routes
+// This ensures assets are served before any route handlers interfere
+const staticPath = path.join(__dirname, 'Client/build');
+console.log('[Short Trips] Serving static files from:', staticPath);
+console.log('[Short Trips] Static path exists:', fs.existsSync(staticPath));
+
+// Debug middleware to see all /shorttrips requests
+app.use('/shorttrips', (req, res, next) => {
+  console.log('[Short Trips] Incoming request:', req.method, req.path, req.originalUrl);
+  next();
+});
+
+// Serve static files under /shorttrips path for gateway mode
+// This MUST be before route handlers to catch asset requests
+app.use('/shorttrips', express.static(staticPath, {
+  index: false, // Prevent express.static from serving index.html
+  dotfiles: 'ignore',
+}));
+
+// Also serve static files at root for direct asset access (standalone mode)
+app.use(express.static(staticPath, {
+  index: false, // Prevent express.static from serving index.html
+  dotfiles: 'ignore',
+}));
+
 // Log all API requests for debugging
 app.use('/shorttrips/api', (req, res, next) => {
   if (req.path.includes('hotel-image')) {
@@ -85,7 +103,7 @@ app.use('/shorttrips/api', (req, res, next) => {
 });
 
 ////////////////////////////////////////////////
-// Serve static files from the React app's build directory
+// Serve config.json from the React app's build directory
 // Allow serving a runtime config.json from an external file outside the packaged app.
 // Set environment variable RUNTIME_CONFIG_PATH to the absolute path of the config.json
 // you want to serve (this file can live outside the EXE). If not provided or the
@@ -133,11 +151,21 @@ app.get('/config.json', (req, res) => {
   return res.send('{}');
 });
 
-app.use(express.static(path.join(__dirname, 'Client/build'), {
-  index: false, // Prevent express.static from serving index.html
-}));
-
 // Custom handling for all routes, serving index.html
+// Handle /shorttrips/employee without userID - serve index.html directly
+app.get('/shorttrips/employee', (req, res) => {
+  const indexFilePath = path.resolve(__dirname, 'Client/build', 'index.html');
+  fs.readFile(indexFilePath, 'utf8', (err, data) => {
+    if (err) {
+      console.error('Failed to read index.html:', err);
+      res.status(500).send('An error occurred');
+      return;
+    }
+    res.send(data);
+  });
+});
+
+// Handle /shorttrips/employee/:userID
 app.get('/shorttrips/employee/:userID', (req, res) => {
   // Read the index.html file
   const indexFilePath = path.resolve(__dirname, 'Client/build', 'index.html');
@@ -190,10 +218,23 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`API Documentation: https://localhost:${PORT}/`);
-});
-
+// Only start the server if not running in gateway mode
+if (!process.env.GATEWAY_MODE) {
+  if(debug==false){
+    // Create HTTPS server  
+    https.createServer(sslOptions, app).listen(PORT, () => {
+      console.log(`✅ HTTPS Server running at https://localhost:${PORT}`);
+      console.log(`📘 API Documentation: https://localhost:${PORT}/`);
+    });
+  }
+  else{
+    app.listen(PORT, () => {
+      console.log(`✅ HTTP Server running at http://localhost:${PORT}`);
+      console.log(`📘 API Documentation: http://localhost:${PORT}/`);
+    });
+  }
+} else {
+  console.log('[Short Trips] Running in gateway mode - server will not start here');
+}
 
 module.exports = app;
