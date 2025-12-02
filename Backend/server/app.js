@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -10,6 +11,21 @@ const roomTypeRoutes = require('./routes/roomTypeRoutes');
 const companionRoutes = require('./routes/companionRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const imageRoutes = require('./routes/imageRoutes');
+
+// Check database connection on startup
+const prisma = require('./lib/prisma');
+(async () => {
+    try {
+        await prisma.$connect();
+        console.log('[Short Trips] ✅ Database connection successful');
+        if (!process.env.DATABASE_URL) {
+            console.warn('[Short Trips] ⚠️ DATABASE_URL not set. Using default Prisma connection.');
+        }
+    } catch (error) {
+        console.error('[Short Trips] ❌ Database connection failed:', error.message);
+        console.error('[Short Trips] Please ensure DATABASE_URL is set correctly.');
+    }
+})();
 
 // Initialize image service early to load configuration and log status
 const imageService = require('./services/imageService');
@@ -34,15 +50,21 @@ if (!process.env.GATEWAY_MODE && fs.existsSync(path.join(certPath, 'localhost.ke
 }
 
 // 2. Define your CORS options
-const allowedDomains = ['www.first-systems.com','localhost','Phpco.local'];
+const allowedDomains = ['www.first-systems.com','localhost','Phpco.local', '127.0.0.1', '0.0.0.0'];
 
 const corsOptions = {
   origin: function (origin, callback) {
     //console.log('CORS Origin:', origin);
+    // Allow requests with no origin (like mobile apps, Postman, or same-origin requests)
     if (!origin) return callback(null, true);
+    
+    // When running in gateway mode, allow all origins (gateway handles CORS)
+    if (process.env.GATEWAY_MODE === 'true') {
+      return callback(null, true);
+    }
 
     // Check if the incoming origin is the one we want to allow
-try {
+    try {
       const url = new URL(origin);
       //console.log('CORS Hostname:', url.hostname);
       const hostname = url.hostname;

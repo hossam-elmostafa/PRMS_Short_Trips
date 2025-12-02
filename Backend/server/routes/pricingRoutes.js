@@ -57,61 +57,95 @@ router.post('/submit', async(req, res) => {
 
 
 ////////////////////////////////////////////////////////////////////////////////////        
-  const result =  await submitTripApplication(employeeId, familyIds, hotels);
-
-        // Return appropriate status code based on result
-        if (result.success) {
+        try {
+            const result = await submitTripApplication(employeeId, familyIds, hotels);
+            
+            console.log("[submit] Result:", { success: result.success });
+            
+            // Always return 200 to prevent network errors in frontend
             return res.status(200).json(result);
-        } else {
-            return res.status(500).json(result);
+        } catch (error) {
+            console.error('[submit] Error:', error);
+            // Return 200 with error details to prevent network error
+            return res.status(200).json({
+                success: false,
+                message: error.message || 'Failed to submit trip application',
+                error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            });
         }
 });
 
 // RQ-AZ-PR-31-10-2024.1: Review Trip and Calculate Cost
 router.post('/review-trip', async (req, res) => {
-    console.log("review-trip: "+ req.body);
-    const { employeeId, familyIds, hotels, lang } = req.body;
-    
-    if (!employeeId) {
-        return res.status(400).json({
-            success: false,
-            message: 'Employee ID is required'
-        });
-    }
-    
-    if (!hotels || !Array.isArray(hotels)) {
-        return res.status(400).json({
-            success: false,
-            message: 'Hotels must be an array'
-        });
-    }
-    
-    const result = await reviewTripAndCalculateCost(lang || 'ar', employeeId, familyIds || '', hotels);
-    
-    if (result.success) {
+    try {
+        console.log("[review-trip] Request received:", { employeeId: req.body.employeeId, hotelsCount: req.body.hotels?.length });
+        const { employeeId, familyIds, hotels, lang } = req.body;
+        
+        if (!employeeId) {
+            return res.status(200).json({
+                success: false,
+                message: 'Employee ID is required'
+            });
+        }
+        
+        if (!hotels || !Array.isArray(hotels)) {
+            return res.status(200).json({
+                success: false,
+                message: 'Hotels must be an array'
+            });
+        }
+        
+        const result = await reviewTripAndCalculateCost(lang || 'ar', employeeId, familyIds || '', hotels);
+        
+        console.log("[review-trip] Result:", { success: result.success, hasData: !!result.data });
+        
+        // Always return 200 to prevent network errors in frontend
         return res.status(200).json(result);
-    } else {
-        return res.status(500).json(result);
+    } catch (error) {
+        console.error('[review-trip] Error:', error);
+        // Return 200 with error details to prevent network error
+        return res.status(200).json({
+            success: false,
+            message: error.message || 'Failed to review trip and calculate cost',
+            error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
 // RQ-AZ-PR-31-10-2024.1: Check Trip Submission
 router.post('/check-submission', async (req, res) => {
-    const { employeeId, lang } = req.body;
-    
-    if (!employeeId) {
-        return res.status(400).json({
-            success: false,
-            message: 'Employee ID is required'
+    try {
+        const { employeeId, lang } = req.body;
+        
+        console.log('[check-submission] Request received:', { employeeId, lang });
+        
+        if (!employeeId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Employee ID is required'
+            });
+        }
+        
+        const result = await checkTripSubmission(lang || 'ar', employeeId);
+        
+        console.log('[check-submission] Result:', result);
+        
+        // Always return 200, but include success flag in response
+        // This prevents network errors in frontend
+        return res.status(200).json({
+            success: result.success || false,
+            readonlyMode: result.success || false, // If submission exists, readonlyMode is true
+            message: result.message || ''
         });
-    }
-    
-    const result = await checkTripSubmission(lang || 'ar', employeeId);
-    
-    if (result.success) {
-        return res.status(200).json(result);
-    } else {
-        return res.status(500).json(result);
+    } catch (error) {
+        console.error('[check-submission] Error:', error);
+        // Return 200 with success: false to prevent network error
+        return res.status(200).json({
+            success: false,
+            readonlyMode: false,
+            message: error.message || 'Failed to check trip submission',
+            error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 

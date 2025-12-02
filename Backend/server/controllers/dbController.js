@@ -886,29 +886,41 @@ async function reviewTripAndCalculateCost(lang = 'ar', empCode, familyIds, hotel
 // Calls P_STRIP_SUBMIT
 async function checkTripSubmission(lang = 'ar', empCode) {
     try {
-        console.log("checkTripSubmission: "+ lang + " " + empCode);
+        console.log("[checkTripSubmission] Starting check for:", { lang, empCode });
+        
+        // Check if Prisma is connected
+        try {
+            await prisma.$connect();
+            console.log("[checkTripSubmission] Database connection OK");
+        } catch (dbError) {
+            console.error("[checkTripSubmission] Database connection failed:", dbError.message);
+            return {
+                success: false,
+                message: `Database connection error: ${dbError.message}. Please check DATABASE_URL environment variable.`
+            };
+        }
+        
         const langBit = lang === 'ar' ? 1 : 0;
         empCode = String(empCode).replace(/^:+/, '').trim();
         const esc = (s) => String(s || '').replace(/'/g, "''");
         
-        //console.log(`[checkTripSubmission] Calling P_STRIP_SUBMIT with lang=${langBit}, empCode=${empCode}`);
+        console.log(`[checkTripSubmission] Calling P_STRIP_SUBMIT with lang=${langBit}, empCode=${empCode}`);
         
         // Call the stored procedure directly and check the result set
         // Similar to how P_STRIP_SUBMIT_FAMILY works
         const result = await prisma.$queryRawUnsafe(`
             EXEC P_STRIP_SUBMIT ${langBit}, '${esc(empCode)}';
         `);
-        console.log("checkTripSubmission: "+ `
-            EXEC P_STRIP_SUBMIT ${langBit}, '${esc(empCode)}';
-        `);
         
-        //console.log('[checkTripSubmission] P_STRIP_SUBMIT result:', JSON.stringify(result));
+        console.log('[checkTripSubmission] P_STRIP_SUBMIT result:', JSON.stringify(result));
         
         let success = false;
         let message = '';
         
         if (result && result.length > 0) {
             const firstRow = result[0];
+            console.log('[checkTripSubmission] First row:', firstRow);
+            
             // Check for Result column (common pattern)
             const resultValue = firstRow.Result || firstRow.RESULT || firstRow.result;
             const allValues = Object.values(firstRow);
@@ -920,6 +932,7 @@ async function checkTripSubmission(lang = 'ar', empCode) {
                 const resultStr = String(resultValue).trim();
                 if (resultNum === 1 || resultStr === '1') {
                     success = true;
+                    message = 'Trip already submitted';
                 } else if (resultStr !== '' && !isNaN(resultNum)) {
                     // It's a number but not 1 - might be an error code
                     message = `Trip submission failed with code: ${resultNum}`;
@@ -933,28 +946,43 @@ async function checkTripSubmission(lang = 'ar', empCode) {
                 const firstValueStr = String(firstValue).trim();
                 if (firstValueNum === 1 || firstValueStr === '1') {
                     success = true;
+                    message = 'Trip already submitted';
                 } else if (firstValueStr !== '' && !isNaN(firstValueNum)) {
                     message = `Trip submission failed with code: ${firstValueNum}`;
                 } else {
                     message = String(firstValue);
                 }
             }
+        } else {
+            console.log('[checkTripSubmission] No result returned from stored procedure');
+            success = false;
+            message = 'No submission found';
         }
         
-        //console.log('[checkTripSubmission] Success:', success, 'Message:', message);
+        console.log('[checkTripSubmission] Final result:', { success, message });
         
         return {
             success: success,
+            message: message
         };
         
     } catch (error) {
         console.error('[checkTripSubmission] Error calling P_STRIP_SUBMIT:', error);
+        console.error('[checkTripSubmission] Error stack:', error.stack);
         
         // Check if the error is about the procedure not existing
         if (error.message && error.message.includes('Could not find stored procedure')) {
             return {
                 success: false,
                 message: 'Stored procedure P_STRIP_SUBMIT not found in database. Please ensure it is created.'
+            };
+        }
+        
+        // Check for database connection errors
+        if (error.message && (error.message.includes('connection') || error.message.includes('ECONNREFUSED') || error.message.includes('timeout'))) {
+            return {
+                success: false,
+                message: `Database connection error: ${error.message}. Please check DATABASE_URL and ensure database is accessible.`
             };
         }
         
