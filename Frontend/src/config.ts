@@ -36,6 +36,26 @@ export function getApiBase(): string {
   return `${base}:${port}`;
 }
 
+// Protocol getter/setter functions
+export function setProtocol(v: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).__PROTOCOL_OVERRIDE = v;
+}
+
+export function getProtocol(): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const override = (globalThis as any).__PROTOCOL_OVERRIDE;
+  if (override) return override;
+  
+  // Default to window.location.protocol if available (removes trailing colon)
+  if (typeof window !== 'undefined' && window.location) {
+    return window.location.protocol.replace(':', '');
+  }
+  
+  // Fallback to http
+  return 'http';
+}
+
 // Load runtime config from /config.json (placed in the `public/` folder of the built app).
 // This fetch happens at runtime (in the browser) and allows changing the API host
 // without rebuilding the app. Example `public/config.json`:
@@ -63,6 +83,23 @@ export async function loadRuntimeConfig(): Promise<void> {
             (globalThis as any).__BASE_PORT_OVERRIDE = portStr;
             // eslint-disable-next-line no-console
             console.info('[config] runtime PORT override set to', portStr, `from key ${k}`);
+            break;
+          }
+        }
+      }
+    }
+    
+    // Support PROTOCOL from config.json
+    const possibleProtocolKeys = ['PROTOCOL', 'protocol'];
+    for (const k of possibleProtocolKeys) {
+      if (Object.prototype.hasOwnProperty.call(cfg, k)) {
+        const raw = (cfg as any)[k];
+        if (raw !== null && raw !== undefined) {
+          const protocolStr = String(raw).trim().toLowerCase();
+          if (protocolStr === 'http' || protocolStr === 'https') {
+            setProtocol(protocolStr);
+            // eslint-disable-next-line no-console
+            console.info('[config] runtime PROTOCOL override set to', protocolStr, `from key ${k}`);
             break;
           }
         }

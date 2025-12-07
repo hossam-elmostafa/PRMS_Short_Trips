@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getApiBase, getProtocol } from '../config';
 
 interface Hotel {
   // Add your hotel properties here based on your backend data structure
@@ -15,7 +16,7 @@ const Hotels = () => {
   useEffect(() => {
     const fetchHotels = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/hotels');
+        const response = await fetch(`${getProtocol()}://${getApiBase()}/shorttrips/api/hotels`);
         const result = await response.json();
         
         if (result.success) {
