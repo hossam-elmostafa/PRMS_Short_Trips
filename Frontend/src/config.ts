@@ -20,7 +20,17 @@ export function setBaseUrl(v: string) {
 }
 
 export function getBaseUrl(): string {
-  return (globalThis as GlobalThisWithOverrides).__BASE_URL_OVERRIDE ?? BASE_URL;
+  const override = (globalThis as GlobalThisWithOverrides).__BASE_URL_OVERRIDE;
+  if (override) return override;
+  
+  // Fallback to window.location.hostname if available (for dynamic hostname detection)
+  // This ensures the frontend uses the correct domain when accessed from external domains
+  if (typeof window !== 'undefined' && window.location) {
+    return window.location.hostname;
+  }
+  
+  // Last resort: use the hardcoded BASE_URL
+  return BASE_URL;
 }
 
 export function setApiPort(v: string) {
