@@ -70,9 +70,12 @@ export interface City {
 }
 
 // BUG-AZ-PR-29-10-2025.1: Fetch cities from dedicated API endpoint with language support
-export async function getCitiesFromServer(lang: 'ar' | 'en' = 'ar') {
+export async function getCitiesFromServer(lang: 'ar' | 'en' = 'ar', employeeId?: number | string) {
   try {
-    const response = await fetch(`${getProtocol()}://${getApiBase()}/shorttrips/api/cities?lang=${lang}`);
+    const empQ = employeeId != null && String(employeeId).trim() !== ''
+      ? `&emp=${encodeURIComponent(String(employeeId))}`
+      : '';
+    const response = await fetch(`${getProtocol()}://${getApiBase()}/shorttrips/api/cities?lang=${lang}${empQ}`);
     if (!response.ok) {
       throw new Error(i18n.t('errors.httpError', { status: response.status }));
     }
@@ -86,9 +89,12 @@ export async function getCitiesFromServer(lang: 'ar' | 'en' = 'ar') {
     return [];
   }
 }
-export async function getHotelsByCityFromServer(city: string, lang: 'ar' | 'en' = 'ar') {
+export async function getHotelsByCityFromServer(city: string, lang: 'ar' | 'en' = 'ar', employeeId?: number | string) {
   try {
-    const response = await fetch(`${getProtocol()}://${getApiBase()}/shorttrips/api/hotels/${encodeURIComponent(city)}?lang=${lang}`);
+    const empQ = employeeId != null && String(employeeId).trim() !== ''
+      ? `&emp=${encodeURIComponent(String(employeeId))}`
+      : '';
+    const response = await fetch(`${getProtocol()}://${getApiBase()}/shorttrips/api/hotels/${encodeURIComponent(city)}?lang=${lang}${empQ}`);
     //console.log('Fetching hotels for city:', response.url);
     if (!response.ok) {
       throw new Error(i18n.t('errors.httpError', { status: response.status }));
@@ -109,10 +115,14 @@ export async function getHotelsByCityFromServer(city: string, lang: 'ar' | 'en' 
 // Fetch actual room prices for a hotel
 export type HotelRoomPrices = Record<string, number> & { room_price?: number; extra_bed_price?: number };
 
-export async function getHotelRoomPricesFromServer(hotelCode: string, date?: string): Promise<HotelRoomPrices> {
+export async function getHotelRoomPricesFromServer(
+  hotelCode: string,
+  date?: string,
+  lang: 'ar' | 'en' = 'en'
+): Promise<HotelRoomPrices> {
   try {
     const dateParam = date || new Date().toISOString().slice(0, 10);
-    const url = `${getProtocol()}://${getApiBase()}/shorttrips/api/hotel/${encodeURIComponent(hotelCode)}/rooms?date=${encodeURIComponent(dateParam)}`;
+    const url = `${getProtocol()}://${getApiBase()}/shorttrips/api/hotel/${encodeURIComponent(hotelCode)}/rooms?date=${encodeURIComponent(dateParam)}&lang=${lang}`;
     //console.log('Fetching room prices from:', url);
     const response = await fetch(url);
     if (!response.ok) {
@@ -127,6 +137,28 @@ export async function getHotelRoomPricesFromServer(hotelCode: string, date?: str
   } catch (error) {
     console.error(i18n.t('errors.fetchHotelRoomPrices'), error);
     return {} as HotelRoomPrices;
+  }
+}
+
+/** GET_WEB_HOTEL_PRICE_LIST(@lang, @hotelCode) — rows for price-list grid */
+export async function getHotelPriceListFromServer(
+  hotelCode: string,
+  lang: 'ar' | 'en' = 'en'
+): Promise<Record<string, unknown>[]> {
+  try {
+    const url = `${getProtocol()}://${getApiBase()}/shorttrips/api/hotel/${encodeURIComponent(hotelCode)}/price-list?lang=${lang}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(i18n.t('errors.httpError', { status: response.status }));
+    }
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || i18n.t('errors.fetchHotelRoomPrices'));
+    }
+    return Array.isArray(result.data) ? (result.data as Record<string, unknown>[]) : [];
+  } catch (error) {
+    console.error('[getHotelPriceListFromServer]', error);
+    throw error;
   }
 }
 

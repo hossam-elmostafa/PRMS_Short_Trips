@@ -7,10 +7,10 @@ const path = require('path');
 router.get('/hotels/:city', async (req, res) => {
   try {
     const { city } = req.params;
-    const { lang } = req.query; // optional: might be 'en', 'en-US', etc.
-    // BUG-AZ-PR-29-10-2025.1: Normalize language to 'ar'|'en' to avoid Arabic cities in EN mode
+    const { lang, emp, employeeId } = req.query;
     const normLang = String(lang || 'ar').toLowerCase().startsWith('en') ? 'en' : 'ar';
-    const hotels = await hotelService.getHotelsByCity(city, normLang);
+    const empCode = String(emp || employeeId || '').trim();
+    const hotels = await hotelService.getHotelsByCity(city, normLang, empCode);
     // Always return 200 for better UX; empty list if nothing found
     res.json({ success: true, data: hotels || [] });
   } catch (error) {
@@ -42,10 +42,10 @@ router.get('/hotels', async(req, res) => {
 
 router.get('/cities', async (req, res) => {
   try {
-    const { lang } = req.query; // optional: might be 'en', 'en-US', etc.
-    // BUG-AZ-PR-29-10-2025.1: Normalize language for cities endpoint
+    const { lang, emp, employeeId } = req.query;
     const normLang = String(lang || 'ar').toLowerCase().startsWith('en') ? 'en' : 'ar';
-    const cities = await hotelService.getAllCities(normLang);
+    const empCode = String(emp || employeeId || '').trim();
+    const cities = await hotelService.getAllCities(normLang, empCode);
     res.json({ success: true, data: cities });
   } catch (error) {
     console.error('Error in cities route:', error);
@@ -57,8 +57,9 @@ router.get('/cities', async (req, res) => {
 router.get('/hotel/:hotelCode/rooms', async (req, res) => {
   try {
     const { hotelCode } = req.params;
-    const { date } = req.query; // Optional date parameter
-    const pricing = await hotelService.getHotelRoomPrices(hotelCode, date);
+    const { date, lang } = req.query;
+    const normLang = String(lang || 'en').toLowerCase().startsWith('ar') ? 'ar' : 'en';
+    const pricing = await hotelService.getHotelRoomPrices(hotelCode, date, normLang);
     //console.log (pricing);
     res.json({ success: true, data: pricing });
   } catch (error) {
@@ -66,6 +67,19 @@ router.get('/hotel/:hotelCode/rooms', async (req, res) => {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 
+});
+
+// GET_WEB_HOTEL_PRICE_LIST(@lang, @hotelCode)
+router.get('/hotel/:hotelCode/price-list', async (req, res) => {
+  try {
+    const { hotelCode } = req.params;
+    const normLang = String(req.query.lang || 'en').toLowerCase().startsWith('ar') ? 'ar' : 'en';
+    const rows = await hotelService.getHotelPriceList(hotelCode, normLang);
+    res.json({ success: true, data: rows || [] });
+  } catch (error) {
+    console.error('Error in hotel price-list route:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
 });
 
 

@@ -1,7 +1,42 @@
 require('dotenv').config();
 const prisma = require('../lib/prisma');
 
-async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
+/** Form tag for short-trips (strip) web flows — matches GET_WEB_* TVFs (e.g. FormTag 'ST'). */
+const SHORT_TRIPS_FORM_TAG = 'ST';
+
+function escSql(s) {
+    return String(s ?? '').replace(/'/g, "''");
+}
+
+/** Map GET_WEB_POLICY (POLICY_TRIP_*) columns to legacy POLICY_STRIP_* keys used by the short-trips frontend. */
+function augmentStripPolicyRow(row) {
+    if (!row || typeof row !== 'object') return {};
+    const o = { ...row };
+    if (o.POLICY_TRIP_ENABLED !== undefined && o.POLICY_STRIP_ENABLED === undefined) {
+        o.POLICY_STRIP_ENABLED = o.POLICY_TRIP_ENABLED;
+    }
+    if (o.POLICY_TRIP_MAX_COMPAN !== undefined && o.POLICY_STRIP_MAXCOMPAN === undefined) {
+        o.POLICY_STRIP_MAXCOMPAN = o.POLICY_TRIP_MAX_COMPAN;
+    }
+    if (o.POLICY_TRIP_MAX_SELECTIONS !== undefined && o.POLICY_STRIP_MAXHOTELS === undefined) {
+        o.POLICY_STRIP_MAXHOTELS = o.POLICY_TRIP_MAX_SELECTIONS;
+    }
+    if (o.POLICY_TRIP_MAX_HOTELS !== undefined && o.POLICY_STRIP_MAXHOTELS === undefined) {
+        o.POLICY_STRIP_MAXHOTELS = o.POLICY_TRIP_MAX_HOTELS;
+    }
+    if (o.POLICY_TRIP_STARTDATE !== undefined && o.POLICY_STRIP_STARTDATE === undefined) {
+        o.POLICY_STRIP_STARTDATE = o.POLICY_TRIP_STARTDATE;
+    }
+    if (o.POLICY_TRIP_ENDDATE !== undefined && o.POLICY_STRIP_ENDDATE === undefined) {
+        o.POLICY_STRIP_ENDDATE = o.POLICY_TRIP_ENDDATE;
+    }
+    if (o.POLICY_TRIP_EMP_CONT !== undefined && o.POLICY_STRIP_EMP_CONT === undefined) {
+        o.POLICY_STRIP_EMP_CONT = o.POLICY_TRIP_EMP_CONT;
+    }
+    return o;
+}
+
+async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX', empCode = '') {
     //console.log(`[getHotelsByCityFromDB] lang=${lang}, city=${city}`);
     try {
         //console.log(10);
@@ -24,8 +59,8 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
         if (!looksLikeCode) {
             try {
                 const [citiesAr, citiesEn] = await Promise.all([
-                    getCitiesFromDB('ar'),
-                    getCitiesFromDB('en')
+                    getCitiesFromDB('ar', empCode),
+                    getCitiesFromDB('en', empCode)
                 ]);
                 const inputNorm = normalizeArabic(cityInput);
                 const all = [...(citiesAr || []), ...(citiesEn || [])];
@@ -45,35 +80,25 @@ async function getHotelsByCityFromDB(lang = 'ar', city = 'ALEX') {
         }
         //console.log(30);
         // Execute proc directly; map flexible column names
-        const esc = (s) => String(s).replace(/'/g, "''");
+        const esc = escSql;
         const cityCodeEsc = esc(cityCode);
         const cityNameEsc = esc(cityInput);
-        //console.log(1);
-        // Fetch Arabic and English names, then merge on HOTEL_CODE to deliver both ar/en
-        
-        const queryFor = async (bit, city) => prisma.$queryRawUnsafe(`
-            DECLARE @Results TABLE (
-                HOTEL_CODE NVARCHAR(100),
-                HOTEL_NAME NVARCHAR(400),
-                HOTEL_PIC VARCHAR(300),
-                HOTEL_ROOM_TYPES NVARCHAR(MAX),
-				HOTEL_BEDS_COUNTS NVARCHAR(MAX),
-				HOTEL_EXTRA_BEDS_COUNTS NVARCHAR(MAX)
-            );
+        const empEsc = esc(String(empCode || '').replace(/^:+/, '').trim());
+        const formEsc = esc(SHORT_TRIPS_FORM_TAG);
 
-            INSERT INTO @Results
-            EXEC P_GET_STRIP_HOTEL ${bit}, N'${city}';
-
-SELECT HOTEL_CODE, HOTEL_NAME, HOTEL_ROOM_TYPES,HOTEL_EXTRA_BEDS_COUNTS,HOTEL_BEDS_COUNTS, HOTEL_PIC FROM @Results;
+        // GET_WEB_HOTELS: 0 = English, 1 = Arabic (merge ar/en rows on HOTEL_CODE)
+        const queryFor = async (langBit, citySql) => prisma.$queryRawUnsafe(`
+            SELECT HOTEL_CODE, HOTEL_NAME, HOTEL_ROOM_TYPES, HOTEL_EXTRA_BEDS_COUNTS, HOTEL_BEDS_COUNTS,
+                   HOTEL_PIC, HOTEL_PICS
+            FROM GET_WEB_HOTELS(${langBit}, '${empEsc}', '${formEsc}', N'${citySql}')
         `);
 
-        // First try with resolved code; then, if needed, retry with original city name
-        let rowsAr = await queryFor(0, cityCodeEsc);
-        let rowsEn = await queryFor(1, cityCodeEsc);
+        let rowsAr = await queryFor(1, cityCodeEsc);
+        let rowsEn = await queryFor(0, cityCodeEsc);
             //console.log(cityCodeEsc);
         if ((!rowsAr || rowsAr.length === 0) && (!rowsEn || rowsEn.length === 0)) {
-            rowsAr = await queryFor(0, cityNameEsc);
-            rowsEn = await queryFor(1, cityNameEsc);
+            rowsAr = await queryFor(1, cityNameEsc);
+            rowsEn = await queryFor(0, cityNameEsc);
         }
 
         const arByCode = new Map();
@@ -92,35 +117,23 @@ SELECT HOTEL_CODE, HOTEL_NAME, HOTEL_ROOM_TYPES,HOTEL_EXTRA_BEDS_COUNTS,HOTEL_BE
         };
         
         (rowsAr || []).forEach(r => {
-            console.log('Row data (AR):', r); // ADD THIS
-
             const code = String(r.HOTEL_CODE || '').trim();
-            if (code) {
-                arByCode.set(code, String(r.HOTEL_NAME || '').trim());
-                // Store room types from the procedure result
-                if (r.HOTEL_ROOM_TYPES) {
-                    //console.log('Adding room types for', code, r.HOTEL_ROOM_TYPES);
-                    roomTypesByCode.set(code, String(r.HOTEL_ROOM_TYPES).trim());
-                }
-                //console.log(r);
-                if (r.HOTEL_EXTRA_BEDS_COUNTS) {
-                    //console.log('Adding extra beds for', code, r.HOTEL_EXTRA_BEDS_COUNTS);
-                    roomExtraBeds.set(code, String(r.HOTEL_EXTRA_BEDS_COUNTS).trim());
-                }
-                if (r.HOTEL_BEDS_COUNTS) {
-                    //console.log(' beds for', code, r.HOTEL_BEDS_COUNTS);
-                    roomBeds.set(code, String(r.HOTEL_BEDS_COUNTS).trim());
-                }
-                // Store hotel picture
-                if (r.HOTEL_PIC) {
-                    console.log('Setting hotelPic for', code, ':', r.HOTEL_PIC); // ADD THIS
-
-                    const pic = String(r.HOTEL_PIC).trim();
-                    hotelPics.set(code, pic);
-                    hotelPicNames.set(code, extractFileName(pic));
-                }         } else {
-                    console.log('No HOTEL_PIC for', code); // ADD THIS
-                        
+            if (!code) return;
+            arByCode.set(code, String(r.HOTEL_NAME || '').trim());
+            if (r.HOTEL_ROOM_TYPES) {
+                roomTypesByCode.set(code, String(r.HOTEL_ROOM_TYPES).trim());
+            }
+            if (r.HOTEL_EXTRA_BEDS_COUNTS) {
+                roomExtraBeds.set(code, String(r.HOTEL_EXTRA_BEDS_COUNTS).trim());
+            }
+            if (r.HOTEL_BEDS_COUNTS) {
+                roomBeds.set(code, String(r.HOTEL_BEDS_COUNTS).trim());
+            }
+            const picCombined = String(r.HOTEL_PIC || '').trim()
+                || String(String(r.HOTEL_PICS || '').split('|')[0] || '').trim();
+            if (picCombined) {
+                hotelPics.set(code, picCombined);
+                hotelPicNames.set(code, extractFileName(picCombined));
             }
         });
         
@@ -139,10 +152,11 @@ SELECT HOTEL_CODE, HOTEL_NAME, HOTEL_ROOM_TYPES,HOTEL_EXTRA_BEDS_COUNTS,HOTEL_BE
                     roomBeds.set(code, String(r.HOTEL_BEDS_COUNTS).trim());
                 }
                 // Store hotel picture if not already set from Arabic query
-                if (r.HOTEL_PIC && !hotelPics.has(code)) {
-                    const pic = String(r.HOTEL_PIC).trim();
-                    hotelPics.set(code, pic);
-                    hotelPicNames.set(code, extractFileName(pic));
+                const picCombined = String(r.HOTEL_PIC || '').trim()
+                    || String(String(r.HOTEL_PICS || '').split('|')[0] || '').trim();
+                if (picCombined && !hotelPics.has(code)) {
+                    hotelPics.set(code, picCombined);
+                    hotelPicNames.set(code, extractFileName(picCombined));
                 }
             }
         });
@@ -186,8 +200,6 @@ SELECT HOTEL_CODE, HOTEL_NAME, HOTEL_ROOM_TYPES,HOTEL_EXTRA_BEDS_COUNTS,HOTEL_BE
             const supportedRoomBeds = roomBeds.get(code) || 'D:2,FR:4,FS:5,J:6,S:1,T:3'; // Default to all if not specified
             const hotelPic = hotelPics.get(code) || '';
             const hotelPicName = hotelPicNames.get(code) || extractFileName(hotelPic);
-            console.log('Hotel:', code, 'hotelPic:', hotelPic); // ADD THIS
-
             return { 
                 id, 
                 ar: arName, 
@@ -199,12 +211,9 @@ SELECT HOTEL_CODE, HOTEL_NAME, HOTEL_ROOM_TYPES,HOTEL_EXTRA_BEDS_COUNTS,HOTEL_BE
                 hotelPicName
             };
         });
-        console.log('Final mapped hotels:', JSON.stringify(mapped, null, 2)); // ADD THIS
-
-
         return mapped;
     } catch (error) {
-        console.error('Error calling stored procedure P_GET_STRIP_HOTEL:', error);
+        console.error('Error calling GET_WEB_HOTELS:', error);
         console.error('Parameters used - city:', city, 'lang:', lang);
         return [];
     }
@@ -276,74 +285,49 @@ async function getHotelsFromDB(lang = 'ar') {
     }
 }
 
-// BUG-AZ-PR-29-10-2025.1: Fixed by AG - Corrected stored procedure language parameter
-// Issue: Cities were showing in wrong language (reversed)
-// Solution: The stored procedure P_GET_STRIP_CITIES uses reversed logic: 0=English, 1=Arabic
-async function getCitiesFromDB(lang = 'ar') {
+// GET_WEB_CITIES(@lang, @empCode, @formTag) — 0 = English, 1 = Arabic
+async function getCitiesFromDB(lang = 'ar', empCode = '') {
     try {
-        // The stored procedure has reversed logic: 0=English, 1=Arabic
-        const langBit = lang === 'en' ? 0 : 1;
-        //console.log(`[getCitiesFromDB] lang=${lang}, langBit=${langBit}`);
+        const langBit = lang === 'ar' ? 1 : 0;
+        const empEsc = escSql(String(empCode || '').replace(/^:+/, '').trim());
+        const formEsc = escSql(SHORT_TRIPS_FORM_TAG);
         const rows = await prisma.$queryRawUnsafe(`
-            DECLARE @Results TABLE (
-                CITIES_CODE VARCHAR(50),
-                CITIES_NAME NVARCHAR(200)
-            );
-
-            INSERT INTO @Results
-            EXEC P_GET_STRIP_CITIES ${langBit};
-
-            SELECT CITIES_CODE, CITIES_NAME FROM @Results;
+            SELECT * FROM GET_WEB_CITIES(${langBit}, '${empEsc}', '${formEsc}')
         `);
 
-        const result = (rows || []).map(r => ({ code: r.CITIES_CODE, name: r.CITIES_NAME }));
-        //console.log(`[getCitiesFromDB] First 3 cities:`, result.slice(0, 3));
+        const result = (rows || []).map((r) => ({
+            code: String(r.CITY_CODE ?? r.CITIES_CODE ?? '').trim(),
+            name: String(r.CITY_NAME ?? r.CITIES_NAME ?? '').trim(),
+        })).filter((c) => c.code);
         return result;
     } catch (error) {
-        console.error('Error calling stored procedure P_GET_STRIP_CITIES:', error);
-        console.error('Parameters used - lang:', lang);
+        console.error('Error calling GET_WEB_CITIES:', error);
+        console.error('Parameters used - lang:', lang, 'empCode:', empCode);
         return [];
     }
 }
 
 async function getCompanionsfromDB(employeeId, lang = 'en') {
     try {
-        // BUG-AZ-PR-29-10-2025.1: Companions proc expects 1 = Arabic, 0 = English (confirmed)
+        // GET_WEB_EMP_FAMILY: 0 = English, 1 = Arabic (same convention as winter trips backend)
         const langBit = lang === 'ar' ? 1 : 0;
         const empCode = String(employeeId).replace(/^:+/, '').trim();
-        
-        // Call stored procedure using table variable to capture results
+        const esc = (s) => String(s || '').replace(/'/g, "''");
+        const empCodeEsc = esc(empCode);
         const result = await prisma.$queryRawUnsafe(`
-            DECLARE @Results TABLE (
-                EMPFAMILY_RelativeID VARCHAR(50),
-                EMPFAMILY_RELTYPE VARCHAR(10),
-                EMPFAMILY_NAME VARCHAR(100)
-            )
-            
-            INSERT INTO @Results
-            EXEC P_GET_STRIP_EMP_FAMILY ${langBit}, '${empCode}'
-            
-            SELECT EMPFAMILY_RelativeID AS RELID ,EMPFAMILY_RELTYPE AS rel,EMPFAMILY_NAME AS name FROM @Results
+            SELECT Family.EMPFAMILY_RELATIVEID AS RELID,
+                   Family.EMPFAMILY_RELTYPE AS rel,
+                   Family.EMPFAMILY_NAME AS name
+            FROM GET_WEB_EMP_FAMILY(${langBit}, '${empCodeEsc}', '${escSql(SHORT_TRIPS_FORM_TAG)}') AS Family
+            ORDER BY Family.EMPFAMILY_ORDER, Family.EMPFAMILY_NAME
         `);
-        // console.log(`
-        //     DECLARE @Results TABLE (
-        //         EMPFAMILY_RelativeID VARCHAR(50),
-        //         EMPFAMILY_RELTYPE VARCHAR(10),
-        //         EMPFAMILY_NAME VARCHAR(100)
-        //     )
-            
-        //     INSERT INTO @Results
-        //     EXEC P_GET_STRIP_EMP_FAMILY ${langBit}, '${empCode}'
-            
-        //     SELECT EMPFAMILY_RelativeID AS RELID ,EMPFAMILY_RELTYPE AS rel,EMPFAMILY_NAME AS name FROM @Results
-        // `);
-        
+
         return result;
-        
+
     } catch (error) {
-        console.error('Error calling stored procedure P_GET_STRIP_EMP_FAMILY:', error);
+        console.error('Error calling GET_WEB_EMP_FAMILY:', error);
         console.error('Parameters used - employeeId:', employeeId, 'lang:', lang);
-        
+
         return '';
     }
 }
@@ -445,7 +429,8 @@ async function getEmployeeNamefromDB(employeeId, lang = 'ar') {
 
 async function getTransportAllowancefromDB(employeeId, lang = 'en', city = 'ALEX') {
     try {
-        const langBit = lang === 'en' ? 1 : 0;
+        // GET_WEB_TRANS_ALLOWANC: 0 = English, 1 = Arabic
+        const langBit = lang === 'ar' ? 1 : 0;
         const empCode = String(employeeId).replace(/^:+/, '').trim();
         const esc = (s) => String(s || '').replace(/'/g, "''").trim();
 
@@ -454,8 +439,8 @@ async function getTransportAllowancefromDB(employeeId, lang = 'en', city = 'ALEX
         let resolvedCity = cityInput;
         try {
             const [citiesAr, citiesEn] = await Promise.all([
-                getCitiesFromDB('ar'),
-                getCitiesFromDB('en')
+                getCitiesFromDB('ar', empCode),
+                getCitiesFromDB('en', empCode)
             ]);
             const normalizeArabic = (text) => String(text || '')
                 .replace(/أ|إ|آ/g, 'ا')
@@ -475,14 +460,9 @@ async function getTransportAllowancefromDB(employeeId, lang = 'en', city = 'ALEX
             // ignore resolution errors; use input as-is
         }
 
-        // Helper to execute the proc and read any returned value
+        const formEsc = esc(SHORT_TRIPS_FORM_TAG);
         const execForCity = async (cityParam) => prisma.$queryRawUnsafe(`
-            DECLARE @Results TABLE (
-                VAL NVARCHAR(200)
-            );
-            INSERT INTO @Results (VAL)
-            EXEC P_GET_STRIP_TRANS_ALLOWANC ${langBit}, N'${cityParam}', N'${esc(empCode)}';
-            SELECT * FROM @Results;
+            SELECT * FROM GET_WEB_TRANS_ALLOWANC(${langBit}, N'${cityParam}', N'${esc(empCode)}', N'${formEsc}')
         `);
 
         // First try resolved code, then fall back to original input
@@ -519,35 +499,61 @@ async function getTransportAllowancefromDB(employeeId, lang = 'en', city = 'ALEX
 
         return { value: 0, currency: '', label: '' };
     } catch (error) {
-        console.error('Error calling stored procedure P_GET_STRIP_TRANS_ALLOWANC:', error);
+        console.error('Error calling GET_WEB_TRANS_ALLOWANC:', error);
         console.error('Parameters used - employeeId:', employeeId, 'lang:', lang, 'city:', city);
         return { value: 0, currency: '', label: '' };
     }
 }
   
-// Retrieve actual room prices for a hotel from P_GET_STRIP_HOTEL_ROOMS @hotelCode, @date
-async function getHotelRoomsPricingFromDB(hotelCode, date = null) {
+// GET_WEB_HOTELS_ROOMS_PRICES(@lang, @hotelCode, @selectedDate, @formTag)
+async function getHotelRoomsPricingFromDB(hotelCode, date = null, lang = 'en') {
     try {
-        const code = String(hotelCode || '').trim().replace(/'/g, "''");
-        
+        const code = escSql(String(hotelCode || '').trim());
+        const langBit = lang === 'ar' ? 1 : 0;
+        const dateStr = String(date || new Date().toISOString().slice(0, 10)).slice(0, 10);
+        const dateSql = escSql(dateStr);
+        const formEsc = escSql(SHORT_TRIPS_FORM_TAG);
+
         try {
-            // Try with date parameter first
-            // const rows = await prisma.$queryRawUnsafe(`
-            //     SELECT * 
-            //     FROM GetHotelRoomPrices(N'${code}') 
-            //     WHERE PRICE_DATE = N'${date}'
-            // `);
-            //console.log(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}',N'${date}'`);
-            const rows = await prisma.$queryRawUnsafe(`EXEC P_GET_STRIP_HOTEL_ROOMS N'${code}',N'${date}'`);
-            return rows;
+            const rows = await prisma.$queryRawUnsafe(`
+                SELECT * FROM GET_WEB_HOTELS_ROOMS_PRICES(${langBit}, '${code}', CAST('${dateSql}' AS DATETIME), '${formEsc}')
+            `);
+            return (rows || []).map((r) => {
+                const rp = Number(r.ROOM_PRICE);
+                return {
+                    ROOM_TYPE: r.ROOM_TYPE,
+                    ROOM_TYPE_DESC: r.ROOM_TYPE_DESC,
+                    PRICE_DATE: r.PRICE_DATE,
+                    ROOM_PRICE: Number.isFinite(rp) ? rp : 0,
+                    EXTRA_BED_COUNT: r.EXTRA_BED_COUNT,
+                    EXTRA_BED_PRICE: r.EXTRA_BED_PRICE != null && r.EXTRA_BED_PRICE !== ''
+                        ? String(r.EXTRA_BED_PRICE)
+                        : '',
+                };
+            });
         } catch (error) {
-            // Fallback to without date parameter
             console.error('Error fetching hotel room prices with date:', error);
             return [];
         }
     } catch (error) {
-        console.error('Error calling stored procedure P_GET_STRIP_HOTEL_ROOMS:', error);
+        console.error('Error calling GET_WEB_HOTELS_ROOMS_PRICES:', error);
         console.error('Parameters used - hotelCode:', hotelCode, 'date:', date);
+        return [];
+    }
+}
+
+// GET_WEB_HOTEL_PRICE_LIST(@lang, @hotelCode) — full price list (grid); no date parameter
+async function getHotelPriceListFromDB(hotelCode, lang = 'en') {
+    try {
+        const code = escSql(String(hotelCode || '').trim());
+        const langBit = lang === 'ar' ? 1 : 0;
+        const rows = await prisma.$queryRawUnsafe(`
+            EXEC dbo.GET_WEB_HOTEL_PRICE_LIST @lang = ${langBit}, @hotelCode = N'${code}'
+        `);
+        return rows || [];
+    } catch (error) {
+        console.error('Error calling GET_WEB_HOTEL_PRICE_LIST:', error);
+        console.error('Parameters used - hotelCode:', hotelCode, 'lang:', lang);
         return [];
     }
 }
@@ -579,28 +585,21 @@ async function getHotelRoomTypesFromDB(hotelCode) {
 
 async function getPolicyDataFromDB(employeeId) {
     try {
-        const empCode = String(employeeId).replace(/^:+/, '').trim();
+        const empCode = escSql(String(employeeId).replace(/^:+/, '').trim());
+        const formEsc = escSql(SHORT_TRIPS_FORM_TAG);
         const rows = await prisma.$queryRawUnsafe(`
-            EXEC P_GET_STRIP_POLICY '${empCode}'
+            SELECT * FROM GET_WEB_POLICY(0, '${empCode}', '${formEsc}')
         `);
-        
+
         if (rows && rows.length > 0) {
-            const row = rows[0];
-            
-            // Save all columns in variables as specified
+            const row = augmentStripPolicyRow(rows[0]);
+
             return {
-                // Max companions and hotels
                 maxCompanions: Number(row.POLICY_STRIP_MAXCOMPAN) || 0,
                 maxHotels: Number(row.POLICY_STRIP_MAXHOTELS) || 0,
-                
-                // Date range
                 startDate: row.POLICY_STRIP_STARTDATE,
                 endDate: row.POLICY_STRIP_ENDDATE,
-                
-                // Employee contribution percentage
                 empContribution: Number(row.POLICY_STRIP_EMP_CONT) || 0,
-                
-                // All other policy columns
                 allColumns: row
             };
         }
@@ -613,7 +612,7 @@ async function getPolicyDataFromDB(employeeId) {
             allColumns: {} 
         };
     } catch (error) {
-        console.error('Error calling stored procedure P_GET_STRIP_POLICY:', error);
+        console.error('Error calling GET_WEB_POLICY:', error);
         console.error('Parameters used - employeeId:', employeeId);
         return { 
             maxCompanions: 0, 
@@ -1113,85 +1112,72 @@ async function getSecretKeyValues(secret) {
     }
 }
 
-// Get the last saved companions data via stored proc P_GET_STRIP_GET_LAST_EMP_FAMILY
 async function getLastCompanionsFromDB(lang = 'ar', empCode) {
     try {
-        // BUG-AZ-PR-29-10-2025.1: Align bit mapping with companions proc (1 = Arabic, 0 = English)
         const langBit = lang === 'ar' ? 1 : 0;
         empCode = String(empCode).replace(/^:+/, '').trim();
-        
+        const empEsc = escSql(empCode);
+        const formEsc = escSql(SHORT_TRIPS_FORM_TAG);
+
         const result = await prisma.$queryRawUnsafe(`
-            DECLARE @Results TABLE (
-                EMPFAMILY_RelativeID VARCHAR(150),
-                EMPFAMILY_RELTYPE VARCHAR(20),
-                EMPFAMILY_NAME VARCHAR(300)
-            );
-            INSERT INTO @Results
-            EXEC P_GET_STRIP_GET_LAST_EMP_FAMILY ${langBit}, '${empCode}';
-            SELECT 
-                EMPFAMILY_RelativeID AS RELID, 
-                EMPFAMILY_NAME AS name, 
-                EMPFAMILY_RELTYPE AS rel 
-            FROM @Results;
+            SELECT EMPFAMILY_RELATIVEID AS RELID,
+                   EMPFAMILY_NAME AS name,
+                   EMPFAMILY_RELTYPE AS rel
+            FROM GET_WEB_LAST_EMP_FAMILY(${langBit}, '${empEsc}', '${formEsc}')
         `);
         return result;
     } catch (error) {
-        console.error('Error calling stored procedure P_GET_STRIP_GET_LAST_EMP_FAMILY:', error);
+        console.error('Error calling GET_WEB_LAST_EMP_FAMILY:', error);
         console.error('Parameters used - empCode:', empCode, 'lang:', lang);
         return '';
     }
 }
 
-// Get the last saved hotels data via stored proc P_GET_STRIP_GET_LAST_HOTELS
 async function getLastHotelsFromDB(lang = 'ar', empCode) {
     try {
         const langBit = lang === 'ar' ? 1 : 0;
         empCode = String(empCode).replace(/^:+/, '').trim();
-        
-        const result = await prisma.$queryRawUnsafe(`
-            DECLARE @Results TABLE (
-                CITY_CODE VARCHAR(50),
-                CITY_NAME VARCHAR(100),
-                HOTEL_CODE VARCHAR(50),
-                HOTEL_NAME VARCHAR(100),
-                REQ_DATE DATETIME,
-                SELECTED_ROOMS VARCHAR(200),
-                HOTEL_BEDS_COUNTS VARCHAR(100),
-                HOTEL_EXTRA_BEDS_COUNTS VARCHAR(100),
-                HOTEL_PIC VARCHAR(300),
-                TOTAL_COST INT,
-                EMP_COST FLOAT
-            );
-            INSERT INTO @Results
-            EXEC P_GET_STRIP_GET_LAST_HOTELS ${langBit}, '${empCode}';
-            SELECT
-                CITY_CODE,
-                CITY_NAME,
-                HOTEL_CODE,
-                HOTEL_NAME,
-                CONVERT(varchar(10), REQ_DATE, 120) AS REQ_DATE,
-                SELECTED_ROOMS,
-                HOTEL_BEDS_COUNTS,
-                HOTEL_EXTRA_BEDS_COUNTS,
-                HOTEL_PIC,
-                TOTAL_COST,
-                EMP_COST
-            FROM @Results;`);
-            
-        console.log(`Query result for langBit=${langBit}, empCode=${empCode}:`, JSON.stringify(result, null, 2));
+        const empNum = Number(empCode);
+        const empArg = Number.isFinite(empNum) ? empNum : 0;
+        const formEsc = escSql(SHORT_TRIPS_FORM_TAG);
 
-        // Process results to handle image paths
-        const processedResults = result.map(hotel => ({
-            ...hotel,
-            // Create URL endpoint for loading the image from local disk
-            HOTEL_PIC_URL: hotel.HOTEL_PIC 
-                ? `/api/images/load?path=${encodeURIComponent(hotel.HOTEL_PIC)}`
-                : null
-        }));
+        const raw = await prisma.$queryRawUnsafe(`
+            SELECT * FROM GET_WEB_LAST_SELECTION(${langBit}, ${empArg}, '${formEsc}')
+        `);
+
+        const rows = (raw || []).filter((h) => h && String(h.HOTEL_CODE || '').trim() !== '');
+
+        const formatReqDate = (h) => {
+            const v = h.REQ_DATE ?? h.REQ_STARTDATE;
+            if (!v) return '';
+            if (v instanceof Date) return v.toISOString().slice(0, 10);
+            const s = String(v);
+            return s.length >= 10 ? s.slice(0, 10) : s;
+        };
+
+        const processedResults = rows.map((h) => {
+            const pic = String(h.HOTEL_PIC || h.PIC || '').trim();
+            return {
+                CITY_CODE: h.CITY_CODE,
+                CITY_NAME: h.CITY_NAME,
+                HOTEL_CODE: h.HOTEL_CODE,
+                HOTEL_NAME: h.HOTEL_NAME,
+                REQ_DATE: formatReqDate(h),
+                SELECTED_ROOMS: h.SELECTED_ROOMS,
+                HOTEL_BEDS_COUNTS: h.HOTEL_BEDS_COUNTS,
+                HOTEL_EXTRA_BEDS_COUNTS: h.HOTEL_EXTRA_BEDS_COUNTS,
+                HOTEL_PIC: pic,
+                TOTAL_COST: h.TOTAL_COST,
+                EMP_COST: h.EMP_COST,
+                HOTEL_PIC_URL: pic
+                    ? `/api/images/load?path=${encodeURIComponent(pic)}`
+                    : null
+            };
+        });
 
         return processedResults;
     } catch (error) {
-        console.error('Error calling stored procedure P_GET_STRIP_GET_LAST_HOTELS:', error);
+        console.error('Error calling GET_WEB_LAST_SELECTION:', error);
         console.error('Parameters used - empCode:', empCode, 'lang:', lang);
         return [];
     }
@@ -1233,6 +1219,7 @@ module.exports = {
     getHotelsByCityFromDB,
     getCitiesFromDB,
     getHotelRoomsPricingFromDB,
+    getHotelPriceListFromDB,
     getHotelRoomTypesFromDB,
     submitTripApplication,
     getHotelsFromDB,

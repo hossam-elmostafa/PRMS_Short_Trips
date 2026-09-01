@@ -24,7 +24,7 @@ const Hotels = () => {
         } else {
           setError(result.message || 'Failed to fetch hotels');
         }
-      } catch (err) {
+      } catch {
         setError('Failed to fetch hotels');
       } finally {
         setLoading(false);

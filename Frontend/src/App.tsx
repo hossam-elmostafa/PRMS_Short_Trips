@@ -22,6 +22,7 @@ import {
   ReviewHotelResult,
 } from './services/Services';
 import { getApiBase, getProtocol } from './config';
+import HotelSelectionColumn from './components/HotelSelectionColumn';
 
 interface ToastNotification {
   id: number;
@@ -50,7 +51,7 @@ interface AppProps {
 type RoomPricing = { ROOM_TYPE: string; ROOM_PRICE: number ,EXTRA_BED_PRICE: string };
 type PricingPayload = RoomPricing[] | (Record<string, number> & { room_price?: number; extra_bed_price?: number });
 
-// Typed shape for rows returned by P_GET_STRIP_GET_LAST_HOTELS
+// Typed shape for rows returned by GET_WEB_LAST_SELECTION (hotel lines), mapped to last-hotel fields
 interface LastHotelRow {
   CITY_CODE?: string;
   CITY_NAME?: string;
@@ -135,7 +136,7 @@ const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, 
     // Check cache directly, not inside setState
     if (!hotelPricingCache[cacheKey]) {
       pricingPromises.push(
-        getHotelRoomPricesFromServer(hotelId, dateStr)
+        getHotelRoomPricesFromServer(hotelId, dateStr, currentLang)
           .then(pricing => ({ cacheKey, pricing }))
           .catch(() => null)
       );
@@ -154,7 +155,7 @@ const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, 
   if (Object.keys(newCache).length > 0) {
     setHotelPricingCache(prev => ({ ...prev, ...newCache }));
   }
-}, [hotelPricingCache]); // Include hotelPricingCache in dependencies
+}, [hotelPricingCache, currentLang]);
 
   useEffect(() => {
   // Only run once on mount or when explicitly triggered
@@ -165,7 +166,7 @@ const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, 
       const lang: 'ar' | 'en' = (i18n.language || '').toLowerCase().startsWith('en') ? 'en' : 'ar';
       const [hotelsData, citiesData, companionsData, roomTypesData, , employeeName, policyData] = await Promise.all([
         getHotelsFromServer(lang),
-        getCitiesFromServer(lang),
+        getCitiesFromServer(lang, employeeID),
         getCompanionsFromServer(employeeID, lang),
         getRoomTypesFromServer(),
         getTransportOptionsFromServer(employeeID),
@@ -405,7 +406,7 @@ const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, 
       try {
         const [hotelsData, citiesData] = await Promise.all([
           getHotelsFromServer(lang),
-          getCitiesFromServer(lang)
+          getCitiesFromServer(lang, employeeID)
         ]);
         
         // Store old cities before updating state
@@ -441,8 +442,7 @@ const batchLoadMonthPricing = useCallback(async (hotelId: string, year: number, 
         console.error('Failed to refresh localized datasets on language change', e);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [i18n.language]);
+  }, [i18n.language, employeeID]);
   // BUG-AZ-PR-29-10-2025.1: Also refresh companions and employee name on language change
   // Reason: These were loaded only on initial fetch, causing wrong language after toggling
   useEffect(() => {
@@ -557,7 +557,7 @@ useEffect(() => {
     if (city) {
       (async () => {
         try {
-          const hotels = await getHotelsByCityFromServer(city, currentLang);
+          const hotels = await getHotelsByCityFromServer(city, currentLang, employeeID);
           //console.log('Fetched hotels for city', city, hotels);
           setHOTELS(prev => ({ ...prev, [city]: hotels }));
 
@@ -594,7 +594,7 @@ useEffect(() => {
       return;
     }
     try {
-      const hotels = await getHotelsByCityFromServer(city, currentLang);
+      const hotels = await getHotelsByCityFromServer(city, currentLang, employeeID);
       //console.log('Fetched hotels for city 2', city, hotels);
       setHOTELS(prev => ({ ...prev, [city]: hotels }));
     } catch (e) {
@@ -604,7 +604,7 @@ useEffect(() => {
     const selected = columns[col].selectedHotel;
     if (selected && selected.id) {
       try {
-        const pricing = await getHotelRoomPricesFromServer(selected.id);
+        const pricing = await getHotelRoomPricesFromServer(selected.id, undefined, currentLang);
         setHotelPricingCache(prev => ({ ...prev, [selected.id]: pricing }));
       } catch (e) {
         console.error('Failed to load room prices for hotel', selected.id, e);
@@ -668,7 +668,7 @@ const selectHotel = async (hotel: Hotel) => {
   setShowHotelPopup(false);
 
   try {
-    const pricing = await getHotelRoomPricesFromServer(hotel.id);
+    const pricing = await getHotelRoomPricesFromServer(hotel.id, undefined, currentLang);
     setHotelPricingCache(prev => {
       const updated = { ...prev, [hotel.id]: pricing };
       return updated;
@@ -742,7 +742,7 @@ const selectDate = async (dateObj: Date) => {
   if (!hotelPricingCache[cacheKey]) {
     try {
       //console.log('Fetching pricing for:', selectedHotel.id, dateStr);
-      const pricing = await getHotelRoomPricesFromServer(selectedHotel.id, dateStr);
+      const pricing = await getHotelRoomPricesFromServer(selectedHotel.id, dateStr, currentLang);
       //console.log('Fetched pricing:', pricing);
       
       setHotelPricingCache(prev => {
@@ -817,45 +817,33 @@ const selectDate = async (dateObj: Date) => {
 
 
 
-const updateRoomCount = (col: number, roomKey: string, value: number) => {
-  //console.log('updateRoomCount called with value:', value);
-    const val = Math.max(0, value);
-    setColumns(prev => {
-      ///////////////////////////// BUG-AZ-PR-29-10-2025.3
-      if(val<prev[col].roomCounts[roomKey]){
-        //reset extra bed count if room count decreased below extra bed count
-        updateExtraBedCount(col, roomKey, 0);
-      }
-      //////////////////////////////
-      //console.log('Previous state:', prev[col].roomCounts);
-      const updated = {
+  /** Replaces per-type room inputs; keeps payload keys aligned with ROOM_TYPES */
+  const syncRoomAggregates = (
+    col: number,
+    roomCounts: Record<string, number>,
+    extraBedCounts: Record<string, number>
+  ) => {
+    setColumns((prev) => {
+      const maxExtra = prev[col].maxExtraBeds;
+      const mergedRooms: Record<string, number> = {};
+      const clampedExtra: Record<string, number> = {};
+      ROOM_TYPES.forEach((rt) => {
+        const rc = Math.max(0, roomCounts[rt.key] ?? 0);
+        mergedRooms[rt.key] = rc;
+        const maxAllowed = (maxExtra[rt.key] || 0) * rc;
+        clampedExtra[rt.key] = Math.max(0, Math.min(extraBedCounts[rt.key] ?? 0, maxAllowed));
+      });
+      return {
         ...prev,
         [col]: {
           ...prev[col],
-          roomCounts: { ...prev[col].roomCounts, [roomKey]: val },
+          roomCounts: mergedRooms,
+          extraBedCounts: clampedExtra,
           totalCost: undefined,
-          empCost: undefined
-        }
+          empCost: undefined,
+        },
       };
-      // Reset review state when room count changes
-      setIsReviewSuccessful(false);
-      return { ...updated };
     });
-  };
-
-  const updateExtraBedCount = (col: number, roomKey: string, value: number) => {
-    const maxAllowed = (columns[col].maxExtraBeds[roomKey] || 0) * (columns[col].roomCounts[roomKey] || 0);
-    const val = Math.max(0, Math.min(value, maxAllowed));
-    setColumns(prev => ({
-      ...prev,
-      [col]: {
-        ...prev[col],
-        extraBedCounts: { ...prev[col].extraBedCounts, [roomKey]: val },
-        totalCost: undefined,
-        empCost: undefined
-      }
-    }));
-    // Reset review state when extra bed count changes
     setIsReviewSuccessful(false);
   };
 
@@ -908,7 +896,15 @@ const updateRoomCount = (col: number, roomKey: string, value: number) => {
     i18n.changeLanguage(newLang);
   };
 
-const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
+  const getRoomTypeName = (roomType: RoomType): string => {
+    const translatedName = t(`rooms.roomTypes.${roomType.key}`);
+    if (translatedName && translatedName !== `rooms.roomTypes.${roomType.key}`) {
+      return translatedName;
+    }
+    return roomType.ar;
+  };
+
+  const handleTooltipShow = async (e: React.MouseEvent, dateObj: Date) => {
   //console.log('handleTooltipShow')
   //console.log(1);
   const yyyy = dateObj.getFullYear();
@@ -1093,282 +1089,27 @@ const renderCalendar = () => {
   // BUG-AZ-PR-29-10-2025.1: Fixed by AG - Added helper to get localized room type names
   // Issue: Room types were always showing in Arabic from database
   // Solution: Check i18n translations first, fallback to Arabic if translation not found
-  const getRoomTypeName = (roomType: RoomType): string => {
-    // Try to get translation first, fallback to Arabic name
-    const translatedName = t(`rooms.roomTypes.${roomType.key}`);
-    if (translatedName && translatedName !== `rooms.roomTypes.${roomType.key}`) {
-      return translatedName;
-    }
-    // Log missing translations for debugging
-    //console.log(`Missing translation for room type key: ${roomType.key}, ar: ${roomType.ar}`);
-    return roomType.ar; // Fallback to Arabic name
-  };
-
   const renderColumn = (col: number) => {
     const colData = columns[col];
-
-    // RQ-AZ-PR-31-10-2024.1: Removed automatic cost calculation
-    // Costs are only shown after clicking review button (from database)
-    let hasAnyPrice = false;
-    
-    if (colData.selectedHotel && colData.arrivalDate) {
-      const dateObj = new Date(colData.arrivalDate);
-
-      ROOM_TYPES.forEach(rt => {
-        const priceData = priceFor(colData.selectedHotel!.id, rt.key, dateObj);
-        // Check if any room type has a valid non-zero price (for warning only)
-        // RQ-AZ-PR-31-10-2024.1: No automatic cost calculation - costs come from review button
-    if (priceData.room_price !== null && priceData.room_price > 0) {
-      hasAnyPrice = true;
-    }
-
-
-
-
-    // console.log('readonlyMode:', readonlyMode, colData);
-      });
-    }
-
-
     return (
-      <section key={col} className="bg-white p-6 rounded-2xl shadow-lg">
-        <h2 className="text-xl font-bold mb-3">
-          {t('selection.title')} {getArabicOrdinal(col)}
-        </h2>
-
-        <select
-          className="w-full border rounded p-3 mb-4 text-lg"
-          value={colData.selectedCity}
-          onChange={(e) => handleCityChange(col, e.target.value)}
-          disabled={readonlyMode}
-          
-        >
-          <option value="">{t('city.select')}</option>
-          {/* BUG-AZ-PR-29-10-2025.1: Fixed by AG - Use city.code as key and city.name for display */}
-          {CITIES.map(city => (
-            <option key={city.code} value={city.name}>{city.name}</option>
-          ))}
-        </select>
-  {/* BUG-PR-26-10-2025.3  Transportation Flicker */}
-
-        <div className="flex items-center gap-3 mb-3">
-          <button
-            className="bg-indigo-600 text-white px-6 py-2 rounded-lg"
-            onClick={() => openHotelPopup(col)}
-            disabled={readonlyMode}
-          >
-            {t('hotel.select')}
-          </button>
-          {/* BUG-PR-26-10-2025.3: Only show transport allowance when both city and allowance are available
-              to prevent flicker during loading */}
-          {colData.selectedCity && colData.travelAllowance && (
-            <>
-              <span style={{ color: '#16a34a', fontWeight: '700', fontSize: '14px' }}>{t('transport.allowance')}</span>
-              <input
-                type="text"
-                readOnly
-                value={colData.travelAllowance}
-                style={{
-                  width: '84px',
-                  padding: '6px 8px',
-                  borderRadius: '8px',
-                  background: '#ecfdf5',
-                  color: '#065f46',
-                  border: '1px solid #bbf7d0',
-                  textAlign: 'center',
-                  fontWeight: '600',
-                  cursor: 'not-allowed'
-                }}
-              />
-            </>
-          )}
-        </div>
-
-        {colData.selectedHotel && (
-          <>
-            <img
-              src={(() => {
-                const withTypes = (colData.selectedHotel as unknown as { hotelPicName?: string; hotelPic?: string }) || {};
-                const preferred = (withTypes.hotelPic && withTypes.hotelPic.trim() !== '')
-                  ? withTypes.hotelPic
-                  : (withTypes.hotelPicName || '');
-                const isHttp = /^https?:\/\//i.test(preferred);
-                const url = preferred
-                  ? (isHttp ? preferred : `${getProtocol()}://${getApiBase()}/shorttrips/api/hotel-image?path=${encodeURIComponent(preferred)}&v=${Date.now()}`)
-                  : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60';
-                return url;
-              })()}
-              alt={colData.selectedHotel?.en || colData.selectedHotel?.ar || 'hotel'}
-              style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }}
-              className="mb-2"
-              onError={(e) => {
-                e.currentTarget.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=60';
-              }}
-            />
-            <div className="mb-2 text-lg font-semibold text-blue-700">
-              {colData.selectedHotel.en || colData.selectedHotel.ar || 'Hotel Selected'}
-            </div>
-          </>
-        )}
-        {!colData.selectedHotel && (
-          <div className="mb-2 text-lg font-semibold text-blue-700">{t('hotel.notSelected')}</div>
-        )}
-
-        <label className="block font-semibold mb-1">{t('rooms.types')}</label>
-        
-        {/* Show warning if hotel and date selected but no prices available */}
-        {colData.selectedHotel && colData.arrivalDate && !hasAnyPrice && !readonlyMode && !(colData.totalCost || colData.empCost) && (
-          <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-start gap-2">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                <line x1="12" y1="9" x2="12" y2="13"></line>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-              </svg>
-              <div>
-                <div className="font-semibold text-yellow-800 text-sm">{t('rooms.noPricesTitle')}</div>
-                <div className="text-yellow-700 text-xs mt-1">{t('rooms.noPricesMessage')}</div>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        
-        <div>
-{ROOM_TYPES.map(rt => {
-  const maxBeds = (colData.maxExtraBeds?.[rt.key] ?? 0);
-  const roomCount = (colData.roomCounts?.[rt.key] ?? 0);
-  const reqBeds = (colData.extraBedCounts?.[rt.key] ?? 0);
-  
-  // Check if this room type is supported by the selected hotel
-  const supportedRoomTypes = colData.selectedHotel?.supportedRoomTypes 
-    ? colData.selectedHotel.supportedRoomTypes.split(',').map(t => t.trim())
-    : [];
-  
-  const hasSupportedRoomTypes = supportedRoomTypes.length > 0;
-  const isSupported = hasSupportedRoomTypes ? supportedRoomTypes.includes(rt.key) : true;
-  
-  // Check pricing for this room type (only if date is selected)
-  let priceData = { room_price: null as number | null, extra_bed_price: null as string | null };
-  let hasValidPrice = true; // Assume valid until we check with date
-  
-  if (colData.selectedHotel && colData.arrivalDate) {
-    const dateObj = new Date(colData.arrivalDate);
-    priceData = priceFor(colData.selectedHotel.id, rt.key, dateObj);
-    //console.log('Room type:', rt.key, 'Price data on date', colData.arrivalDate, ':', priceData);
-    hasValidPrice = priceData.room_price !== null && priceData.room_price > 0;
-  }
-  
-  // Room type is enabled if:
-  // - Hotel is selected AND (no restriction list or room type is supported)
-  // - AND (no date selected OR date selected with valid price)
-  const isEnabled = !!colData.selectedHotel && 
-                    isSupported && 
-                    (!colData.arrivalDate || hasValidPrice);
-
-//{ room_price: number | null, extra_bed_price: string | null } => {
-
-  return (
-    <div 
-      key={rt.key} 
-      className="flex items-center gap-2 mb-2" 
-      style={{ 
-        flexWrap: 'nowrap',
-        opacity: isEnabled ? 1 : 0.6,
-        pointerEvents: isEnabled ? 'auto' : 'none'
-      }}
-    >
-      <span style={{ width: '110px' }}>
-        {getRoomTypeName(rt)}
-      </span>
-      <input
-        type="number"
-        min="0"
-        value={roomCount}
-        onChange={(e) => updateRoomCount(col, rt.key, parseInt(e.target.value) || 0)}
-        disabled={!isEnabled || readonlyMode}
-        style={{ 
-          width: '40px', 
-          textAlign: 'center', 
-          background: isEnabled ? '#fff' : '#f3f4f6', 
-          border: isEnabled ? '1px solid #d1d5db' : '1px solid #e5e7eb', 
-          marginRight: '6px',
-          cursor: isEnabled ? 'text' : 'not-allowed'
-        }}
+      <HotelSelectionColumn
+        key={col}
+        col={col}
+        colData={colData}
+        readonlyMode={readonlyMode}
+        CITIES={CITIES}
+        ROOM_TYPES={ROOM_TYPES}
+        getArabicOrdinal={getArabicOrdinal}
+        handleCityChange={handleCityChange}
+        openHotelPopup={openHotelPopup}
+        syncRoomAggregates={syncRoomAggregates}
+        openCalendar={openCalendar}
+        priceFor={priceFor}
+        showToast={showToast}
+        t={t}
+        isRTL={isRTL}
       />
-      <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>
-        {t('rooms.allowedExtra')}
-      </span>
-      <input
-        type="number"
-        min="0"
-        max="2"
-        value={maxBeds}
-        readOnly
-        disabled={!isEnabled || readonlyMode}
-        style={{ 
-          width: '32px', 
-          textAlign: 'center', 
-          background: '#f3f4f6', 
-          border: '1px solid #e5e7eb', 
-          marginRight: '6px',
-          cursor: 'not-allowed'
-        }}
-      />
-      <span className="text-xs text-gray-600" style={{ marginRight: '2px', whiteSpace: 'nowrap' }}>
-        {t('rooms.extraCount')}
-      </span>
-      <input
-        type="number"
-        min="0"
-        value={reqBeds}
-        onChange={(e) => updateExtraBedCount(col, rt.key, parseInt(e.target.value) || 0)}
-        disabled={!isEnabled || readonlyMode}
-        style={{ 
-          width: '32px', 
-          textAlign: 'center', 
-          background: isEnabled ? '#fff' : '#f3f4f6', 
-          border: isEnabled ? '1px solid #d1d5db' : '1px solid #e5e7eb', 
-          marginRight: '6px',
-          cursor: isEnabled ? 'text' : 'not-allowed'
-        }}
-      />
-    </div>
-  );
-})}
-        </div>
-
-        <button
-          className="bg-indigo-600 text-white px-10 py-2 rounded-lg mt-3"
-          onClick={() => openCalendar(col)}
-          disabled={readonlyMode}
-        >
-          {t('date.select')}
-        </button>
-
-        <label className="block font-semibold mb-1 mt-2">{t('date.arrival')}</label>
-        <input
-          readOnly
-          value={colData.arrivalDate}
-          className="border p-1 rounded w-full bg-gray-50 text-lg"
-          placeholder="—"
-          disabled={readonlyMode}
-        />
-
-              {/* RQ-AZ-PR-31-10-2024.1: Only show costs from database after review button */}
-              {colData.totalCost != null && colData.empCost != null && (
-          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px', borderRadius: '8px' }} className="mt-4">
-            <div className="font-semibold">
-      {t('pricing.total')}: EGP {colData.totalCost}<br />
-      {t('pricing.employee')}: EGP {colData.empCost}
-            </div>
-          </div>
-        )}
-      </section>
-      
     );
-    
-    
   };
 
   function validateChoicesOrder(choices: ColumnState[]): { valid: boolean; message: string } {  let foundEmpty = false;

@@ -1,4 +1,4 @@
-const { getHotelsFromDB,getHotelsByCityFromDB, getCitiesFromDB, getPolicyDataFromDB, getHotelRoomsPricingFromDB, getLastHotelsFromDB } = require('../controllers/dbController');
+const { getHotelsFromDB,getHotelsByCityFromDB, getCitiesFromDB, getPolicyDataFromDB, getHotelRoomsPricingFromDB, getHotelPriceListFromDB, getLastHotelsFromDB } = require('../controllers/dbController');
 
 
 
@@ -9,17 +9,20 @@ async function getAllHotels(lang = 'ar') {
   return await getHotelsFromDB(lang);
 }
 
-async function getHotelsByCity(city, lang = 'ar') {
-  return await getHotelsByCityFromDB(lang, city);
+async function getHotelsByCity(city, lang = 'ar', empCode = '') {
+  return await getHotelsByCityFromDB(lang, city, empCode);
 }
 
-async function getAllCities(lang = 'ar') {
-  return await getCitiesFromDB(lang);
+async function getAllCities(lang = 'ar', empCode = '') {
+  return await getCitiesFromDB(lang, empCode);
 }
 
-async function getHotelRoomPrices(hotelCode, date = null) {
-  // return await get  return await getHotelRoomsPricingFromDB(hotelCode, date);
-  return await getHotelRoomsPricingFromDB(hotelCode, date);
+async function getHotelRoomPrices(hotelCode, date = null, lang = 'en') {
+  return await getHotelRoomsPricingFromDB(hotelCode, date, lang);
+}
+
+async function getHotelPriceList(hotelCode, lang = 'en') {
+  return await getHotelPriceListFromDB(hotelCode, lang);
 }
 
 async function getPolicyData(employeeId) {
@@ -40,6 +43,7 @@ module.exports = {
   getHotelsByCity,
   getPolicyData,
   getHotelRoomPrices,
+  getHotelPriceList,
   submitTrip,
   getLastHotels
 };
